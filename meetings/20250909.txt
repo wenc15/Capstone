@@ -1,0 +1,15 @@
+2025.9.9 First meeting
+Attendees: All 6 member
+Brainstorming capstone ideas. 
+
+5 ideas are proposed:
+- LinkedIn auto application tool
+- Psychology patient scheduling system
+- Discord all-in-one bot
+- Focus enhancement app
+- Hand gesture recognition
+
+3 topics selected to continue with further consideration:
+- Psychology patient scheduling system
+- Discord all-in-one bot
+- Focus enhancement app
