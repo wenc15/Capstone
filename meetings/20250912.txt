@@ -1,0 +1,11 @@
+2025.9.12 Meeting with instructor
+Attendees: All 6 member
+Checking the possible risks and feasibility of the 3 topics.
+
+- Focus App:
+Using other devices might bypass the app’s detection.
+- Mental Health Platform:
+With AI: Accuracy is questionable; AI errors could lead to serious consequences. Perhaps users should seek advice from mental health professionals instead?
+Without AI: Purpose is unclear—would it just be an ordinary scheduling app?
+- Discord Bot:
+Is the importance of Discord being overestimated?
