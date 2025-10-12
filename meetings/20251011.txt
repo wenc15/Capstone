@@ -1,0 +1,15 @@
+2025.10.9 Fourth meeting
+Attendees: All 6 member
+Deciding Nickname and Final review for SRS
+
+We list 4 nicknames:
+JinBengBeng
+Phoenix
+Growin
+Carden
+After introducing each name, we hold a vote:
+JinBengBeng 2 votes
+Growin 3 votes
+1 abstrained from voting
+Nickname is now Growin. 
+We go over the SRS document and modify each part to fit the deliverable requirements. 
