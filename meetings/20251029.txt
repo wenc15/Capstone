@@ -1,0 +1,10 @@
+2025.10.29 Sixth meeting
+Attendees: All 6 member
+Refine a detailed project plan, recover details deleted due to page limits. 
+
+Scheduled a team meeting  on Oct. 30 to do a final check on changes. 
+p0: Timer, Widgets, Backend Monitoring
+p1: Gacha System, Pet System, Music Player
+p2: Simple Games, Collection System, Achievements
+p3: User Profile, Dashboard
+p4: Friend & Social Ranking System
