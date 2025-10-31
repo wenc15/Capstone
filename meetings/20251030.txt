@@ -1,0 +1,10 @@
+2025.10.30 Seventh meeting
+Attendees: All 6 member
+Confirm the new SRS
+
+Final check on changes, we modified P3 and P1:
+p0: Timer, Widgets, Backend Monitoring
+p1: Gacha System, Pet System, Music Player
+p2: Simple Games, Collection System, Achievements, User Profile
+p3: Dashboard
+p4: Friend & Social Ranking System
