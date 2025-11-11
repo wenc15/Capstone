@@ -1,0 +1,16 @@
+{
+  "name": "growin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "Jingyao Sun, Qinquan Wang",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^39.1.2"
+  }
+}
