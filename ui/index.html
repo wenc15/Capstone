@@ -1,34 +1,264 @@
-<!doctype html>
-<html lang="zh">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Electron Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Growin – Mock UI</title>
   <style>
-    body {
-      margin: 0;
-      display: grid;
-      place-items: center;
-      height: 100vh;
-      background: #f4f4f5;
-      font-family: sans-serif;
+    :root {
+      --bg: #edf3ef;              /* overall background */
+      --panel: #f9fcfa;           /* main panel background */
+      --muted: #dce5df;           /* borders, dividers */
+      --text: #2f3a34;            /* main text */
+      --sub: #5f6b63;             /* secondary text */
+      --green: #5f8d6d;           /* primary button color */
+      --green-press: #4e765b;     /* button pressed state */
+      --chip: #e8f1eb;            /* tag/chip background */
+      --shadow: 0 4px 18px rgba(0, 0, 0, 0.04); /* soft shadow */
+      --radius: 14px;             /* global corner radius */
     }
-    button {
-      font-size: 18px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      background-color: #4f46e5;
-      color: white;
-      cursor: pointer;
+    *{ box-sizing: border-box; }
+    body{
+      margin:0; padding:24px; background: var(--bg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
     }
-    button:hover {
-      background-color: #4338ca;
+    .app{
+      position: relative;
+      max-width: 980px; margin: 0 auto; background: var(--panel); border-radius: 16px; box-shadow: var(--shadow); border:1px solid #e9e9e7;
+      overflow: hidden;
     }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--muted);
+    }
+    .brand{ font-size:28px; font-weight:800; letter-spacing:.3px; }
+    .weather-chip{
+      display:inline-flex; align-items:center; gap:8px; font-size:14px; padding:6px 10px; background: var(--chip); border-radius: 999px; border:1px solid var(--muted);
+    }
+
+    .main{ display:flex; min-height:520px; }
+
+    .sidebar{
+      position: relative; /* so the widget can visually float near it */
+      width: 220px; border-right:1px solid var(--muted); padding:18px 14px; display:flex; flex-direction:column; gap:14px;
+    }
+    .nav-btn{
+      display:flex; align-items:center; gap:12px; width:100%; border:none; background:transparent; padding:10px 12px; border-radius:12px; font-size:16px; text-align:left; cursor:pointer;
+    }
+    .nav-btn:hover{ background:#f3f4f3; }
+
+    .pet-placeholder{
+      margin-top:8px; width:100%; aspect-ratio: 1.4 / 1; border:1px dashed #cfd2cf; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--sub); background:#fafbfa;
+    }
+
+    .content{ flex:1; padding:28px 32px; position:relative; }
+    .timer{ font-size:92px; font-weight:800; text-align:center; color:#2f3a34; letter-spacing:2px; }
+
+    .primary{
+      display:block; margin:16px auto 22px; padding:16px 28px; border-radius:14px; background: var(--green); color:white; font-weight:700; font-size:24px; border:none; cursor:pointer; box-shadow: 0 4px 10px rgba(75,139,107,.25);
+    }
+    .primary:active{ background: var(--green-press); transform: translateY(1px); }
+
+    .grid{
+      display:grid; grid-template-columns: 1fr 1fr; gap:22px; align-items:start; margin-top:10px;
+    }
+    .card{ border:1px solid var(--muted); border-radius:14px; padding:16px; background:#fff; }
+    .card h3{ margin:0 0 12px; font-size:18px; }
+    .stat{ color:var(--sub); margin:6px 0; font-size:15px; }
+
+    .placeholder-btn{
+      padding:10px 12px; border-radius:12px; border:1px dashed #cfd2cf; background:#fafbfa; color:var(--sub); font-size:15px; cursor:pointer; width: fit-content;
+    }
+
+    /* Floating widget placeholder */
+    .floating-widget {
+      position: absolute;
+      left: 70px;           
+      top: 450px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(100, 150, 120, 0.25); 
+      border: 2px solid rgba(100, 150, 120, 0.4);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(3px);
+      cursor: grab;
+      transition: all 0.25s ease;
+    }
+
+    /* hover */
+    .floating-widget:hover {
+      background: rgba(100, 150, 120, 0.65);
+      border-color: rgba(100, 150, 120, 0.8);
+      box-shadow: 0 6px 18px rgba(100, 150, 120, 0.25);
+    }
+
+/* dragging */
+.floating-widget:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+}
+
+.time-control{
+  max-width: 520px;
+  margin: 6px auto 10px;
+}
+.time-control label{
+  display:block;
+  font-size:14px;
+  color: var(--sub);
+  margin-bottom:6px;
+}
+.control-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+#timeRange{
+  flex:1;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  outline: none;
+}
+#timeRange::-webkit-slider-thumb{
+  appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid #ffffffaa;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  cursor: pointer;
+}
+#timeRange::-moz-range-thumb{
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  border: none;
+  cursor: pointer;
+}
+#timeValue{
+  min-width: 60px;
+  text-align:right;
+  font-variant-numeric: tabular-nums;
+  color: var(--sub);
+}
+
+
   </style>
 </head>
 <body>
-  <button id="start-btn">Start</button>
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="brand">Growin</div>
+      <div class="weather-chip">☁️ <span>??°C</span></div>
+    </header>
 
-  <script src="renderer.js"></script>
+    <section class="main">
+      <aside class="sidebar">
+        <button class="nav-btn">🕑 <span>Timer</span></button>
+        <button class="nav-btn">📊 <span>Statistics</span></button>
+        <button class="nav-btn">🌿 <span>Pet</span></button>
+
+        <div class="pet-placeholder">Pet Placeholder</div>
+      </aside>
+
+      <div class="content">
+        <div class="timer">25:00</div>
+        <div class="time-control">
+          <div class="control-row">
+            <input id="timeRange" type="range" min="15" max="60" step="1" value="25" />
+            <output id="timeValue" for="timeRange">25 min</output>
+          </div>
+        </div>
+        <button class="primary">Start</button>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Your Cards</h3>
+            <button class="placeholder-btn">Open Cards</button>
+          </div>
+          <div class="card">
+            <h3>Session Summary</h3>
+            <div class="stat">Focus Time: ???</div>
+            <div class="stat">Distractions: ?</div>
+            <div class="stat">Cards Collected: ?</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Floating widget placeholder (draggable) -->
+    <div class="floating-widget" id="widget" title="Widget">
+    </div>
+  </div>
+
+  <script>
+    // ===== Slider -> update timer display =====
+    (function(){
+      const timerEl = document.querySelector('.timer');
+      const range = document.getElementById('timeRange');
+      const out = document.getElementById('timeValue');
+
+      function setTimerByMinutes(mins){
+        // Update main timer display in mm:00 format
+        const m = Math.max(0, Math.floor(mins));
+        const mm = String(m).padStart(2,'0');
+        timerEl.textContent = `${mm}:00`;
+        out.value = `${m} min`;
+      }
+
+      range?.addEventListener('input', ()=> setTimerByMinutes(range.value));
+      // Initialize once
+      setTimerByMinutes(range?.value || 25);
+
+      // Optional: lock the slider after Start is clicked
+      // document.querySelector('.primary')?.addEventListener('click', ()=>{
+      //   range.disabled = true;
+      // });
+    })();
+  </script>
+
+
+  <script>
+    // Make the floating widget draggable within the app container
+    (function(){
+      const widget = document.getElementById('widget');
+      const app = document.getElementById('app');
+      let dragging = false; let startX=0, startY=0, startLeft=0, startTop=0;
+
+      const onMouseDown = (e)=>{
+        dragging = true; widget.style.cursor = 'grabbing';
+        const rect = widget.getBoundingClientRect();
+        startX = e.clientX; startY = e.clientY;
+        const appRect = app.getBoundingClientRect();
+        startLeft = rect.left - appRect.left; startTop = rect.top - appRect.top;
+        e.preventDefault();
+      };
+      const onMouseMove = (e)=>{
+        if(!dragging) return;
+        const appRect = app.getBoundingClientRect();
+        let newLeft = startLeft + (e.clientX - startX);
+        let newTop  = startTop  + (e.clientY - startY);
+        // keep inside app bounds
+        const maxLeft = appRect.width - widget.offsetWidth - 8;
+        const maxTop  = appRect.height - widget.offsetHeight - 8;
+        newLeft = Math.max(8, Math.min(maxLeft, newLeft));
+        newTop  = Math.max(8, Math.min(maxTop, newTop));
+        widget.style.left = newLeft + 'px';
+        widget.style.top  = newTop + 'px';
+      };
+      const onMouseUp = ()=>{ dragging = false; widget.style.cursor = 'grab'; };
+
+      widget.addEventListener('mousedown', onMouseDown);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+
+      // Also support touch
+      widget.addEventListener('touchstart', (e)=>{ onMouseDown(e.touches[0]); });
+      window.addEventListener('touchmove', (e)=>{ onMouseMove(e.touches[0]); });
+      window.addEventListener('touchend', onMouseUp);
+    })();
+  </script>
 </body>
 </html>
