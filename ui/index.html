@@ -53,9 +53,9 @@
             </div>
             <div class="card">
               <h3>Session Summary</h3>
-              <div class="stat">Focus Time: <span id="focusLast">—</span></div>
-              <div class="stat">Distractions: ?</div>
-              <div class="stat">Cards Collected: ?</div>
+              <div>Focus Time: <span id="sumFocusTime">—</span></div>
+              <div>Distractions: <span id="sumDistractions">?</span></div>
+              <div>Cards Collected: <span id="sumCards">?</span></div>
             </div>
           </div>
         </div>
@@ -130,6 +130,6 @@
   <!-- 统计图表库（需在 renderer.js 之前） -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- 在页面末尾引入渲染脚本 -->
-  <script src="./renderer.js"></script>
+  <script type="module" src="./renderer.js"></script>
 </body>
 </html>
