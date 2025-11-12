@@ -140,6 +140,27 @@
       pointer-events: none; z-index: 9999;
     }
     .toast.show{ opacity:1; transform: translateY(0); }
+
+    /* 激活中的导航按钮样式 */
+    .nav-btn.active{
+      background:#e8f1eb;              /* 略微加深底色 */
+      font-weight:700;                  /* 文字更粗 */
+      color: var(--green);              /* 文字/图标用主题绿 */
+      border:1px solid var(--muted);
+    }
+
+    /* 左侧高亮条（可选的小装饰） */
+    .nav-btn.active::before{
+      content:"";
+      width:4px; height:70%; 
+      background: var(--green);
+      border-radius: 999px;
+      position:absolute; left:6px; 
+    }
+    .sidebar{ position:relative; }
+    .nav-btn{ position:relative; }  /* 让 ::before 定位生效 */
+
+
   </style>
 </head>
 <body>

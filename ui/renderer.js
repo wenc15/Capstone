@@ -239,3 +239,30 @@ if (range) {
 }
 updatePreview();
 showView('timer'); // 默认显示计时视图
+
+// —— 左侧导航的“激活态” & 视图切换 —— //
+(function(){
+  const btnTimer = document.getElementById('navTimer');
+  const btnStats = document.getElementById('navStats');
+  const viewTimer = document.getElementById('view-timer');
+  const viewStats = document.getElementById('view-stats');
+  const allBtns  = [btnTimer, btnStats];
+  const allViews = [viewTimer, viewStats];
+
+  function setActive(btn, view){
+    // 视图切换
+    allViews.forEach(v => v.style.display = (v === view) ? 'block' : 'none');
+    // 激活样式
+    allBtns.forEach(b => {
+      b.classList.toggle('active', b === btn);
+      b.setAttribute('aria-current', b === btn ? 'page' : 'false');
+    });
+  }
+
+  // 事件绑定
+  btnTimer.addEventListener('click', ()=> setActive(btnTimer, viewTimer));
+  btnStats.addEventListener('click', ()=> setActive(btnStats, viewStats));
+
+  // 首屏默认高亮 Timer
+  setActive(btnTimer, viewTimer);
+})();
