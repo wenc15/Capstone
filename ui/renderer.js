@@ -266,3 +266,112 @@ showView('timer'); // 默认显示计时视图
   // 首屏默认高亮 Timer
   setActive(btnTimer, viewTimer);
 })();
+
+
+//11.12 add widget pause
+// ---- Single timer store ----
+(function(){
+  const listeners = new Set();
+  const state = {
+    isRunning: false,
+    isPaused: false,
+    durationMs: 0,
+    remainingMs: 0,
+    endAt: 0
+  };
+  let tickId = null;
+
+  function emit(){ listeners.forEach(fn => fn({ ...state })); }
+  function tick(){
+    if (!state.isRunning || state.isPaused) return;
+    const now = Date.now();
+    state.remainingMs = Math.max(0, state.endAt - now);
+    if (state.remainingMs === 0) stopInternal();
+    emit();
+  }
+  function stopInternal(){
+    state.isRunning = false;
+    state.isPaused = false;
+    state.durationMs = 0;
+    state.remainingMs = 0;
+    state.endAt = 0;
+    if (tickId){ clearInterval(tickId); tickId = null; }
+  }
+
+  const FocusTimer = {
+    start(ms){
+      state.isRunning = true;
+      state.isPaused = false;
+      state.durationMs = ms;
+      state.remainingMs = ms;
+      state.endAt = Date.now() + ms;
+      if (tickId) clearInterval(tickId);
+      tickId = setInterval(tick, 200);
+      emit();
+    },
+    pause(){
+      if (!state.isRunning || state.isPaused) return;
+      state.isPaused = true;
+      state.remainingMs = Math.max(0, state.endAt - Date.now());
+      emit();
+    },
+    resume(){
+      if (!state.isRunning || !state.isPaused) return;
+      state.isPaused = false;
+      state.endAt = Date.now() + state.remainingMs;
+      emit();
+    },
+    reset(){ stopInternal(); emit(); },
+    getState(){ return { ...state }; },
+    subscribe(fn){ listeners.add(fn); fn({ ...state }); return () => listeners.delete(fn); }
+  };
+
+  window.FocusTimer = FocusTimer;
+})();
+
+// ---- Mount widget UI ----
+(function(){
+  const root = document.getElementById('widget');
+  if (!root) return;
+
+  root.innerHTML = `
+    <div class="wg-time" id="wgTime">00:00</div>
+    <button class="wg-btn" id="wgPlay" aria-label="Play/Pause">▶️</button>
+  `;
+
+  const elTime = root.querySelector('#wgTime');
+  const btnPlay = root.querySelector('#wgPlay');
+
+  const DEFAULT_MS = 25 * 60 * 1000;
+
+  function format(ms){
+    const total = Math.max(0, Math.floor(ms/1000));
+    const m = Math.floor(total/60).toString().padStart(2,'0');
+    const s = (total%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  function selectedDurationMs(){
+    // Try to read minutes from an existing slider/input if present; fallback to 25
+    const el = document.getElementById('timerSlider') || document.getElementById('timerMinutes');
+    if (el && !isNaN(Number(el.value))) return Number(el.value) * 60 * 1000;
+    return DEFAULT_MS;
+  }
+
+  btnPlay.addEventListener('click', () => {
+    const st = window.FocusTimer.getState();
+    if (!st.isRunning) {
+      window.FocusTimer.start(selectedDurationMs());
+    } else if (st.isPaused) {
+      window.FocusTimer.resume();
+    } else {
+      window.FocusTimer.pause();
+    }
+  });
+
+  window.FocusTimer.subscribe(st => {
+    elTime.textContent = format(st.remainingMs);
+    btnPlay.textContent = (!st.isRunning || st.isPaused) ? '▶️' : '⏸️';
+  });
+})();
+
