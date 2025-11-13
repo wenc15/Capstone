@@ -4,7 +4,7 @@ Content-Type: application/json
 
 {
   "durationSeconds": 300,
-  "allowedProcesses": ["chrome.exe", "notepad.exe"],
+  "allowedProcesses": ["chrome.exe", "notepad.exe", "Code.exe"],
   "graceSeconds": 10
 }
 
