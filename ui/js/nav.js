@@ -1,14 +1,20 @@
 // js/nav.js
 import { renderStats } from './stats.js';
 
-export function mountNav({
-  btnTimer,
-  btnStats,
-  viewTimer,
-  viewStats,
-  statsEls,
-  chartRef,
-}) {
+export function mountNav(els) {
+  const {
+    navTimer,
+    navStats,
+    viewTimer,
+    viewStats,
+    statsEls,
+    chartRef
+  } = els;
+
+  const btnTimer = navTimer;
+  const btnStats = navStats;
+
+
   // 防御一下：元素没拿到就直接返回
   if (!btnTimer || !btnStats || !viewTimer || !viewStats) return;
 

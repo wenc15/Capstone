@@ -4,23 +4,20 @@ import { clampMins, fmt, showToast, notifySystem } from './utils.js';
 import { saveSession } from './storage.js';
 import { renderStats } from './stats.js';
 
-/**
- * 把计时器 UI 相关逻辑封装到一个函数里
- * renderer.js 只需要把 DOM 元素传进来就行
- */
-export function mountTimer({
-  display,
-  startBtn,
-  resetBtn,
-  range,
-  out,
-  noteInput,
-  focusLast,
-  toastEl,
-  viewStats,
-  statsEls,
-  chartRef,
-}) {
+export function mountTimer(els) {
+  const {
+    display,
+    startBtn,
+    resetBtn,
+    range,
+    out,
+    noteInput,
+    focusLast,
+    toastEl,
+    viewStats,
+    statsEls,
+    chartRef
+  } = els;
 
 // ===== state (Timer) =====
 let endTs = null;        // 结束时间戳（ms）
