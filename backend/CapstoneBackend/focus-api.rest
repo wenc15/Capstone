@@ -1,0 +1,23 @@
+### 开始专注
+POST http://localhost:5024/api/focus/start
+Content-Type: application/json
+
+{
+  "durationSeconds": 300,
+  "allowedProcesses": ["chrome.exe", "notepad.exe"],
+  "graceSeconds": 10
+}
+
+### 默认模板接口测试
+GET http://localhost:5024/weatherforecast
+
+###
+
+### 查看状态
+GET http://localhost:5024/api/focus/status
+
+###
+
+### 停止专注
+POST http://localhost:5024/api/focus/stop
+Content-Type: application/json
