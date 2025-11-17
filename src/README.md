@@ -56,8 +56,7 @@ git pull
 
 后端目录结构如下：
 
-backend/
-  CapstoneBackend/
+src/
     Controllers/
     Models/
     Services/
@@ -68,7 +67,7 @@ backend/
 
 进入后端项目目录：
 
-cd backend/CapstoneBackend
+cd src
 dotnet restore   # 只需第一次（其实我没做这一步也没问题）
 dotnet run
 
@@ -85,7 +84,7 @@ Application started. Press Ctrl+C to shut down.
 
 在 VS Code 中打开文件：
 
-backend/CapstoneBackend/focus-api.rest
+src/focus-api.rest
 
 
 文件内容如下（端口保持与你终端输出一致，默认 5024（按照你自己的更改））：
