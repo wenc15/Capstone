@@ -1,5 +1,4 @@
 **/bin/
-src/chrome-extension/node_modules/
-src/chrome-extension/dist/
-src/chrome-extension/build/
+node_modules/
+
 **/obj/
