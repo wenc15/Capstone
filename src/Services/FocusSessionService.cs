@@ -1,3 +1,19 @@
+// 2025/11/18 edited by 京华昼梦
+// 新增内容：
+//   - 添加 sessionId 与 startedAt 字段，用于记录会话唯一标识与开始时间。
+//   - 在 StartSession 中新增 remainingSeconds 的立即初始化，确保前端首次 /status 即获得正确倒计时。
+//   - 新增 IsRunning() 方法，供 Controller 用于防止重复启动会话。
+// =============================================================
+// 新增的作用：
+//   - 提升前后端联动一致性：StartSession 在启动瞬间即可提供可用状态，避免前端出现 0 秒或延迟。
+//   - 提供更安全的会话状态管理：外部（Controller）可在启动前判断会话是否占用。
+// =============================================================
+// 新增的结构变化：
+//   - StartSession() 现在负责初始化会话元信息（sessionId、startedAt、remainingSeconds）。
+//   - 类对外暴露新的运行状态查询方法：IsRunning()。
+// =============================================================
+
+
 //2025/11/17 edited by Zikai
 //新增用户profile和预设白名单相关联动
 // =============================================================
@@ -38,10 +54,13 @@ public class FocusSessionService
     private bool _failed;
     private string? _failReason;
 
-    private int _remainingSeconds;
+    private int _remainingSeconds; //11/18/25 不确定是否应该让变量初始化为0
     private int _violationSeconds;
     private string? _currentProcess;
     private bool _isRunning;
+    private string? _sessionId;       // 新：用于调试/日志（可选）
+    private DateTimeOffset? _startedAt; // 新：用于会话元信息（可选）
+
 
     public FocusSessionService(LocalDataService dataService)
     {
@@ -61,6 +80,11 @@ public class FocusSessionService
             _plannedDurationSeconds = req.DurationSeconds;
             _endAt = _startAt.AddSeconds(req.DurationSeconds);
             _grace = TimeSpan.FromSeconds(req.GraceSeconds <= 0 ? 10 : req.GraceSeconds);
+
+            _sessionId = Guid.NewGuid().ToString("N");          // 新增：给本次专注生成唯一 ID
+            _startedAt = DateTimeOffset.Now;                    // 新增：记录专注开始时间
+            _remainingSeconds = Math.Max(0,                     // 新增：初始化剩余秒数
+                (int)(_endAt - _startedAt.Value).TotalSeconds);
 
             _failed = false;
             _failReason = null;
@@ -185,4 +209,18 @@ public class FocusSessionService
             };
         }
     }
+
+    // ---------------------------------------------------------
+    // ★ 新增：让 Controller 可以判断当前是否已有正在运行的 session
+    // ---------------------------------------------------------
+    public bool IsRunning()
+    {
+        lock (_lock)
+        {
+            // 返回当前专注模式是否处于“活跃”
+            // 加锁确保不会读到 timer 还没写完的值
+            return _isRunning;
+        }
+    }
+
 }
