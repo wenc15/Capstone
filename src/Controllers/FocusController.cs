@@ -57,6 +57,7 @@ public class FocusController : ControllerBase
     }
 
     // 前端点击 Stop 时调用：手动结束当前专注
+    // 11/18/25 优化选项：添加isRunning检测 防止误触stop时也会返回结果（未实装）
     [HttpPost("stop")]
     public IActionResult Stop()
     {
