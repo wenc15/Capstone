@@ -1,23 +1,27 @@
 // js/dom.js
+// Collects all DOM elements needed across the UI.
 
 export function collectDom() {
-  // ===== Timer 部分 =====
-  const display    = document.getElementById('timerDisplay');
-  const startBtn   = document.getElementById('startBtn');
+  // ===== Timer area =====
+  const display   = document.getElementById('timerDisplay');
+  const startBtn  = document.getElementById('startBtn');
   const stopBtn   = document.getElementById('stopBtn');
-  const range      = document.getElementById('timeRange');
-  const out        = document.getElementById('timeValue');
-  const noteInput  = document.getElementById('sessionNote');
-  const focusLast  = document.getElementById('focusLast');
-  const toastEl    = document.getElementById('doneToast');
+  const range     = document.getElementById('timeRange');
+  const out       = document.getElementById('timeValue');
+  // const noteInput = document.getElementById('sessionNote'); // removed
+  const focusLast = document.getElementById('focusLast');
+  const toastEl   = document.getElementById('doneToast');
 
-  // ===== 视图切换部分 =====
-  const viewTimer  = document.getElementById('view-timer');
-  const viewStats  = document.getElementById('view-stats');
-  const navTimer   = document.getElementById('navTimer');
-  const navStats   = document.getElementById('navStats');
+  // Whitelist checkbox group container (replaces old <select id="whitelistSelect">)
+  const whitelistGroup = document.getElementById('whitelistGroup');
 
-  // ===== Stats 部分 =====
+  // ===== View switching =====
+  const viewTimer = document.getElementById('view-timer');
+  const viewStats = document.getElementById('view-stats');
+  const navTimer  = document.getElementById('navTimer');
+  const navStats  = document.getElementById('navStats');
+
+  // ===== Stats area =====
   const statCount    = document.getElementById('statCount');
   const statTotal    = document.getElementById('statTotal');
   const statLastNote = document.getElementById('statLastNote');
@@ -25,18 +29,31 @@ export function collectDom() {
 
   return {
     // Timer
-    display, startBtn, stopBtn, range, out, noteInput, focusLast, toastEl,
+    display,
+    startBtn,
+    stopBtn,
+    range,
+    out,
+    focusLast,
+    toastEl,
+    whitelistGroup,
 
     // Views & Nav
-    viewTimer, viewStats, navTimer, navStats,
+    viewTimer,
+    viewStats,
+    navTimer,
+    navStats,
 
     // Stats
-    statCount, statTotal, statLastNote, chartCanvas,
+    statCount,
+    statTotal,
+    statLastNote,
+    chartCanvas,
 
-    // 统计图表实例容器
+    // Chart.js instance holder
     chartRef: { current: null },
 
-    // 统计用的对象结构（方便传给 renderStats）
-    statsEls: { statCount, statTotal, statLastNote, chartCanvas }
+    // Convenience object for stats.js
+    statsEls: { statCount, statTotal, statLastNote, chartCanvas },
   };
 }

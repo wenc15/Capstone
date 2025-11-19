@@ -1,23 +1,23 @@
-/*11.18 edited by Jingyao:
-// 新增内容：
-//   - 新增后端基础地址常量 API_BASE，用于集中配置 .NET 后端服务 URL。
-//   - 新增 createBackendSession(durationMinutes) 方法，封装调用 POST /api/focus/start 的逻辑，
-//     统一构造 durationSeconds / allowedProcesses / graceSeconds 请求体。
-//   - 调整 Start 按钮点击事件：在启动本地倒计时前，先 await createBackendSession(...)，
-//     确保每次前端 Start 对应一次后端 Session，失败时中断前端计时并重置。
-//   - 移除 pause / resume 相关按钮与状态字段，仅保留 Start / Stop 两态逻辑，减少与后端状态模型不一致的部分。
-// 新增的结构变化：
-//   - timer_ui.js 顶部增加「后端配置区」（API_BASE + createBackendSession），计时逻辑仍封装在
-//     mountTimer 内部，对外导出 API 不变。
-//   - Start 按钮事件现在变为「后端 Start 成功 → 本地 startCountdown()」，后端返回非 2xx 时不会
-//     再进入倒计时状态，避免前后端状态不一致。
-//   - 与后端的会话参数（durationSeconds / allowedProcesses / graceSeconds）集中收敛在
-//     createBackendSession 内部，避免分散在多个事件处理函数中，方便后续统一维护与扩展。*/
-import { setFocusStatus } from './focusStatusStore.js';
+/* 11.18 edited by Jingyao:
+ *  - Backend integration for start/stop focus session.
+ */
 
+/* 11.18–11.19 edited by Claire (Qinquan) Wang:
+ *  - Hooked timer logic to backend (createBackendSession/stopBackendSession).
+ *  - Replaced the old notes input with a whitelist-based flow.
+ *  - Delegated whitelist management to js/whitelist.js (checkbox multi-select).
+ *  - Fixed updatePreview so the slider updates both the main timer display and the widget.
+ */
+
+import { setFocusStatus } from './focusStatusStore.js';
 import { clampMins, fmt, showToast, notifySystem } from './utils.js';
 import { saveSession } from './storage.js';
 import { renderStats } from './stats.js';
+import {
+  initWhitelist,
+  getAllowedProcesses,
+  getWhitelistNote,
+} from './whitelist.js';
 
 export function mountTimer(els) {
   const {
@@ -26,31 +26,36 @@ export function mountTimer(els) {
     stopBtn,
     range,
     out,
-    noteInput,
+    whitelistGroup,   // ← checkbox group container, from dom.js
     focusLast,
     toastEl,
     viewStats,
     statsEls,
-    chartRef
+    chartRef,
   } = els;
 
-  // ===== Backend config（使用真实后端接口）=====
-  const API_BASE = 'http://localhost:5024'; // ← 这里改成 dotnet run 打印的那个地址
+  // ===== Backend config =====
+  // Adjust this base URL if your backend listens on a different host/port.
+  const API_BASE = 'http://localhost:5024';
+
+  // Initialize the whitelist checkbox group (tracks selected apps internally)
+  initWhitelist(whitelistGroup);
 
   /**
-   * 在后端创建一个新的专注 Session（只在“新一轮 Start”时调用）
-   * @param {number} durationMinutes - 前端当前设定的分钟数
+   * Create a new focus session on the backend.
+   * Called once per "Start" click.
+   * @param {number} durationMinutes - duration selected on the slider (minutes)
    */
   async function createBackendSession(durationMinutes) {
     const durationSeconds = Math.max(1, Math.round(durationMinutes * 60));
 
-    // TODO：后面接你的白名单 UI，现在先写死几个进程名做联调
-    const allowedProcesses = ['chrome.exe', 'notepad.exe'];
+    // Build allowedProcesses from the current whitelist selection
+    const allowedProcesses = getAllowedProcesses();
 
     const body = {
       durationSeconds,
       allowedProcesses,
-      graceSeconds: 10, // 先写死，之后需要再做设置项
+      graceSeconds: 10, // can be made configurable later
     };
 
     const res = await fetch(`${API_BASE}/api/focus/start`, {
@@ -69,20 +74,16 @@ export function mountTimer(els) {
       }
       throw new Error(msg || `Start failed: ${res.status}`);
     }
-
-    // 后端现在没返回 JSON，就不解析了
-    return;
   }
 
-  /* 11.18 Jingyao Sun: Add stop session */
-    /**
-   * 告诉后端「我手动结束这次专注」
+  /**
+   * Tell the backend that the current focus session was stopped manually.
    */
   async function stopBackendSession() {
     const res = await fetch(`${API_BASE}/api/focus/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '{}'  // 可以留空，但带个空对象最保险
+      body: '{}',
     });
 
     if (!res.ok) {
@@ -97,22 +98,26 @@ export function mountTimer(els) {
     }
   }
 
+  // ===== Timer state =====
+  let endTs = null;        // timestamp when the session should end (ms)
+  let tick = null;         // setInterval handle
+  let isRunning = false;   // whether the timer is currently running
+  let remainingMs = 0;     // remaining time in ms
+  let lastStartedMins = 0; // duration (minutes) used for this session
 
-  // ===== state (Timer) =====
-  let endTs = null;        // 结束时间戳（ms）
-  let tick = null;         // setInterval 句柄
-  let isRunning = false;   // 当前是否正在计时
-  let remainingMs = 0;     // 剩余时间（ms）
-  let lastStartedMins = 0; // 本次计时起始设定（用于完成显示）
-
-
-
-  // 把当前前端 timer 的状态同步到共享 store，给 widget 用
+  /**
+   * Push the current timer state into the shared focusStatus store
+   * so that the floating widget can reflect it.
+   * @param {number | undefined} msOverride
+   */
   function broadcastState(msOverride) {
     const running = isRunning && !!endTs;
-    const msLeft = typeof msOverride === 'number'
-      ? msOverride
-      : (running ? Math.max(0, endTs - Date.now()) : remainingMs);
+    const msLeft =
+      typeof msOverride === 'number'
+        ? msOverride
+        : running
+        ? Math.max(0, endTs - Date.now())
+        : remainingMs;
 
     setFocusStatus({
       isRunning: running,
@@ -124,36 +129,56 @@ export function mountTimer(els) {
     });
   }
 
-
+  /**
+   * Slider preview:
+   * - Always updates the main timer display and the text label.
+   * - When not running, keeps remainingMs in sync with the slider
+   *   and clears endTs (pure preview).
+   * - Broadcasts preview time to the widget.
+   */
   function updatePreview() {
-    if (isRunning && !endTs) {
-      const mins = clampMins(Number(range.value || 25));
-      display.textContent = fmt(mins * 60 * 1000);
-      if (out) out.value = `${mins} min`;
+    if (!range) return;
 
-      remainingMs = mins * 60 * 1000;
-      broadcastState(); // 预览时顺便同步给 widget
+    const mins = clampMins(Number(range.value || 25));
+    const ms = mins * 60 * 1000;
+
+    display.textContent = fmt(ms);
+    if (out) {
+      out.value = `${mins} min`;
     }
+
+    if (!isRunning) {
+      remainingMs = ms;
+      endTs = null;
+    }
+
+    broadcastState(ms);
   }
 
-  // ===== timer core =====
+  // ===== Timer core =====
+
+  /**
+   * Start the local countdown timer, assuming the backend session
+   * has already been created successfully.
+   */
   function startCountdown() {
     const now = Date.now();
 
-    // 每次 Start 都从当前滑条重新开始一轮
     lastStartedMins = clampMins(Number(range.value || 25));
     remainingMs = lastStartedMins * 60 * 1000;
     endTs = now + remainingMs;
 
     isRunning = true;
     range.disabled = true;
-    stopBtn.style.display = 'inline-block';   // 跑起来时显示 Stop
+    if (stopBtn) {
+      stopBtn.style.display = 'inline-block';
+    }
 
     if (tick) clearInterval(tick);
     tick = setInterval(() => {
       const left = endTs - Date.now();
       display.textContent = fmt(left);
-      broadcastState(left); // 每次 tick 同步给 widget
+      broadcastState(left);
 
       if (left <= 0) {
         clearInterval(tick);
@@ -162,29 +187,39 @@ export function mountTimer(els) {
         endTs = null;
         remainingMs = 0;
         range.disabled = false;
-        stopBtn.style.display = 'none';
-        updatePreview();      // 里面也会 broadcastState
+        if (stopBtn) {
+          stopBtn.style.display = 'none';
+        }
 
-        // 记录本次完成
-        const note = noteInput?.value || '';
+        // Return to "preview" state based on the slider
+        updatePreview();
+
+        // Use the current whitelist apps as the "note/app" string
+        const note = getWhitelistNote();
         saveSession(lastStartedMins, note);
-        if (focusLast) focusLast.textContent = `${lastStartedMins} min`;
+
+        if (focusLast) {
+          focusLast.textContent = `${lastStartedMins} min`;
+        }
 
         showToast(toastEl, `Session complete: ${lastStartedMins} min ✅`);
         notifySystem('Focus session complete', `${lastStartedMins} minutes`);
 
-        // 如果当前在 Statistics 视图，刷新图表
+        // If the stats view is currently visible, refresh it
         if (viewStats && viewStats.style.display !== 'none') {
           renderStats({ els: statsEls, chartRef });
         }
 
-        broadcastState(); // 完成后同步一次“已结束”状态
+        broadcastState();
       }
     }, 200);
 
-    broadcastState(); // 启动时同步一次
+    broadcastState();
   }
 
+  /**
+   * Stop the local countdown and reset the UI back to the slider preview state.
+   */
   function stopCountdown() {
     clearInterval(tick);
     tick = null;
@@ -196,65 +231,62 @@ export function mountTimer(els) {
     const ms = mins * 60 * 1000;
     display.textContent = fmt(ms);
 
-    stopBtn.style.display = 'none';
+    if (stopBtn) {
+      stopBtn.style.display = 'none';
+    }
     range.disabled = false;
-    updatePreview();   // 会顺便 broadcastState
-    broadcastState();  // 再保险同步一次
+
+    updatePreview();
+    broadcastState();
   }
 
+  // ===== Event wiring =====
 
-  // ===== events =====
+  // Slider preview
   range?.addEventListener('input', updatePreview);
 
+  // Start button
   startBtn?.addEventListener('click', async () => {
-    // 已经在跑就什么都不做，避免重复点击
     if (isRunning) {
       return;
     }
 
-    // 每次 Start 都视为新的一轮：先让后端启动 session
     try {
       const mins = clampMins(Number(range.value || 25));
       await createBackendSession(mins);
     } catch (err) {
       console.error('Start session via backend failed:', err);
-      alert('启动专注失败（后端），请稍后再试');
-      return; // 后端失败就不要启动前端计时了
+      alert('Failed to start focus session (backend). Please try again later.');
+      return;
     }
 
-    // 后端启动成功后，再启动前端倒计时
     startCountdown();
   });
 
-
-
+  // Stop button
   stopBtn?.addEventListener('click', async () => {
-    // 已经不在跑的话，不用多此一举
     if (!isRunning) {
       return;
     }
 
     try {
-      // 1. 告诉后端：这次 session 手动结束（记成 Aborted）
       await stopBackendSession();
     } catch (err) {
       console.error('Stop session via backend failed:', err);
-      alert('停止专注失败（后端），请稍后再试');
-      // 如果你希望“后端失败就别停前端计时”，这里可以直接 return
+      alert('Failed to stop focus session (backend). Please try again later.');
+      // If you prefer to keep the timer running when backend fails, you can return here.
       // return;
     }
 
-    // 2. 无论如何，先把前端的倒计时停掉，让界面别继续跑
     stopCountdown();
   });
 
-
-  // ===== init =====
+  // ===== Initial setup =====
   if (range) {
     range.min = '1';
     range.max = '60';
     range.value = String(clampMins(Number(range.value || 25)));
   }
   updatePreview();
-  broadcastState(); // 初始同步一次
+  broadcastState();
 }
