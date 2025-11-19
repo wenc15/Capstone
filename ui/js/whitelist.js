@@ -5,12 +5,14 @@
 //  - Keep track of selected apps (multi-select).
 //  - Provide helper functions for backend payloads and notes.
 
-// js/whitelist.js
-// 11.19 updated by Jingyao
-// Responsibility:
-//  - Search-based whitelist UI (like Windows search).
-//  - Manage selected apps list.
-//  - Provide helper functions for backend payloads and notes.
+/* 11.19 edited by Jingyao Sun:
+ *  - Replaced checkbox-based whitelist with a search + selected-list UI (Windows-style).
+ *  - Introduced APP_CATALOG and internal currentWhitelistApps to track selected apps by id.
+ *  - Implemented initWhitelist() to wire search input, results list, and removable pills.
+ *  - Exposed getAllowedProcesses()/getWhitelistNote() for backend payloads and stats notes.
+ *  - Changed the default whitelist app to be Electron.
+ */
+
 //
 // 外部使用：
 //   import { initWhitelist, getAllowedProcesses, getWhitelistNote } from './whitelist.js';
@@ -26,10 +28,11 @@ const APP_CATALOG = [
   { id: 'code',   label: 'Visual Studio Code',  exeList: ['Code.exe', 'code.exe'] },
   { id: 'word',   label: 'Microsoft Word',      exeList: ['WINWORD.EXE'] },
   { id: 'ppt',    label: 'PowerPoint',          exeList: ['POWERPNT.EXE'] },
+  { id: 'electron',    label: 'Electron',          exeList: ['electron.exe'] },
 ];
 
 // 当前选中的应用，用 id 表示（例如 ["chrome", "code"]）
-let currentWhitelistApps = ['chrome'];  // 默认至少包含 Chrome，避免白名单为空
+let currentWhitelistApps = ['electron'];  // 默认至少包含 Electron，避免白名单为空
 
 function findAppById(id) {
   return APP_CATALOG.find(app => app.id === id) || null;
@@ -117,7 +120,7 @@ function renderResults(rootEl, keyword) {
 export function initWhitelist(groupEl) {
   if (!groupEl) {
     console.warn('[Whitelist] initWhitelist called with null element');
-    currentWhitelistApps = ['chrome'];
+    currentWhitelistApps = ['electron'];
     return;
   }
 
@@ -130,7 +133,7 @@ export function initWhitelist(groupEl) {
     return;
   }
 
-  // 初始渲染：默认选中 chrome
+  // 初始渲染：默认选中 electron
   renderSelected(groupEl);
   renderResults(groupEl, '');
 
@@ -165,9 +168,9 @@ export function initWhitelist(groupEl) {
 
     currentWhitelistApps = currentWhitelistApps.filter(id => id !== appId);
 
-    // 安全起见：若全删光了，回到默认 chrome，避免后端白名单为空
+    // 安全起见：若全删光了，回到默认 electron，避免后端白名单为空
     if (!currentWhitelistApps.length) {
-      currentWhitelistApps = ['chrome'];
+      currentWhitelistApps = ['electron'];
     }
 
     renderSelected(groupEl);

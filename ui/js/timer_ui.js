@@ -22,6 +22,14 @@
  *  - Fixed updatePreview so the slider updates both the main timer display and the widget.
  */
 
+/* 11.19 edited by Jingyao Sun:
+ *  - Wired timer to backend status polling via GET /api/focus/status.
+ *  - Merged backendFlags into focusStatus so the widget can reflect failures/violations.
+ *  - Added backend failure handling to stop the countdown and show a toast reason.
+ *  - Ensured Start/Stop also start/stop backend status polling for consistent session state.
+ */
+
+
 import { setFocusStatus } from './focusStatusStore.js';
 import { clampMins, fmt, showToast, notifySystem } from './utils.js';
 import { saveSession } from './storage.js';

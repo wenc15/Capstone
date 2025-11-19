@@ -1,3 +1,16 @@
+// 2025/11/19 edited by 京华昼梦
+// 新增内容：
+//   - 增加 SessionHistoryFilePath，用于存储所有专注会话的详细历史记录。
+// =============================================================
+// 新增的作用：
+//   - 为 LocalDataService 提供统一的历史记录 JSON 文件路径。
+//   - 与 user_profile.json、whitelist_presets.json 一致，保持数据文件结构清晰。
+// =============================================================
+// 新增的结构变化：
+//   - LocalStoragePaths 增加新字段 SessionHistoryFilePath。
+//   - 所有历史会话的记录将写入 %AppData%/Growin/session_history.json。
+// =============================================================
+
 //2025/11/17 created by Zikai
 // =============================================================
 // 文件：LocalStoragePaths.cs
@@ -32,6 +45,11 @@ public static class LocalStoragePaths
     /// <summary>白名单预设文件路径：whitelist_presets.json</summary>
     public static string WhitelistPresetsFilePath =>
         Path.Combine(BaseDirectory, "whitelist_presets.json");
+
+    /// <summary>专注会话历史文件路径：session_history.json</summary>
+    public static string SessionHistoryFilePath =>
+        Path.Combine(BaseDirectory, "session_history.json");
+
 
     /// <summary>
     /// 确保 BaseDirectory 存在（不存在时自动创建）。

@@ -1,3 +1,8 @@
+/* 11.19 edited by Jingyao Sun:
+ *  - Added styling for the new whitelist search UI (title, search row, results list).
+ *  - Styled selected app pills with removable buttons for better visual feedback.
+ *  - Introduced helper classes (wl-* family) to keep monitor-related styles isolated.
+ */
 
 :root {
     --bg: #edf3ef;
