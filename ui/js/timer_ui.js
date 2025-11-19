@@ -129,7 +129,7 @@ export function mountTimer(els) {
     }
   }
 
-    /**
+  /**
    * Poll backend /api/focus/status once and merge into backendFlags.
    */
   async function pollBackendStatusOnce() {
@@ -211,7 +211,9 @@ export function mountTimer(els) {
     remainingMs = 0;
 
     if (range) range.disabled = false;
-    if (stopBtn) stopBtn.style.display = 'none';
+
+    // 按钮恢复为“未运行”状态：只显示 Start
+    setButtonsForRunning(false);
 
     // 回到预览状态
     updatePreview();
@@ -253,7 +255,8 @@ export function mountTimer(els) {
   let isRunning = false;   // whether the timer is currently running
   let remainingMs = 0;     // remaining time in ms
   let lastStartedMins = 0; // duration (minutes) used for this session
-    // Latest backend status snapshot (monitoring result)
+
+  // Latest backend status snapshot (monitoring result)
   let backendFlags = {
     isFailed: false,
     isViolating: false,
@@ -265,7 +268,22 @@ export function mountTimer(els) {
   // Polling timer for /api/focus/status
   let statusTimer = null;
 
-    // 计算当前这次 session 已经坚持了多少分钟（用于 Session Summary）
+  // === Start/Stop 按钮显示控制 ===
+  function setButtonsForRunning(running) {
+    if (!startBtn || !stopBtn) return;
+
+    if (running) {
+      // 计时中：隐藏 Start，只显示 Stop
+      startBtn.style.display = 'none';
+      stopBtn.style.display = 'inline-block';
+    } else {
+      // 未计时：只显示 Start，隐藏 Stop
+      startBtn.style.display = 'inline-block';
+      stopBtn.style.display = 'none';
+    }
+  }
+
+  // 计算当前这次 session 已经坚持了多少分钟（用于 Session Summary）
   function computeElapsedMinutes() {
     // 如果还没真正 start，就用 slider 当前值兜底
     if (!isRunning || !endTs) {
@@ -351,9 +369,9 @@ export function mountTimer(els) {
 
     isRunning = true;
     if (range) range.disabled = true;
-    if (stopBtn) {
-      stopBtn.style.display = 'inline-block';
-    }
+
+    // 计时开始：只显示 Stop
+    setButtonsForRunning(true);
 
     if (tick) clearInterval(tick);
     tick = setInterval(() => {
@@ -373,9 +391,9 @@ export function mountTimer(els) {
         endTs = null;
         remainingMs = 0;
         if (range) range.disabled = false;
-        if (stopBtn) {
-          stopBtn.style.display = 'none';
-        }
+
+        // 计时自然结束 → 恢复为“未运行”按钮状态（只显示 Start）
+        setButtonsForRunning(false);
 
         // Return to "preview" state based on the slider
         updatePreview();
@@ -426,10 +444,10 @@ export function mountTimer(els) {
       display.textContent = fmt(ms);
     }
 
-    if (stopBtn) {
-      stopBtn.style.display = 'none';
-    }
     if (range) range.disabled = false;
+
+    // 手动停止：恢复为“未运行”按钮状态（只显示 Start）
+    setButtonsForRunning(false);
 
     updatePreview();
     broadcastState();
@@ -499,4 +517,7 @@ export function mountTimer(els) {
   }
   updatePreview();
   broadcastState();
+
+  // 确保一开始是“未运行”状态：只显示 Start，隐藏 Stop
+  setButtonsForRunning(false);
 }
