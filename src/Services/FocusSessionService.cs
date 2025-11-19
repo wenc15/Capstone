@@ -1,3 +1,18 @@
+// 2025/11/19 edited by 京华昼梦
+// 新增内容：
+//   - 在 EndSession(outcome) 中新增写入会话历史的逻辑。
+//   - 根据 elapsedSeconds 自动计算本次会话的 minutes（最少 1 分钟）。
+//   - 将当前 whitelist 应用列表作为 note 保存到 history。
+// =============================================================
+// 新增的作用：
+//   - 每次会话结束（成功 / 失败 / 手动终止）都能记录完整历史，供 Stats 使用。
+//   - 与 RecordSession(outcome, seconds) 同步，构成“汇总 + 历史明细”的双层数据体系。
+// =============================================================
+// 新增的结构变化：
+//   - EndSession() 现在除更新 profile 外，还调用 AddSessionHistory()。
+//   - 引入新的 SessionHistoryItem 数据结构，保持与前端 stats.js 的 JSON 格式一致。
+// =============================================================
+
 // 2025/11/18 edited by 京华昼梦
 // 新增内容：
 //   - 添加 sessionId 与 startedAt 字段，用于记录会话唯一标识与开始时间。
@@ -166,7 +181,7 @@ public class FocusSessionService
     }
 
     /// <summary>
-    /// 会话统一结束逻辑：停止计时器，计算实际专注时长，并更新用户 Profile。
+    /// 会话统一结束逻辑：停止计时器，计算实际专注时长，并更新用户 Profile 与会话历史。
     /// </summary>
     private void EndSession(SessionOutcome outcome)
     {
@@ -183,8 +198,27 @@ public class FocusSessionService
             ? 0
             : Math.Max(0, (int)(now - _startAt).TotalSeconds);
 
+        // 更新总体 Profile 统计
         _dataService.RecordSession(outcome, elapsedSeconds);
+
+        // === 新增：写入 session_history.json ===
+        // 把秒数换算成分钟，至少 1 分钟
+        var minutes = Math.Max(1, elapsedSeconds / 60);
+
+        // 这里用当前 whitelist 作为 note（前端 stats 会展示在“Last Note/App”里）
+        var note = _whitelist is { Count: > 0 }
+            ? string.Join(", ", _whitelist)
+            : string.Empty;
+
+        _dataService.AddSessionHistory(new SessionHistoryItem
+        {
+            Ts = now.ToUnixTimeMilliseconds(),
+            Minutes = minutes,
+            Note = note,
+            Outcome = outcome.ToString().ToLower(), // success / failed / aborted
+        });
     }
+
 
     private static string NormalizeProcessName(string name)
     {

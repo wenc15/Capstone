@@ -1,3 +1,17 @@
+// 2025/11/19 edited by 京华昼梦
+// 新增内容：
+//   - 添加专注会话历史读写功能：GetSessionHistory() / AddSessionHistory()。
+//   - 使用 session_history.json 持久化每次会话的分钟数、备注与结果。
+// =============================================================
+// 新增的作用：
+//   - 为统计页面（stats.js）提供真正的后端数据来源。
+//   - 支持按时间顺序累计每次会话的完整记录，而非只记录汇总 profile。
+// =============================================================
+// 新增的结构变化：
+//   - LocalDataService 增加 SessionHistory 相关逻辑，与现有 UserProfile/Whitelist 一致。
+//   - 所有写入均使用相同的锁机制与 JSON 序列化配置，确保线程安全与格式一致。
+// =============================================================
+
 //2025/11/17 created by Zikai
 // =============================================================
 // 文件：LocalDataService.cs
@@ -111,6 +125,52 @@ public class LocalDataService
 
 
     #endregion
+
+    #region SessionHistory 相关
+
+    /// <summary>
+    /// 读取专注会话历史列表，如果文件不存在则返回空列表。
+    /// </summary>
+    public List<SessionHistoryItem> GetSessionHistory()
+    {
+        lock (_fileLock)
+        {
+            var path = LocalStoragePaths.SessionHistoryFilePath;
+
+            if (!File.Exists(path))
+                return new List<SessionHistoryItem>();
+
+            try
+            {
+                var json = File.ReadAllText(path);
+                var list = JsonSerializer.Deserialize<List<SessionHistoryItem>>(json, JsonOptions);
+                return list ?? new List<SessionHistoryItem>();
+            }
+            catch
+            {
+                return new List<SessionHistoryItem>();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 追加一条专注会话历史记录到 session_history.json。
+    /// </summary>
+    public void AddSessionHistory(SessionHistoryItem entry)
+    {
+        lock (_fileLock)
+        {
+            var list = GetSessionHistory();
+            list.Add(entry);
+
+            var path = LocalStoragePaths.SessionHistoryFilePath;
+            var json = JsonSerializer.Serialize(list, JsonOptions);
+            File.WriteAllText(path, json);
+        }
+    }
+
+    #endregion
+
 
     #region 白名单预设相关
 
