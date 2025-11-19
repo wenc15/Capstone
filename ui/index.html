@@ -1,5 +1,5 @@
-<!-- [Changed 11.19 - Claire] Replaced <select id="whitelistSelect"> with a checkbox group (#whitelistGroup) -->
 <!DOCTYPE html>
+<!-- [Changed 11.19 - Claire] Replaced <select id="whitelistSelect"> with a checkbox group (#whitelistGroup) -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -24,6 +24,7 @@
       </aside>
 
       <div class="content">
+        <!-- Timer view -->
         <div id="view-timer">
           <div class="timer" id="timerDisplay">25:00</div>
 
@@ -40,13 +41,14 @@
             <button class="secondary" id="stopBtn" style="display:none;">Stop</button>
           </div>
 
+          <!-- [Changed 11.19 - Claire] Whitelist checkbox group (replaces old notes input) -->
           <div id="whitelistGroup"
                style="max-width:520px;margin:0 auto 14px;display:flex;flex-direction:column;gap:6px;">
             <div style="font-size:14px;color:var(--muted-text,#666);">
               Allowed apps (whitelist)
             </div>
 
-            <!-- Checkbox list for allowed apps; front-end + backend both rely on these values -->
+            <!-- Checkbox list for allowed apps; frontend + backend both rely on these values -->
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
               <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
                 <input type="checkbox" name="whitelistApp" value="chrome" checked />
@@ -78,7 +80,7 @@
               You can select multiple apps. Only selected apps will be treated as allowed during focus.
             </small>
           </div>
-          <!-- [Changed 11.19 - Claire] timer_ui.js / whitelist.js will read checkboxes under #whitelistGroup -->
+          <!-- timer_ui.js / whitelist.js will read checkboxes under #whitelistGroup -->
 
           <div class="grid">
             <div class="card">
@@ -94,6 +96,7 @@
           </div>
         </div>
 
+        <!-- Stats view -->
         <div id="view-stats" style="display:none;">
           <h2 style="margin:6px 0 12px;">Statistics</h2>
 

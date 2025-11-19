@@ -1,4 +1,11 @@
 // js/nav.js
+// 11.19 edited by Claire (Qinquan) Wang
+// Changes:
+//  - Keep Timer/Stats navigation logic in one place.
+//  - Always refresh the Stats view (renderStats) whenever the user
+//    navigates to Statistics.
+//  - Add basic defensive checks and console warnings instead of failing silently.
+
 import { renderStats } from './stats.js';
 
 export function mountNav(els) {
@@ -8,43 +15,56 @@ export function mountNav(els) {
     viewTimer,
     viewStats,
     statsEls,
-    chartRef
+    chartRef,
   } = els;
 
   const btnTimer = navTimer;
   const btnStats = navStats;
 
-
-  // 防御一下：元素没拿到就直接返回
-  if (!btnTimer || !btnStats || !viewTimer || !viewStats) return;
+  // Defensive check: if any core element is missing, abort mounting nav
+  if (!btnTimer || !btnStats || !viewTimer || !viewStats) {
+    console.warn('[Nav] Missing nav or view elements. Navigation not mounted.');
+    return;
+  }
 
   const allBtns = [btnTimer, btnStats];
   const allViews = [viewTimer, viewStats];
 
+  /**
+   * Set the active nav button and corresponding view.
+   * Also triggers a stats refresh when switching to the Stats view.
+   * @param {HTMLElement} btn  - the button that should be marked active
+   * @param {HTMLElement} view - the view element to show
+   */
   function setActive(btn, view) {
-    // 视图切换
-    allViews.forEach(v => {
+    // Toggle which main view is visible
+    allViews.forEach((v) => {
       if (!v) return;
-      v.style.display = (v === view) ? 'block' : 'none';
+      v.style.display = v === view ? 'block' : 'none';
     });
 
-    // 左侧按钮激活样式
-    allBtns.forEach(b => {
+    // Toggle active style & aria-current on sidebar buttons
+    allBtns.forEach((b) => {
       if (!b) return;
-      b.classList.toggle('active', b === btn);
-      b.setAttribute('aria-current', b === btn ? 'page' : 'false');
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-current', isActive ? 'page' : 'false');
     });
 
-    // 如果切到统计视图，顺便刷新统计
+    // When switching to Statistics, refresh stats using latest local data
     if (view === viewStats) {
-      renderStats({ els: statsEls, chartRef });
+      try {
+        renderStats({ els: statsEls, chartRef });
+      } catch (err) {
+        console.error('[Nav] Failed to render stats view:', err);
+      }
     }
   }
 
-  // 事件绑定
+  // Wire up navigation button clicks
   btnTimer.addEventListener('click', () => setActive(btnTimer, viewTimer));
   btnStats.addEventListener('click', () => setActive(btnStats, viewStats));
 
-  // 默认显示 Timer 视图并高亮 Timer 按钮
+  // Default: show Timer view and highlight Timer button on app load
   setActive(btnTimer, viewTimer);
 }

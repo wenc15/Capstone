@@ -1,5 +1,18 @@
 /* 11.18 edited by Jingyao:
- *  - Backend integration for start/stop focus session.
+ // 新增内容：
+ //   - 新增后端基础地址常量 API_BASE，用于集中配置 .NET 后端服务 URL。
+ //   - 新增 createBackendSession(durationMinutes) 方法，封装调用 POST /api/focus/start 的逻辑，
+ //     统一构造 durationSeconds / allowedProcesses / graceSeconds 请求体。
+ //   - 调整 Start 按钮点击事件：在启动本地倒计时前，先 await createBackendSession(...)，
+ //     确保每次前端 Start 对应一次后端 Session，失败时中断前端计时并重置。
+ //   - 移除 pause / resume 相关按钮与状态字段，仅保留 Start / Stop 两态逻辑，减少与后端状态模型不一致的部分。
+ // 新增的结构变化：
+ //   - timer_ui.js 顶部增加「后端配置区」（API_BASE + createBackendSession），计时逻辑仍封装在
+ //     mountTimer 内部，对外导出 API 不变。
+ //   - Start 按钮事件现在变为「后端 Start 成功 → 本地 startCountdown()」，后端返回非 2xx 时不会
+ //     再进入倒计时状态，避免前后端状态不一致。
+ //   - 与后端的会话参数（durationSeconds / allowedProcesses / graceSeconds）集中收敛在
+ //     createBackendSession 内部，避免分散在多个事件处理函数中，方便后续统一维护与扩展。
  */
 
 /* 11.18–11.19 edited by Claire (Qinquan) Wang:
@@ -137,7 +150,7 @@ export function mountTimer(els) {
    * - Broadcasts preview time to the widget.
    */
   function updatePreview() {
-    if (!range) return;
+    if (!range || !display) return;
 
     const mins = clampMins(Number(range.value || 25));
     const ms = mins * 60 * 1000;
@@ -164,12 +177,12 @@ export function mountTimer(els) {
   function startCountdown() {
     const now = Date.now();
 
-    lastStartedMins = clampMins(Number(range.value || 25));
+    lastStartedMins = clampMins(Number(range?.value || 25));
     remainingMs = lastStartedMins * 60 * 1000;
     endTs = now + remainingMs;
 
     isRunning = true;
-    range.disabled = true;
+    if (range) range.disabled = true;
     if (stopBtn) {
       stopBtn.style.display = 'inline-block';
     }
@@ -177,7 +190,9 @@ export function mountTimer(els) {
     if (tick) clearInterval(tick);
     tick = setInterval(() => {
       const left = endTs - Date.now();
-      display.textContent = fmt(left);
+      if (display) {
+        display.textContent = fmt(left);
+      }
       broadcastState(left);
 
       if (left <= 0) {
@@ -186,7 +201,7 @@ export function mountTimer(els) {
         isRunning = false;
         endTs = null;
         remainingMs = 0;
-        range.disabled = false;
+        if (range) range.disabled = false;
         if (stopBtn) {
           stopBtn.style.display = 'none';
         }
@@ -227,14 +242,16 @@ export function mountTimer(els) {
     isRunning = false;
     remainingMs = 0;
 
-    const mins = clampMins(Number(range.value || 25));
+    const mins = clampMins(Number(range?.value || 25));
     const ms = mins * 60 * 1000;
-    display.textContent = fmt(ms);
+    if (display) {
+      display.textContent = fmt(ms);
+    }
 
     if (stopBtn) {
       stopBtn.style.display = 'none';
     }
-    range.disabled = false;
+    if (range) range.disabled = false;
 
     updatePreview();
     broadcastState();
@@ -252,7 +269,7 @@ export function mountTimer(els) {
     }
 
     try {
-      const mins = clampMins(Number(range.value || 25));
+      const mins = clampMins(Number(range?.value || 25));
       await createBackendSession(mins);
     } catch (err) {
       console.error('Start session via backend failed:', err);
