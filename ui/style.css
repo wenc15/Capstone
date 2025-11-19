@@ -192,3 +192,118 @@ body{
 }
 #widget .wg-btn:hover { background-color: rgba(60,127,83,0.08); }
 #widget .wg-btn:active { transform: translateY(1px) scale(0.98); }
+
+/* =============== 11.19 added Whitelist search UI =============== */
+
+.wl-title {
+  font-size: 14px;
+  color: var(--sub);
+  margin-bottom: 4px;
+}
+
+.wl-search-row input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--muted);
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+}
+
+.wl-search-row input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px rgba(95, 141, 109, 0.35);
+}
+
+.wl-results {
+  margin-top: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+  border-radius: 10px;
+  background: #f5f7f6;
+}
+
+.wl-result-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.wl-result-item:hover {
+  background: rgba(95, 141, 109, 0.08);
+}
+
+.wl-result-name {
+  color: var(--text);
+}
+
+.wl-result-exe {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.wl-result-empty {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--sub);
+}
+
+.wl-selected-block {
+  margin-top: 6px;
+}
+
+.wl-selected-title {
+  font-size: 13px;
+  color: var(--sub);
+  margin-bottom: 4px;
+}
+
+.wl-selected-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wl-selected-empty {
+  font-size: 12px;
+  color: var(--sub);
+}
+
+.wl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  font-size: 12px;
+  color: var(--sub);
+}
+
+.wl-pill-remove {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  color: var(--sub);
+}
+
+.wl-pill-remove:hover {
+  color: var(--text);
+}
+
+.wl-hint {
+  font-size: 11px;
+  color: var(--muted-text, #888);
+  margin-top: 4px;
+  display: block;
+}

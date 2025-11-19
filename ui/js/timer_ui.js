@@ -111,12 +111,119 @@ export function mountTimer(els) {
     }
   }
 
+    /**
+   * Poll backend /api/focus/status once and merge into backendFlags.
+   */
+  async function pollBackendStatusOnce() {
+    try {
+      const res = await fetch(`${API_BASE}/api/focus/status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        console.warn('Status polling failed with status', res.status);
+        return;
+      }
+
+      const data = await res.json();
+      // data 对应后端 FocusStatusResponse:
+      // { isRunning, remainingSeconds, isFailed, failReason,
+      //   isViolating, violationSeconds, currentProcess }
+
+      // 更新本地 backendFlags（监控状态）
+      backendFlags.isFailed = !!data.isFailed;
+      backendFlags.isViolating = !!data.isViolating;
+      backendFlags.violationSeconds = data.violationSeconds ?? 0;
+      backendFlags.currentProcess = data.currentProcess ?? null;
+      backendFlags.failReason = data.failReason ?? null;
+
+      // 如果后端还在跑，就用后端的剩余秒数修正一下前端
+      if (data.isRunning) {
+        remainingMs = Math.max(0, (data.remainingSeconds ?? 0) * 1000);
+      }
+
+      // 把新的状态广播给 widget / 其他 UI
+      broadcastState();
+
+      // 如果后端判定失败，就在前端也结束这次 session
+      if (data.isFailed) {
+        console.log('Session failed from backend:', data.failReason);
+        handleBackendFailure(data.failReason);
+      }
+    } catch (err) {
+      console.error('Error while polling backend status:', err);
+      // 这里失败就静默，避免打扰用户；下次轮询再试
+    }
+  }
+
+  /**
+   * When backend marks the session as failed (e.g. user uses non-whitelisted app),
+   * stop local countdown and show a message.
+   */
+  function handleBackendFailure(reason) {
+    // 停掉前端 timer 和轮询
+    stopBackendStatusPolling();
+    clearInterval(tick);
+    tick = null;
+    endTs = null;
+    isRunning = false;
+    remainingMs = 0;
+
+    if (range) range.disabled = false;
+    if (stopBtn) stopBtn.style.display = 'none';
+
+    // 回到预览状态
+    updatePreview();
+    broadcastState();
+
+    const msg =
+      reason && reason.trim()
+        ? `Session failed: ${reason}`
+        : 'Session failed due to non-whitelisted app.';
+    showToast(toastEl, msg);
+  }
+
+  function startBackendStatusPolling() {
+    if (statusTimer) clearInterval(statusTimer);
+    // 每 1 秒轮询一次后端
+    statusTimer = setInterval(pollBackendStatusOnce, 1000);
+  }
+
+  function stopBackendStatusPolling() {
+    if (statusTimer) {
+      clearInterval(statusTimer);
+      statusTimer = null;
+    }
+    // 清空后端标记
+    backendFlags.isFailed = false;
+    backendFlags.isViolating = false;
+    backendFlags.violationSeconds = 0;
+    backendFlags.currentProcess = null;
+    backendFlags.failReason = null;
+
+    broadcastState();
+  }
+
+
   // ===== Timer state =====
   let endTs = null;        // timestamp when the session should end (ms)
   let tick = null;         // setInterval handle
   let isRunning = false;   // whether the timer is currently running
   let remainingMs = 0;     // remaining time in ms
   let lastStartedMins = 0; // duration (minutes) used for this session
+    // Latest backend status snapshot (monitoring result)
+  let backendFlags = {
+    isFailed: false,
+    isViolating: false,
+    violationSeconds: 0,
+    currentProcess: null,
+    failReason: null,
+  };
+
+  // Polling timer for /api/focus/status
+  let statusTimer = null;
+
 
   /**
    * Push the current timer state into the shared focusStatus store
@@ -135,10 +242,14 @@ export function mountTimer(els) {
     setFocusStatus({
       isRunning: running,
       remainingSeconds: Math.max(0, Math.round(msLeft / 1000)),
-      isFailed: false,
-      isViolating: false,
-      violationSeconds: 0,
-      currentProcess: null,
+
+      // merge latest backend monitoring flags
+      isFailed: backendFlags.isFailed,
+      isViolating: backendFlags.isViolating,
+      violationSeconds: backendFlags.violationSeconds,
+      currentProcess: backendFlags.currentProcess,
+      // widget/其他地方如果用得上可以读 failReason，没有就忽略
+      failReason: backendFlags.failReason,
     });
   }
 
@@ -196,6 +307,9 @@ export function mountTimer(els) {
       broadcastState(left);
 
       if (left <= 0) {
+        // 前端认为时间到了 → 同时停止后端状态轮询
+        stopBackendStatusPolling();
+
         clearInterval(tick);
         tick = null;
         isRunning = false;
@@ -277,8 +391,13 @@ export function mountTimer(els) {
       return;
     }
 
+    // 后端会话成功创建 → 开始轮询监控状态
+    startBackendStatusPolling();
+
+    // 再启动本地倒计时
     startCountdown();
   });
+
 
   // Stop button
   stopBtn?.addEventListener('click', async () => {
@@ -294,6 +413,9 @@ export function mountTimer(els) {
       // If you prefer to keep the timer running when backend fails, you can return here.
       // return;
     }
+
+    // 先停掉状态轮询
+    stopBackendStatusPolling();
 
     stopCountdown();
   });
