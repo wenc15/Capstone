@@ -79,6 +79,6 @@ Content-Type: application/json
 #
 # 注意：不再使用 {{presetId}} 占位符，避免 REST Client
 #      没有设置变量时导致 id 传错。
-DELETE http://localhost:5024/api/whitelistpresets/3c858ddb95a341efa543aa1336a225f9
+DELETE http://localhost:5024/api/whitelistpresets/d1c59a2698f44d00a5ac99b09f594952
 
 ###
