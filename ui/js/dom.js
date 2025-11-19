@@ -4,7 +4,7 @@ export function collectDom() {
   // ===== Timer 部分 =====
   const display    = document.getElementById('timerDisplay');
   const startBtn   = document.getElementById('startBtn');
-  const resetBtn   = document.getElementById('resetBtn');
+  const stopBtn   = document.getElementById('stopBtn');
   const range      = document.getElementById('timeRange');
   const out        = document.getElementById('timeValue');
   const noteInput  = document.getElementById('sessionNote');
@@ -25,7 +25,7 @@ export function collectDom() {
 
   return {
     // Timer
-    display, startBtn, resetBtn, range, out, noteInput, focusLast, toastEl,
+    display, startBtn, stopBtn, range, out, noteInput, focusLast, toastEl,
 
     // Views & Nav
     viewTimer, viewStats, navTimer, navStats,

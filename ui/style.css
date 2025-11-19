@@ -63,14 +63,14 @@ body{
 }
 .primary:active{ background: var(--green-press); transform: translateY(1px); }
 
-/* 横向按钮行（Resume 与 Reset 并排） */
+/* 横向按钮行（Resume 与 Stop 并排） */
 .actions{
     display:flex; gap:12px; justify-content:center; align-items:center;
     margin:16px auto 22px;
 }
 .actions .primary{ margin:0; display:inline-flex; }
 
-/* 次级按钮样式（Reset） */
+/* 次级按钮样式（Stop） */
 .secondary{
     display:inline-flex; align-items:center; justify-content:center;
     padding:16px 24px; border-radius:14px; background:#88938e; color:#fff;
