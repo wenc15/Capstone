@@ -27,6 +27,13 @@
  *  - Merged backendFlags into focusStatus so the widget can reflect failures/violations.
  *  - Added backend failure handling to stop the countdown and show a toast reason.
  *  - Ensured Start/Stop also start/stop backend status polling for consistent session state.
+ *  - Added computeElapsedMinutes() to calculate precise elapsed session time (0 min allowed).
+ *  - Integrated updateSessionSummary() for three end-of-session paths:
+ *     (1) Natural completion
+ *     (2) Manual Stop
+ *     (3) Backend failure due to non-whitelisted process
+ *  - handleBackendFailure() now extracts the failing process name from backendFlags.currentProcess
+ *   or failReason, and updates Session Summary accordingly.
  */
 
 
@@ -34,11 +41,14 @@ import { setFocusStatus } from './focusStatusStore.js';
 import { clampMins, fmt, showToast, notifySystem } from './utils.js';
 import { saveSession } from './storage.js';
 import { renderStats } from './stats.js';
+
 import {
   initWhitelist,
   getAllowedProcesses,
   getWhitelistNote,
 } from './whitelist.js';
+
+import { updateSessionSummary } from './session_summary.js';
 
 export function mountTimer(els) {
   const {
@@ -170,7 +180,29 @@ export function mountTimer(els) {
    * stop local countdown and show a message.
    */
   function handleBackendFailure(reason) {
-    // 停掉前端 timer 和轮询
+    // 1. 先计算这次 session 实际坚持了多久
+    const elapsedMinutes = computeElapsedMinutes();
+
+    // 2. 试图拿到具体的违规程序名
+    //   优先用后端发来的 currentProcess（已经保存在 backendFlags 里）
+    let distractedApp = backendFlags.currentProcess;
+
+    // 如果 currentProcess 拿不到，就从 failReason 里抠：
+    // 例如 "使用非白名单程序：chrome"
+    if (!distractedApp && reason) {
+      const idx = reason.indexOf('：'); // 全角冒号
+      if (idx >= 0 && idx < reason.length - 1) {
+        distractedApp = reason.slice(idx + 1).trim();
+      }
+    }
+
+    // 3. 更新首页 Session Summary
+    updateSessionSummary({
+      minutes: elapsedMinutes,
+      distractedApp, // 自动失败 → 这里显示违规程序名
+    });
+
+    // 4. 再停掉前端 timer 和轮询
     stopBackendStatusPolling();
     clearInterval(tick);
     tick = null;
@@ -191,6 +223,7 @@ export function mountTimer(els) {
         : 'Session failed due to non-whitelisted app.';
     showToast(toastEl, msg);
   }
+
 
   function startBackendStatusPolling() {
     if (statusTimer) clearInterval(statusTimer);
@@ -232,6 +265,22 @@ export function mountTimer(els) {
   // Polling timer for /api/focus/status
   let statusTimer = null;
 
+    // 计算当前这次 session 已经坚持了多少分钟（用于 Session Summary）
+  function computeElapsedMinutes() {
+    // 如果还没真正 start，就用 slider 当前值兜底
+    if (!isRunning || !endTs) {
+      const mins = clampMins(Number(range?.value || lastStartedMins || 25));
+      return mins;
+    }
+
+    const totalMs = lastStartedMins * 60 * 1000;
+    const now = Date.now();
+    const leftMs = Math.max(0, endTs - now);
+    const elapsedMs = Math.max(0, totalMs - leftMs);
+
+    const mins = Math.round(elapsedMs / 60000);
+    return Math.max(0, mins);
+  }
 
   /**
    * Push the current timer state into the shared focusStatus store
@@ -348,6 +397,13 @@ export function mountTimer(els) {
         }
 
         broadcastState();
+        // ★ 自然结束：Focus Time = 实际分钟数，Distractions = "—"
+        const elapsedMinutes = computeElapsedMinutes();
+        updateSessionSummary({
+          minutes: elapsedMinutes,
+          distractedApp: null,
+        });
+
       }
     }, 200);
 
@@ -424,6 +480,13 @@ export function mountTimer(els) {
 
     // 先停掉状态轮询
     stopBackendStatusPolling();
+
+    // ★ 手动 Stop：算一下本次坚持了多久，Distractions 置为 "—"
+    const elapsedMinutes = computeElapsedMinutes();
+    updateSessionSummary({
+      minutes: elapsedMinutes,
+      distractedApp: null,
+    });
 
     stopCountdown();
   });
