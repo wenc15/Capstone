@@ -190,7 +190,7 @@ export function mountTimer(els) {
     // 如果 currentProcess 拿不到，就从 failReason 里抠：
     // 例如 "使用非白名单程序：chrome"
     if (!distractedApp && reason) {
-      const idx = reason.indexOf('：'); // 全角冒号
+      const idx = reason.indexOf(': ');
       if (idx >= 0 && idx < reason.length - 1) {
         distractedApp = reason.slice(idx + 1).trim();
       }
