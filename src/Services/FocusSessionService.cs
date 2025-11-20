@@ -173,7 +173,7 @@ public class FocusSessionService
                 if (now - _violationStart.Value >= _grace)
                 {
                     _failed = true;
-                    _failReason = $"使用非白名单程序：{_currentProcess}";
+                    _failReason = $"Used non-whitelisted program：{_currentProcess}";
                     EndSession(SessionOutcome.Failed);
                 }
             }
