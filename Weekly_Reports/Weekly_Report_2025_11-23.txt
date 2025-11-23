@@ -1,0 +1,56 @@
+📝 Capstone Project — 每周工作内容总结
+📅 周期：2025/11/24 – 2025/11/29
+
+🟦 Backend 本周总结
+✅ 已完成
+
+完成 Focus Session 全流程（start / stop / status + 违规判定 + grace）。
+
+完成 Active App Monitoring（前台应用侦测 + 白名单判断）。
+
+完成本地数据持久化基础功能（profile + whitelist presets）。
+
+完成后端 API 与文档、REST 调试环境（Swagger + focus-api.rest）。
+
+完成与前端的计时器/监控最小联动（可跑通基本 demo 流程）。
+
+完成URL Monitoring（浏览器 URL 获取）。
+
+🟦 Frontend 本周总结
+✅ 已完成
+
+主界面基础布局与交互（start / stop / status + 违规判定 + grace），并完成 cards、天气模块与 Session Summary(focus time, distraction)。
+
+Stats 页面基础版（最近专注记录、总 sessions、累计专注时长、上一轮 notes、近 7 天柱状图）。
+
+Widget 原型实现应用内拖拽。
+
+❌ 下周计划
+
+URL Monitoring整体验收测试
+
+Backend 目录结构调整与 README 更新。（包含端口文件等）
+
+Backend 测试文件整理（烧饼）
+
+前后端无关文件整理（e.g. weekly report）
+
+补充所有未备注文件的comment（前后端）
+
+Widget 悬浮于其他软件之上
+
+创建test branch并且规定pull request具体时间以及操作规范（今日）
+
+自由讨论：
+问题与建议
+
+P1 内容时间安排：
+1.Token System —— session 成功后生成 token + API + 持久化
+
+2.Gacha Draw Logic —— 卡池 + 抽卡算法 + inventory 持久化 + API
+
+3.Pet System —— 宠物状态管理（level/affinity）+ 成长逻辑 + API
+
+4.Music Player State —— 音乐播放状态管理（play/pause/next）+ API
+
+前后端人手与工作量安排
