@@ -1,3 +1,4 @@
+<!-- [Changed 11.19 - Claire] Replaced <select id="whitelistSelect"> with a checkbox group (#whitelistGroup) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,7 +24,6 @@
       </aside>
 
       <div class="content">
-        <!-- 计时器视图 -->
         <div id="view-timer">
           <div class="timer" id="timerDisplay">25:00</div>
 
@@ -34,17 +34,51 @@
             </div>
           </div>
 
-          <!-- 并排按钮：Start/Pause/Resume + Reset -->
+          <!-- Actions: Start + Stop -->
           <div class="actions">
             <button class="primary"   id="startBtn">Start</button>
-            <button class="secondary" id="resetBtn" style="display:none;">Reset</button>
+            <button class="secondary" id="stopBtn" style="display:none;">Stop</button>
           </div>
 
-          <!-- 会话备注/应用名 -->
-          <div style="max-width:520px;margin:0 auto 14px;display:flex;gap:10px;">
-            <input id="sessionNote" type="text" placeholder="App used / Notes (optional)"
-                   style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--muted);font-size:14px;">
+          <div id="whitelistGroup"
+               style="max-width:520px;margin:0 auto 14px;display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:14px;color:var(--muted-text,#666);">
+              Allowed apps (whitelist)
+            </div>
+
+            <!-- Checkbox list for allowed apps; front-end + backend both rely on these values -->
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                <input type="checkbox" name="whitelistApp" value="chrome" checked />
+                <span>Google Chrome</span>
+              </label>
+
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                <input type="checkbox" name="whitelistApp" value="code" />
+                <span>VS Code</span>
+              </label>
+
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                <input type="checkbox" name="whitelistApp" value="edge" />
+                <span>Microsoft Edge</span>
+              </label>
+
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                <input type="checkbox" name="whitelistApp" value="word" />
+                <span>Microsoft Word</span>
+              </label>
+
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                <input type="checkbox" name="whitelistApp" value="ppt" />
+                <span>PowerPoint</span>
+              </label>
+            </div>
+
+            <small style="font-size:12px;color:var(--muted-text,#888);">
+              You can select multiple apps. Only selected apps will be treated as allowed during focus.
+            </small>
           </div>
+          <!-- [Changed 11.19 - Claire] timer_ui.js / whitelist.js will read checkboxes under #whitelistGroup -->
 
           <div class="grid">
             <div class="card">
@@ -60,7 +94,6 @@
           </div>
         </div>
 
-        <!-- 统计视图（默认隐藏，由 renderer.js 切换显示） -->
         <div id="view-stats" style="display:none;">
           <h2 style="margin:6px 0 12px;">Statistics</h2>
 
@@ -85,7 +118,7 @@
     <div class="floating-widget" id="widget" title="Widget"></div>
   </div>
 
-  <!-- 仅保留拖拽脚本；滑条与计时逻辑在 renderer.js -->
+  <!-- Draggable widget script; timer logic lives in renderer.js -->
   <script>
     (function(){
       const widget = document.getElementById('widget');
@@ -124,12 +157,12 @@
     })();
   </script>
 
-  <!-- toast 容器（供 renderer.js 使用） -->
+  <!-- Toast container (used by renderer.js) -->
   <div id="doneToast" class="toast" aria-live="polite"></div>
 
-  <!-- 统计图表库（需在 renderer.js 之前） -->
+  <!-- Chart library (must be loaded before renderer.js) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <!-- 在页面末尾引入渲染脚本 -->
+  <!-- Main renderer script -->
   <script type="module" src="./renderer.js"></script>
 </body>
 </html>
