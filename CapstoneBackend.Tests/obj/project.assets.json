@@ -3198,19 +3198,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\zhech\\.nuget\\packages\\": {}
+    "C:\\Users\\14158\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\zhech\\Documents\\GitHub\\Capstone\\CapstoneBackend.Tests\\CapstoneBackend.Tests.csproj",
+      "projectUniqueName": "D:\\Capstone\\Capstone\\CapstoneBackend.Tests\\CapstoneBackend.Tests.csproj",
       "projectName": "CapstoneBackend.Tests",
-      "projectPath": "C:\\Users\\zhech\\Documents\\GitHub\\Capstone\\CapstoneBackend.Tests\\CapstoneBackend.Tests.csproj",
-      "packagesPath": "C:\\Users\\zhech\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\zhech\\Documents\\GitHub\\Capstone\\CapstoneBackend.Tests\\obj\\",
+      "projectPath": "D:\\Capstone\\Capstone\\CapstoneBackend.Tests\\CapstoneBackend.Tests.csproj",
+      "packagesPath": "C:\\Users\\14158\\.nuget\\packages\\",
+      "outputPath": "D:\\Capstone\\Capstone\\CapstoneBackend.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\zhech\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\14158\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -3222,8 +3222,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\zhech\\Documents\\GitHub\\Capstone\\src\\CapstoneBackend.csproj": {
-              "projectPath": "C:\\Users\\zhech\\Documents\\GitHub\\Capstone\\src\\CapstoneBackend.csproj"
+            "D:\\Capstone\\Capstone\\src\\CapstoneBackend.csproj": {
+              "projectPath": "D:\\Capstone\\Capstone\\src\\CapstoneBackend.csproj"
             }
           }
         }
