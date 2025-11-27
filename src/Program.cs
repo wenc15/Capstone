@@ -1,3 +1,14 @@
+// 2025/11/27 edited by wenc15
+// 新增内容：
+//   - 注册 AppDbContext（EF Core + SQLite），用于存储 WebsiteUsage 网站使用记录。
+//   - 在应用启动时通过 EnsureCreated() 自动创建 growin.db 及 WebsiteUsages 表结构。
+//   - 为 UsageController 提供数据库访问支持（/api/Usage, /api/Usage/today）。
+// =============================================================
+// 作用补充：
+//   - 在原有 LocalDataService + FocusSessionService 的基础上，新增一套「网站使用统计」数据通路。
+//   - JSON 本地存储（UserProfile、SessionHistory、Whitelist）与 SQLite 数据库存储（WebsiteUsage）并存，职责清晰。
+// =============================================================
+//
 // 2025/11/18 edited by 京华昼梦
 // 新增内容：
 //   - 补全 Program.cs 的最小主机构建代码，注册 Controller 与 Swagger。
@@ -14,19 +25,22 @@
 //   - 在 DI 容器中新增 LocalDataService、FocusSessionService 的 Singleton 注册。
 //   - 新增名为 DevCorsPolicy 的 CORS 策略，并在管线中通过 app.UseCors() 启用。
 // =============================================================
-
-//2025/11/17 edited by Zikai
-//新增用户profile和预设白名单相关支持
+//
+// 2025/11/17 edited by Zikai
+// 新增用户 profile 和预设白名单相关支持
 // =============================================================
 // 文件：Program.cs
 // 作用：ASP.NET Core 最小主机启动文件，负责注册服务和中间件。
 // 结构：
 //   - 注册控制器、Swagger
 //   - 注册 LocalDataService、FocusSessionService（依赖注入）
-//   - 配置 HTTPS 重定向、路由映射
+//   - 注册 AppDbContext（EF Core + SQLite，用于 WebsiteUsage）
+//   - 配置 HTTPS 重定向、CORS、路由映射
 // =============================================================
 
 using CapstoneBackend.Services;
+using CapstoneBackend.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +62,12 @@ builder.Services.AddSingleton<LocalDataService>();
 // 作为 Singleton，确保整个应用只有一个会话状态源。
 builder.Services.AddSingleton<FocusSessionService>();
 
+// 注册 EF Core + SQLite 数据库上下文（用于存储网站使用记录等）
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    options.UseSqlite("Data Source=growin.db");
+});
+
 // 配置 CORS：开发阶段允许本地前端自由访问
 // 注意：这是开发环境用的“全开放”策略，后期如果要上线可以收紧域名。
 var corsPolicyName = "DevCorsPolicy";
@@ -63,6 +83,14 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// 应用启动时自动创建数据库（如果不存在）
+// 方便开发阶段使用，无需手动跑迁移。
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
 
 // -------------------------------------------------------------
 // 中间件管线配置

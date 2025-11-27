@@ -8,9 +8,14 @@ const FOCUSED_CHECK_MS = 1000;
 const RENOTIFY_MS = 10 * 1000;
 const RECONNECTFAIL_SLEEP = 5;
 
+// Backend REST API base URL (from `dotnet run` output)
+const API_BASE = "http://localhost:5024"; // 🔧 change port if needed
+const USAGE_ENDPOINT = `${API_BASE}/api/usage`; // you'll implement this on backend
+
 // 🔧 Turn this ON later when your backend WS server is ready
 const USE_GROWIN_WEBSOCKET = false;
 const GROWIN_WS_URL = "ws://localhost:9000";
+
 
 // ---- WebSocket state ----
 let growinWebSocket = null;
@@ -124,11 +129,12 @@ function keepGrowinAlive() {
 
 function notifyGrowinServer(data) {
   if (!USE_GROWIN_WEBSOCKET) {
-    console.log("[Growin] (WS disabled) Would send to server:", data);
+    console.log("[Growin] (WS disabled) sending via REST:", data);
+    sendUsageToBackend(data);
     return;
   }
 
-  console.log("[Growin] notify", data);
+  console.log("[Growin] notify (WebSocket)", data);
   if (isGrowinConnected && growinWebSocket) {
     growinWebSocket.send(JSON.stringify(data));
   } else {
@@ -136,6 +142,7 @@ function notifyGrowinServer(data) {
     console.log("[Growin] queued (fail list):", growinNotifyFailList);
   }
 }
+
 
 function renotifyGrowin() {
   if (!USE_GROWIN_WEBSOCKET) return;
@@ -146,6 +153,35 @@ function renotifyGrowin() {
     notifyGrowinServer(item);
   }
 }
+
+// =====================================
+// REST API calls
+// =====================================
+
+async function sendUsageToBackend(data) {
+  try {
+    // Backend API we plan: POST /api/usage
+    // Body format: an array of usage items, so backend can accept batches
+    const body = [data];
+
+    const res = await fetch(USAGE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      console.error("[Growin] REST usage POST failed:", res.status);
+    } else {
+      console.log("[Growin] REST usage POST ok");
+    }
+  } catch (err) {
+    console.error("[Growin] REST usage POST error:", err);
+  }
+}
+
 
 function startRenotify() {
   setInterval(() => {
