@@ -12,8 +12,12 @@
 //     实现完全一致的行为表现。
 // =============================================================
 
+// 2025/11/30 edited by Jingyao
+// 新增内容：
+//   - 和preload.js联通，使timer可以跨窗口同步
+// =============================================================
 
-// focusStatusStore.js
+// 跨窗口可共享的状态仓库：保持原 API 不变
 const listeners = new Set();
 
 let state = {
@@ -23,24 +27,45 @@ let state = {
   isViolating: false,
   violationSeconds: 0,
   currentProcess: null,
+  failReason: null,
 };
 
-// 由 timer UI 调用：更新状态
-export function setFocusStatus(partial) {
-  state = { ...state, ...partial };
-  for (const fn of listeners) {
-    fn({ ...state });
-  }
+// BroadcastChannel：多窗口同步（Electron/现代浏览器都支持）
+let chan = null;
+try {
+  chan = new BroadcastChannel('focus-status');
+  chan.addEventListener('message', (ev) => {
+    const next = ev.data || {};
+    state = { ...state, ...next };
+    for (const fn of listeners) fn({ ...state });
+  });
+} catch (e) {
+  // 某些环境不支持就忽略
 }
 
-// widget / timer UI 都可以读当前状态
+// Electron IPC 兜底（preload.js 暴露的桥）
+if (typeof window !== 'undefined' && window.electronAPI?.onFocusStatus) {
+  window.electronAPI.onFocusStatus((st) => {
+    state = { ...state, ...st };
+    for (const fn of listeners) fn({ ...state });
+  });
+}
+
+export function setFocusStatus(partial) {
+  state = { ...state, ...partial };
+  for (const fn of listeners) fn({ ...state });
+
+  // 广播给其它窗口
+  try { chan?.postMessage(state); } catch (_) {}
+  try { window.electronAPI?.emitFocusStatus?.(state); } catch (_) {}
+}
+
 export function getFocusStatus() {
   return { ...state };
 }
 
-// widget / timer UI 都可以订阅状态变化
 export function subscribeFocusStatus(fn) {
   listeners.add(fn);
-  fn({ ...state }); // 先推一次当前状态
+  fn({ ...state });
   return () => listeners.delete(fn);
 }
