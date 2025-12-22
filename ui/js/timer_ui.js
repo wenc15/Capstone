@@ -15,6 +15,9 @@
  * - 修改了白名单问题，在计时开始后锁定白名单，计时结束后解锁白名单。
  * - grace period 现在强制不允许负数，避免后端报错。
  */
+/* 12.21 edited by Jingyao Sun:
+ * 更改start/stop按钮（startBtn/stopBtn）使timer接收来自widget的命令
+ */
 
 import { setFocusStatus } from './focusStatusStore.js';
 import { clampMins, fmt, showToast, notifySystem } from './utils.js';
@@ -451,6 +454,19 @@ export function mountTimer(els) {
     updateSessionSummary({ minutes: 0, distractedApp: null });
     stopCountdown();
   });
+
+  // ✅ 接收来自 widget 的命令，让主窗口执行真正的 start/stop（走后端 + 同步 + broadcastState）
+  if (window.electronAPI?.onFocusCommand) {
+    window.electronAPI.onFocusCommand((cmd) => {
+      if (cmd === 'start') startBtn?.click();
+      if (cmd === 'stop') stopBtn?.click();
+      if (cmd === 'toggle') {
+        if (isRunning) stopBtn?.click();
+        else startBtn?.click();
+      }
+    });
+  }
+
 
   // ===== Initial setup =====
   if (range) {

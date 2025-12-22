@@ -1,9 +1,16 @@
 // Capstone/ui/main.js
 // 2025/11/28 edited by Jingyao: 新增 ballwin 使悬浮球为独立窗口
+
+//12.20 edited by Jingyao: 用变量统一管理文件路径
 // =============================================================
 
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { placeBallAtOldWidgetSpot } = require('./js/ballPositioner');
+
 const path = require('path');
+
+const PRELOAD_PATH = path.join(__dirname, 'js', 'preload.js');
+
 
 let mainWin, ballWin;
 
@@ -12,7 +19,7 @@ function createMain() {
     width: 1100,
     height: 760,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -25,6 +32,7 @@ function createBall() {
   const winSize = 160;
 
   ballWin = new BrowserWindow({
+    show: false,
     width: winSize,
     height: winSize,
     x: width - winSize - 20,
@@ -38,7 +46,7 @@ function createBall() {
     hasShadow: false,
     roundedCorners: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -53,6 +61,12 @@ function createBall() {
 app.whenReady().then(() => {
   createMain();
   createBall();
+
+  mainWin.webContents.once('did-finish-load', () => {
+  placeBallAtOldWidgetSpot(mainWin, ballWin);
+  ballWin.show();
+});
+
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -75,4 +89,9 @@ ipcMain.handle('ball:setIgnore', (_evt, ignore) => {
 ipcMain.on('focus:status', (_evt, st) => {
   if (mainWin) mainWin.webContents.send('focus:status', st);
   if (ballWin) ballWin.webContents.send('focus:status', st);
+});
+
+// 新增：widget 发命令 -> 转给主窗口执行
+ipcMain.on('focus:command', (_evt, cmd) => {
+  if (mainWin) mainWin.webContents.send('focus:command', cmd);
 });

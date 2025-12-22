@@ -1,6 +1,8 @@
 
 <!-- 11.27 created by Jingyao Sun:
      使widget球可以悬浮于其他应用之上
+
+     12.21 edited: 删除多余的style
 -->
 
 <!doctype html>
@@ -21,10 +23,6 @@
 
     /* 让整个圆形区域成为可拖动区 */
     #widget {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
       -webkit-app-region: drag;
     }
 
@@ -60,17 +58,17 @@
   <div id="widget"></div>
 
   <!-- 共享状态仓库（已支持 BroadcastChannel + IPC） -->
-  <script type="module" src="./focusStatusStore.js"></script>
+  <script type="module" src="./js/focusStatusStore.js"></script>
 
   <!-- 1) 优先使用你自己的 widget.js；2) 没有 mount 时，走兜底渲染 -->
   <script type="module">
-    import { subscribeFocusStatus, getFocusStatus, setFocusStatus } from './focusStatusStore.js';
+    import { subscribeFocusStatus, getFocusStatus, setFocusStatus } from './js/focusStatusStore.js';
 
     const root = document.getElementById('widget');
 
     let mountedByUserCode = false;
     try {
-      const Widget = await import('./widget.js');
+      const Widget = await import('./js/widget.js');
       if (Widget && typeof Widget.mountWidget === 'function') {
         Widget.mountWidget(root);
         mountedByUserCode = true;

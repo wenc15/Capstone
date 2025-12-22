@@ -21,6 +21,9 @@
 // 2025/11/18 edited by Qinquan Wang:
 // 新增内容：
 // 暂停按钮改为停止按钮，图标和 aria-label 也相应更改。
+
+// 12.21 updated by Jingyao: 使独立widget可调用主界面start
+
 import { subscribeFocusStatus, getFocusStatus } from './focusStatusStore.js';
 
 // ---- Mount widget UI ----
@@ -63,25 +66,29 @@ export function mountWidget() {
   // ✅ widget 作为“遥控 Start / Stop”：
   // - 如果当前在运行 → 点一下 = 调用主界面 Stop
   // - 如果当前没在运行 → 点一下 = 调用主界面 Start
+  //12.21 updated by Jingyao: 使独立widget可调用主界面start
   btnPlay.addEventListener('click', () => {
     const st = getFocusStatus();
 
     if (st.isRunning) {
-      // 正在运行 → 调用主 timer 的 Stop 按钮
+      // 1) 内置 widget（同一页面）优先直接点按钮
       const mainStopBtn = document.getElementById('stopBtn');
-      if (mainStopBtn) {
-        mainStopBtn.click();
-      } else {
-        console.warn('stopBtn not found in main UI');
-      }
-    } else {
-      // 没在运行 → 调用主 timer 的 Start 按钮
-      const mainStartBtn = document.getElementById('startBtn');
-      if (mainStartBtn) {
-        mainStartBtn.click();
-      } else {
-        console.warn('startBtn not found in main UI');
-      }
+      if (mainStopBtn) return mainStopBtn.click();
+
+      // 2) 浮动球（独立窗口）走 IPC 命令
+      if (window.electronAPI?.sendFocusCommand) return window.electronAPI.sendFocusCommand('stop');
+
+      console.warn('stop: no stopBtn and no IPC bridge');
+      return;
     }
+
+    // st.isRunning === false
+    const mainStartBtn = document.getElementById('startBtn');
+    if (mainStartBtn) return mainStartBtn.click();
+
+    if (window.electronAPI?.sendFocusCommand) return window.electronAPI.sendFocusCommand('start');
+
+    console.warn('start: no startBtn and no IPC bridge');
   });
+
 }
