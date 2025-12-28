@@ -1,17 +1,9 @@
-<!-- [Changed 11.19 - Claire] Replaced <select id="whitelistSelect"> with a checkbox group (#whitelistGroup) -->
-
-<!-- 11.19 edited by Jingyao Sun:
-     - Replaced the old whitelist checkbox group with a search-based app picker.
-     - Added wlSearchInput, wlSearchResults, and wlSelectedList containers for JS wiring.
-     - Updated whitelistGroup section copy to reflect the new multi-select search flow.
--->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Growin – Mock UI</title>
+  <title>Growin – Grow With Every Focus</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -19,19 +11,21 @@
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand">Growin</div>
-      <div class="weather-chip">☁️ <span>??°C</span></div>
+      <div class="weather-chip">☁️ <span>16°C</span></div>
     </header>
 
     <section class="main">
       <aside class="sidebar">
         <button class="nav-btn" id="navTimer">🕑 <span>Timer</span></button>
         <button class="nav-btn" id="navStats">📊 <span>Statistics</span></button>
-        <button class="nav-btn">🌿 <span>Pet</span></button>
-        <div class="pet-placeholder">Pet Placeholder</div>
+        <button class="nav-btn" id="navPet">🌿 <span>Pet</span></button>
+        
+        <div class="pet-placeholder">
+          <img src="assets/pet_idle_small.png" alt="Pet Preview" style="width: 50px;">
+        </div>
       </aside>
 
       <div class="content">
-        <!-- Timer view -->
         <div id="view-timer">
           <div class="timer" id="timerDisplay">25:00</div>
 
@@ -42,128 +36,82 @@
             </div>
           </div>
 
-          <!-- Actions: Start + Stop -->
-          <!-- 需求：初始只显示 Start，开始后隐藏 Start，只显示 Stop -->
           <div class="actions" id="timerActions">
-            <button class="primary"   id="startBtn">Start</button>
+            <button class="primary" id="startBtn">Start</button>
             <button class="secondary" id="stopBtn" style="display:none;">Stop</button>
           </div>
 
-          <!-- [Changed 11.19 - Claire] Whitelist checkbox group (replaces old notes input) -->
-          <!-- [Changed 11.19 - Jingyao] Whitelist search UI -->
-          <div id="whitelistGroup"
-              style="max-width:520px;margin:0 auto 14px;display:flex;flex-direction:column;gap:8px;">
-            <div class="wl-title">
-              Allowed apps (whitelist)
-            </div>
-
-            <!-- 搜索框 -->
+          <div id="whitelistGroup" style="max-width:520px;margin:20px auto;display:flex;flex-direction:column;gap:8px;">
+            <div class="wl-title">Allowed apps (whitelist)</div>
             <div class="wl-search-row">
-              <input
-                id="wlSearchInput"
-                type="text"
-                placeholder="Search apps (Chrome, VS Code, Word…)"/>
+              <input id="wlSearchInput" type="text" placeholder="Search apps (Chrome, VS Code...)"/>
             </div>
-
-            <!-- 搜索结果列表（点击一项加入上面的 Selected apps） -->
             <div id="wlSearchResults" class="wl-results"></div>
-
-            <!-- 已选应用列表 -->
             <div class="wl-selected-block">
               <div class="wl-selected-title">Selected apps</div>
               <ul id="wlSelectedList" class="wl-selected-list"></ul>
-              <small class="wl-hint">
-                Tip: type to search, then click a result to add it. You can add multiple apps.
-              </small>
             </div>
           </div>
-
-          <!-- timer_ui.js / whitelist.js will read checkboxes under #whitelistGroup -->
 
           <div class="grid">
             <div class="card">
               <h3>Your Cards</h3>
-              <button class="placeholder-btn">Open Cards</button>
+              <div id="cardGalleryShort" style="display:flex; gap:5px;"></div>
+              <button class="placeholder-btn">Open Collection</button>
             </div>
             <div class="card">
               <h3>Session Summary</h3>
               <div>Focus Time: <span id="sumFocusTime">—</span></div>
-              <div>Distractions: <span id="sumDistractions">?</span></div>
-              <div>Cards Collected: <span id="sumCards">?</span></div>
+              <div>Distractions: <span id="sumDistractions">0</span></div>
+              <div>Cards Collected: <span id="sumCards">0</span></div>
             </div>
           </div>
         </div>
 
-        <!-- Stats view -->
         <div id="view-stats" style="display:none;">
-          <h2 style="margin:6px 0 12px;">Statistics</h2>
-
+          <h2 style="margin-bottom:20px;">Focus Statistics</h2>
           <div class="grid">
             <div class="card">
               <h3>Recent Sessions</h3>
               <div class="stat">Total Sessions: <span id="statCount">0</span></div>
-              <div class="stat">Total Focus (last 7 days): <span id="statTotal">0 min</span></div>
-              <div class="stat">Last Note/App: <span id="statLastNote">—</span></div>
+              <div class="stat">Total Focus Time: <span id="statTotal">0 min</span></div>
             </div>
-
             <div class="card">
               <h3>Daily Focus (Last 7 Days)</h3>
               <canvas id="focusChart" width="400" height="220"></canvas>
             </div>
           </div>
         </div>
+
+        <div id="view-pet" style="display:none;">
+          <div class="pet-container">
+            <div class="pet-stage">
+              <img id="petImage" src="assets/pet_idle.png" alt="Pet" class="pet-sprite">
+              <div id="petSpeechBubble" class="speech-bubble" style="display:none;">Ready to focus?</div>
+            </div>
+            
+            <div class="pet-info">
+              <h3>Level <span id="petLevel">1</span></h3>
+              <div class="exp-bar">
+                <div id="petExpFill" class="exp-fill"></div>
+              </div>
+            </div>
+
+            <div class="pet-actions">
+              <button class="action-btn" id="feedBtn">🍎 Feed</button>
+              <button class="action-btn" id="playBtn">🎾 Play</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
-
-    <!-- Floating widget placeholder (draggable) -->
-    <div class="floating-widget" id="widget" title="Widget"></div>
   </div>
 
-  <!-- Draggable widget script; timer logic lives in renderer.js -->
-  <script>
-    (function(){
-      const widget = document.getElementById('widget');
-      const app = document.getElementById('app');
-      let dragging = false; let startX=0, startY=0, startLeft=0, startTop=0;
-
-      const onMouseDown = (e)=>{
-        dragging = true; widget.style.cursor = 'grabbing';
-        const rect = widget.getBoundingClientRect();
-        startX = e.clientX; startY = e.clientY;
-        const appRect = app.getBoundingClientRect();
-        startLeft = rect.left - appRect.left; startTop = rect.top - appRect.top;
-        e.preventDefault();
-      };
-      const onMouseMove = (e)=>{
-        if(!dragging) return;
-        const appRect = app.getBoundingClientRect();
-        let newLeft = startLeft + (e.clientX - startX);
-        let newTop  = startTop  + (e.clientY - startY);
-        const maxLeft = appRect.width - widget.offsetWidth - 8;
-        const maxTop  = appRect.height - widget.offsetHeight - 8;
-        newLeft = Math.max(8, Math.min(maxLeft, newLeft));
-        newTop  = Math.max(8, Math.min(maxTop, newTop));
-        widget.style.left = newLeft + 'px';
-        widget.style.top  = newTop + 'px';
-      };
-      const onMouseUp = ()=>{ dragging = false; widget.style.cursor = 'grab'; };
-
-      widget.addEventListener('mousedown', onMouseDown);
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-
-      widget.addEventListener('touchstart', (e)=>{ onMouseDown(e.touches[0]); });
-      window.addEventListener('touchmove', (e)=>{ onMouseMove(e.touches[0]); });
-      window.addEventListener('touchend', onMouseUp);
-    })();
-  </script>
-
-  <!-- Toast container (used by renderer.js) -->
   <div id="doneToast" class="toast" aria-live="polite"></div>
 
-  <!-- Chart library (must be loaded before renderer.js) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <!-- Main renderer script -->
+  
   <script type="module" src="./renderer.js"></script>
 </body>
 </html>
