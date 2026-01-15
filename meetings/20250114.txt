@@ -1,8 +1,0 @@
-2026.01.14 Tenth meeting
-Attendees: All 5 member
-Design Document Meeting
-
-Discussion over the change of the entire plan as Qingquan Wang quit and leaved the team. 
-Discussion over details of P1 components. Details and plan of pet system, and its relation to gatcha system. 
-The music player will be considered after the pet system is finished. 
-Sechduling time for TA and instructor to report the change in team member and project progress. 
