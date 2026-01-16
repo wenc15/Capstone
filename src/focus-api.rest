@@ -1,3 +1,5 @@
+//2026/01/16 edited by Zikai
+//新增点数系统（Credits）相关测试：查询、增加、消耗点数。
 //2025/11/17 edited by Zikai
 //新增用户profile和预设白名单相关测试
 # =============================================================
@@ -8,6 +10,7 @@
 #   2. 默认模板接口（WeatherForecast 示例）
 #   3. 用户 Profile 接口
 #   4. 白名单预设接口：获取 / 保存 / 删除
+#   5. 点数系统接口：查询 / 增加 / 消耗点数
 # 使用方式：
 #   - 安装 VS Code 插件 "REST Client"
 #   - 光标放在任意请求块内，点击 "Send Request" 即可。
@@ -41,15 +44,7 @@ Content-Type: application/json
 
 ###
 
-### 读取用户 Profile（包含取消会话数）
-# 返回示例：
-# {
-#   "totalFocusSeconds": 3600,
-#   "totalSessions": 10,
-#   "successfulSessions": 6,
-#   "failedSessions": 2,
-#   "canceledSessions": 2
-# }
+### 读取用户 Profile（包含取消会话数和点数）
 GET http://localhost:5024/api/profile
 
 ###
@@ -76,9 +71,31 @@ Content-Type: application/json
 #   1. 先运行“获取所有白名单预设”请求；
 #   2. 从响应里复制某个预设的 id；
 #   3. 替换下面 URL 中的 <PUT_ID_HERE> 然后发送本请求。
-#
-# 注意：不再使用 {{presetId}} 占位符，避免 REST Client
-#      没有设置变量时导致 id 传错。
-DELETE http://localhost:5024/api/whitelistpresets/d1c59a2698f44d00a5ac99b09f594952
+DELETE http://localhost:5024/api/whitelistpresets/<PUT_ID_HERE>
+
+###
+
+### 查询当前点数余额
+GET http://localhost:5024/api/credits
+
+###
+
+### 手动增加点数
+POST http://localhost:5024/api/credits/add
+Content-Type: application/json
+
+{
+  "amount": 10
+}
+
+###
+
+### 消耗点数（测试余额不足/成功场景）
+POST http://localhost:5024/api/credits/consume
+Content-Type: application/json
+
+{
+  "amount": 5
+}
 
 ###
