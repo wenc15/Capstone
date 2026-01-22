@@ -19,6 +19,10 @@
  * 更改start/stop按钮（startBtn/stopBtn）使timer接收来自widget的命令
  */
 
+// 1.22 edited by JS:
+// Added credits system. Session 成功完成后触发 refreshCredits()，让 Token 显示与后端 credits 实时同步。
+//受影响程序：startCountdown()，
+
 import { setFocusStatus } from './focusStatusStore.js';
 import { clampMins, fmt, showToast, notifySystem } from './utils.js';
 import { saveSession } from './storage.js';
@@ -31,6 +35,9 @@ import {
 } from './whitelist.js';
 
 import { updateSessionSummary } from './session_summary.js';
+
+import { refreshCredits } from './creditsStore.js';
+
 
 export function mountTimer(els) {
   const {
@@ -146,6 +153,12 @@ export function mountTimer(els) {
       }
 
       const data = await res.json();
+      // Credits: if backend session just completed successfully, refresh credits
+      if (prevBackendRunning && !data.isRunning && !data.isFailed) {
+        refreshCredits();
+      }
+      prevBackendRunning = !!data.isRunning;
+
       
       // 更新本地 backendFlags（监控状态）
       backendFlags.isFailed = !!data.isFailed;
@@ -310,6 +323,10 @@ export function mountTimer(els) {
   };
 
   let statusTimer = null;
+  // Credits: track backend running edge (for success completion)
+  let prevBackendRunning = false;
+
+
 
   // === Start/Stop 按钮显示控制 ===
   function setButtonsForRunning(running) {
@@ -398,6 +415,8 @@ export function mountTimer(els) {
         if (focusLast) focusLast.textContent = `${lastStartedMins} min`;
         showToast(toastEl, `Session complete: ${lastStartedMins} min ✅`);
         notifySystem('Focus session complete', `${lastStartedMins} minutes`);
+        refreshCredits(); // ✅ Session success -> update Token immediately
+
         if (viewStats && viewStats.style.display !== 'none') {
           renderStats({ els: statsEls, chartRef });
         }

@@ -29,6 +29,9 @@ export function collectDom() {
   const statLastNote = document.getElementById('statLastNote');
   const chartCanvas  = document.getElementById('focusChart');
 
+  //2026/1/22 added token dom
+  const tokenValue = document.getElementById('tokenValue');
+
   return {
     // Timer
     display,
@@ -59,5 +62,8 @@ export function collectDom() {
 
     // Convenience object for stats.js
     statsEls: { statCount, statTotal, statLastNote, chartCanvas },
+
+    //token/credits
+    tokenValue,
   };
 }

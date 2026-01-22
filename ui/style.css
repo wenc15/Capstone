@@ -33,10 +33,10 @@ body{
     padding:16px 18px; border-bottom:1px solid var(--muted);
 }
 .brand{ font-size:28px; font-weight:800; letter-spacing:.3px; }
-.weather-chip{
+/* .weather-chip{
     display:inline-flex; align-items:center; gap:8px; font-size:14px;
     padding:6px 10px; background: var(--chip); border-radius: 999px; border:1px solid var(--muted);
-}
+} */
 
 .main{ display:flex; min-height:520px; }
 
