@@ -18,8 +18,10 @@ export function collectDom() {
   // ===== View switching =====
   const viewTimer = document.getElementById('view-timer');
   const viewStats = document.getElementById('view-stats');
+  const viewPet   = document.getElementById('view-pet');
   const navTimer  = document.getElementById('navTimer');
   const navStats  = document.getElementById('navStats');
+  const navPet    = document.getElementById('navPet');  
 
   // ===== Stats area =====
   const statCount    = document.getElementById('statCount');
@@ -41,8 +43,10 @@ export function collectDom() {
     // Views & Nav
     viewTimer,
     viewStats,
+    viewPet, 
     navTimer,
     navStats,
+    navPet, 
 
     // Stats
     statCount,

@@ -1,3 +1,12 @@
+// 2026/01/16 edited by Zikai
+// 新增内容：
+//   - 在 RecordSession(...) 中根据本次会话时长按 floor(秒 / 60) 累积点数（Credits）。
+//   - 新增 GetCredits() / AddCredits() / TryConsumeCredits() 三个点数接口供 Controller 使用。
+// 新增的作用：
+//   - 为抽奖系统、商店系统等提供统一的点数余额数据来源。
+//   - 将专注会话的有效时长转化为可消费的虚拟货币，增强激励机制。
+// =============================================================
+
 // 2025/11/19 edited by 京华昼梦
 // 新增内容：
 //   - 添加专注会话历史读写功能：GetSessionHistory() / AddSessionHistory()。
@@ -17,7 +26,8 @@
 // 文件：LocalDataService.cs
 // 作用：统一管理本地 JSON 数据的读写。
 // 结构：
-//   - UserProfile 相关：GetUserProfile(), RecordSession()
+//   - UserProfile 相关：GetUserProfile(), RecordSession()，以及 Credits（点数）相关接口
+//   - SessionHistory 相关：GetSessionHistory(), AddSessionHistory()
 //   - 白名单预设相关：GetWhitelistPresets(), SaveWhitelistPreset(), DeleteWhitelistPreset()
 //   - 内部通过 LocalStoragePaths 管理路径，通过 JsonSerializer 持久化。
 // =============================================================
@@ -86,10 +96,8 @@ public class LocalDataService
         }
     }
 
-
-    // 片段：LocalDataService.RecordSession
     // 作用：根据一次专注会话结果更新用户 profile 里的统计信息。
-    //       现在会额外统计 Aborted -> CanceledSessions。
+    //       现在会额外统计 Aborted -> CanceledSessions，同时按照 floor(专注分钟数) 奖励点数（Credits）。
     // =============================================================
     public void RecordSession(SessionOutcome outcome, int focusSeconds)
     {
@@ -97,8 +105,11 @@ public class LocalDataService
         {
             var profile = GetUserProfile();
 
+            // 保护一下：不允许负数时长
+            var safeSeconds = Math.Max(0, focusSeconds);
+
             profile.TotalSessions += 1;
-            profile.TotalFocusSeconds += Math.Max(0, focusSeconds);
+            profile.TotalFocusSeconds += safeSeconds;
 
             switch (outcome)
             {
@@ -119,10 +130,79 @@ public class LocalDataService
                     break;
             }
 
+            // 新增：按分钟数奖励点数，使用 floor 原则
+            // 例如：5.9 分钟 → 5 点；0.5 分钟 → 0 点（不奖励）
+            var minutes = safeSeconds / 60; // int 除法自带向下取整
+            if (minutes > 0)
+            {
+                profile.Credits += minutes;
+            }
+
             SaveUserProfile(profile);
         }
     }
 
+    /// <summary>
+    /// 获取当前点数余额（Credits）。
+    /// </summary>
+    public int GetCredits()
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            return profile.Credits;
+        }
+    }
+
+    /// <summary>
+    /// 增加指定数量的点数。
+    /// amount 必须为正数；返回增加后的最新余额。
+    /// </summary>
+    public int AddCredits(int amount)
+    {
+        if (amount <= 0)
+        {
+            // 非法值直接返回当前余额，不修改。
+            return GetCredits();
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            checked
+            {
+                profile.Credits += amount;
+            }
+
+            SaveUserProfile(profile);
+            return profile.Credits;
+        }
+    }
+
+    /// <summary>
+    /// 尝试消耗指定数量的点数。
+    /// - 当余额不足或 amount 非正数时，返回 false，余额不变。
+    /// - 成功时返回 true，并通过 newBalance 输出新的余额。
+    /// </summary>
+    public bool TryConsumeCredits(int amount, out int newBalance)
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+
+            if (amount <= 0 || profile.Credits < amount)
+            {
+                newBalance = profile.Credits;
+                return false;
+            }
+
+            profile.Credits -= amount;
+            SaveUserProfile(profile);
+
+            newBalance = profile.Credits;
+            return true;
+        }
+    }
 
     #endregion
 
@@ -170,7 +250,6 @@ public class LocalDataService
     }
 
     #endregion
-
 
     #region 白名单预设相关
 

@@ -4,10 +4,10 @@ let growinPageStartTime = Date.now();
 let isGrowinPageVisible = !document.hidden;
 let growinTotalTimeSpent = 0;
 
-// 页面可见性变化：当标签页变成隐藏/显示时触发
+// Page visibility changes: fires when the tab becomes hidden/visible
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    // Tab 刚刚从“可见”变成“隐藏”
+    // Tab just changed from visible → hidden
     if (isGrowinPageVisible) {
       const timeSpent = Date.now() - growinPageStartTime;
       growinTotalTimeSpent += timeSpent;
@@ -15,13 +15,13 @@ document.addEventListener("visibilitychange", () => {
       isGrowinPageVisible = false;
     }
   } else {
-    // Tab 再次可见，重新开始计时
+    // Tab becomes visible again → restart timing
     growinPageStartTime = Date.now();
     isGrowinPageVisible = true;
   }
 });
 
-// 页面关闭 / 刷新 / 跳转 前发送最后一段时间
+// Before the page is closed / refreshed / navigated away, send the final time slice
 window.addEventListener("beforeunload", () => {
   if (isGrowinPageVisible) {
     const timeSpent = Date.now() - growinPageStartTime;
@@ -30,7 +30,7 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
-// 监听标题变化，通知 background 更新 activePage.title
+// Watch for title changes and notify the background to update activePage.title
 let growinLastTitle = document.title;
 const growinTitleObserver = new MutationObserver(() => {
   if (document.title !== growinLastTitle) {
@@ -50,11 +50,11 @@ if (titleNode) {
   });
 }
 
-// 封装发送“本次可见时段时间”的函数
+// Helper: send the “this visible period’s time” to the background script
 function sendGrowinTimeToBackground(timeSpent) {
   chrome.runtime.sendMessage({
     type: "GROWIN_TIME_UPDATE",
-    timeSpent: timeSpent,            // 当前这一段的持续时间（毫秒）
-    totalTime: growinTotalTimeSpent, // 所有可见时间累计（毫秒）
+    timeSpent: timeSpent,            // duration of this visible segment (ms)
+    totalTime: growinTotalTimeSpent, // accumulated visible time (ms)
   });
 }

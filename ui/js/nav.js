@@ -12,14 +12,17 @@ export function mountNav(els) {
   const {
     navTimer,
     navStats,
+    navPet, 
     viewTimer,
     viewStats,
+    viewPet, 
     statsEls,
     chartRef,
   } = els;
 
   const btnTimer = navTimer;
   const btnStats = navStats;
+  const btnPet   = navPet;   
 
   // Defensive check: if any core element is missing, abort mounting nav
   if (!btnTimer || !btnStats || !viewTimer || !viewStats) {
@@ -27,8 +30,8 @@ export function mountNav(els) {
     return;
   }
 
-  const allBtns = [btnTimer, btnStats];
-  const allViews = [viewTimer, viewStats];
+  const allBtns = [btnTimer, btnStats, btnPet];
+  const allViews = [viewTimer, viewStats, viewPet];
 
   /**
    * Set the active nav button and corresponding view.
@@ -64,6 +67,8 @@ export function mountNav(els) {
   // Wire up navigation button clicks
   btnTimer.addEventListener('click', () => setActive(btnTimer, viewTimer));
   btnStats.addEventListener('click', () => setActive(btnStats, viewStats));
+  btnPet.addEventListener('click', () => setActive(btnPet, viewPet));
+
 
   // Default: show Timer view and highlight Timer button on app load
   setActive(btnTimer, viewTimer);
