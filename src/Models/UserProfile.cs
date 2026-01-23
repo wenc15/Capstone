@@ -1,3 +1,10 @@
+// 2026/01/21 edited by Zikai Lu
+// 新增内容：
+//   - 在用户 Profile 中增加 PetGrowth 列表，用于存储宠物成长值（按编号索引）。
+// 新增的作用：
+//   - 为宠物系统提供本地成长值数据来源，便于查询与增减。
+// =============================================================
+
 // 2026/01/16 edited by Zikai
 // 新增内容：
 //   - 在用户 Profile 中增加 Credits 字段，保存当前点数余额。
@@ -26,6 +33,8 @@
 // 开发者（Profile 部分）：Zikai Lu
 // =============================================================
 
+using System.Collections.Generic;
+
 namespace CapstoneBackend.Models;
 
 public class UserProfile
@@ -51,4 +60,10 @@ public class UserProfile
     /// 之后可用于抽奖系统、商店系统等。
     /// </summary>
     public int Credits { get; set; }
+
+    /// <summary>
+    /// 宠物成长值列表，索引即宠物编号（从 0 开始）。
+    /// 默认值为 0；预留 -1 表示“未拥有”的情况（未来可用）。
+    /// </summary>
+    public List<int> PetGrowth { get; set; } = new();
 }

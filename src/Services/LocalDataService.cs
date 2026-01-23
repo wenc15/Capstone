@@ -1,3 +1,12 @@
+// 2026/01/21 edited by Zikai Lu
+// 新增内容：
+//   - 添加宠物成长值（PetGrowth）读写逻辑：GetPetGrowth() / AddPetGrowth() / ConsumePetGrowth()。
+//   - 增加 PetGrowth 列表初始化与索引扩容的辅助方法。
+// 新增的作用：
+//   - 为宠物系统提供按编号管理的成长值存取能力。
+//   - 保证成长值不低于 0，并兼容未来使用 -1 表示未拥有的场景。
+// =============================================================
+
 // 2026/01/16 edited by Zikai
 // 新增内容：
 //   - 在 RecordSession(...) 中根据本次会话时长按 floor(秒 / 60) 累积点数（Credits）。
@@ -94,6 +103,35 @@ public class LocalDataService
             var json = JsonSerializer.Serialize(profile, JsonOptions);
             File.WriteAllText(path, json);
         }
+    }
+
+    private static bool EnsurePetGrowthList(UserProfile profile, int petId)
+    {
+        var changed = false;
+
+        if (profile.PetGrowth == null)
+        {
+            profile.PetGrowth = new List<int>();
+            changed = true;
+        }
+
+        if (petId >= 0 && profile.PetGrowth.Count <= petId)
+        {
+            var missing = petId + 1 - profile.PetGrowth.Count;
+            for (var i = 0; i < missing; i++)
+            {
+                profile.PetGrowth.Add(0);
+            }
+
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static int NormalizePetGrowthValue(int value)
+    {
+        return value < 0 ? 0 : value;
     }
 
     // 作用：根据一次专注会话结果更新用户 profile 里的统计信息。
@@ -201,6 +239,89 @@ public class LocalDataService
 
             newBalance = profile.Credits;
             return true;
+        }
+    }
+
+    /// <summary>
+    /// 获取指定宠物的成长值。
+    /// petId 从 0 开始，若不存在则自动扩容为 0。
+    /// </summary>
+    public int GetPetGrowth(int petId)
+    {
+        if (petId < 0)
+        {
+            return 0;
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            var changed = EnsurePetGrowthList(profile, petId);
+            var growth = profile.PetGrowth[petId];
+
+            if (changed)
+            {
+                SaveUserProfile(profile);
+            }
+
+            return growth;
+        }
+    }
+
+    /// <summary>
+    /// 增加指定宠物的成长值。
+    /// amount 必须为正数；返回增加后的成长值。
+    /// </summary>
+    public int AddPetGrowth(int petId, int amount)
+    {
+        if (petId < 0 || amount <= 0)
+        {
+            return GetPetGrowth(petId);
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            EnsurePetGrowthList(profile, petId);
+
+            var current = NormalizePetGrowthValue(profile.PetGrowth[petId]);
+            checked
+            {
+                current += amount;
+            }
+
+            profile.PetGrowth[petId] = current;
+            SaveUserProfile(profile);
+            return current;
+        }
+    }
+
+    /// <summary>
+    /// 减少指定宠物的成长值。
+    /// amount 必须为正数；不足时减少到 0，返回新的成长值。
+    /// </summary>
+    public int ConsumePetGrowth(int petId, int amount)
+    {
+        if (petId < 0 || amount <= 0)
+        {
+            return GetPetGrowth(petId);
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            EnsurePetGrowthList(profile, petId);
+
+            var current = NormalizePetGrowthValue(profile.PetGrowth[petId]);
+            var newValue = current - amount;
+            if (newValue < 0)
+            {
+                newValue = 0;
+            }
+
+            profile.PetGrowth[petId] = newValue;
+            SaveUserProfile(profile);
+            return newValue;
         }
     }
 
