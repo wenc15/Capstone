@@ -9,7 +9,7 @@
 
 // 2026/01/16 edited by Zikai
 // 新增内容：
-//   - 在 RecordSession(...) 中根据本次会话时长按 floor(秒 / 60) 累积点数（Credits）。
+//   - 在 RecordSession(...) 中根据本次会话时长按 Ceil(秒 / 60) 累积点数（Credits）。
 //   - 新增 GetCredits() / AddCredits() / TryConsumeCredits() 三个点数接口供 Controller 使用。
 // 新增的作用：
 //   - 为抽奖系统、商店系统等提供统一的点数余额数据来源。
@@ -135,7 +135,7 @@ public class LocalDataService
     }
 
     // 作用：根据一次专注会话结果更新用户 profile 里的统计信息。
-    //       现在会额外统计 Aborted -> CanceledSessions，同时按照 floor(专注分钟数) 奖励点数（Credits）。
+    //       现在会额外统计 Aborted -> CanceledSessions，同时按照 ceil(专注分钟数) 奖励点数（Credits）。
     // =============================================================
     public void RecordSession(SessionOutcome outcome, int focusSeconds)
     {
@@ -168,9 +168,9 @@ public class LocalDataService
                     break;
             }
 
-            // 新增：按分钟数奖励点数，使用 floor 原则
-            // 例如：5.9 分钟 → 5 点；0.5 分钟 → 0 点（不奖励）
-            var minutes = safeSeconds / 60; // int 除法自带向下取整
+            // 新增：按分钟数奖励点数，使用 ceil 原则
+            // 例如：5.1 分钟 → 6 点；0.1 分钟 → 1 点（若本次有时长）
+            var minutes = (int)Math.Ceiling(safeSeconds / 60.0);
             if (minutes > 0)
             {
                 profile.Credits += minutes;

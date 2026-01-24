@@ -208,9 +208,8 @@ public class FocusSessionService
         // 更新总体 Profile 统计
         _dataService.RecordSession(outcome, elapsedSeconds);
 
-        // === 新增：写入 session_history.json ===
         // 把秒数换算成分钟，至少 1 分钟
-        var minutes = Math.Max(1, elapsedSeconds / 60);
+        var minutes = Math.Max(1, (int)Math.Ceiling(elapsedSeconds / 60.0));
 
         // 这里用当前 whitelist 作为 note（前端 stats 会展示在“Last Note/App”里）
         var note = _whitelist is { Count: > 0 }
