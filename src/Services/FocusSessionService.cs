@@ -1,3 +1,10 @@
+// 2026/01/21 edited by Zikai Lu
+// 新增内容：
+//   - 使用向上取整计算剩余秒数，避免会话提前结束导致奖励点数不足。
+// 新增的作用：
+//   - 确保成功完成的专注会话能正确累计满分钟的点数与统计时长。
+// =============================================================
+
 // 2025/11/19 edited by 京华昼梦
 // 新增内容：
 //   - 在 EndSession(outcome) 中新增写入会话历史的逻辑。
@@ -132,7 +139,7 @@ public class FocusSessionService
             if (!_isRunning) return;
 
             var now = DateTimeOffset.Now;
-            _remainingSeconds = Math.Max(0, (int)(_endAt - now).TotalSeconds);
+            _remainingSeconds = Math.Max(0, (int)Math.Ceiling((_endAt - now).TotalSeconds));
 
             if (_remainingSeconds <= 0)
             {
@@ -201,9 +208,8 @@ public class FocusSessionService
         // 更新总体 Profile 统计
         _dataService.RecordSession(outcome, elapsedSeconds);
 
-        // === 新增：写入 session_history.json ===
         // 把秒数换算成分钟，至少 1 分钟
-        var minutes = Math.Max(1, elapsedSeconds / 60);
+        var minutes = Math.Max(1, (int)Math.Ceiling(elapsedSeconds / 60.0));
 
         // 这里用当前 whitelist 作为 note（前端 stats 会展示在“Last Note/App”里）
         var note = _whitelist is { Count: > 0 }

@@ -29,7 +29,7 @@ POST http://localhost:5024/api/focus/start
 Content-Type: application/json
 
 {
-  "durationSeconds": 300,
+  "durationSeconds": 60,
   "allowedProcesses": ["chrome.exe", "notepad.exe", "Code.exe"],
   "graceSeconds": 10
 }
