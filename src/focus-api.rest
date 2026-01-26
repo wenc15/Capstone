@@ -1,3 +1,6 @@
+// 2026/01/25 edited by Zhecheng Xu
+// 新增内容：
+//   - 增加方便调试的快捷完成一次对话指令
 // 2026/01/21 edited by Zikai Lu
 // 新增内容：
 //   - 增加宠物成长值相关接口测试。
@@ -130,5 +133,16 @@ Content-Type: application/json
 {
   "amount": 5
 }
+
+###
+
+### Debug: 模拟一次成功专注会话（直接加 Credits）
+# 说明：
+#   - focusSeconds 控制本次“假会话”的时长（秒）
+#   - Credits 增加规则仍然是 floor(秒 / 60)
+# 用法示例：
+#   - 600 秒 -> 预期 addedMinutes = 10，credits += 10
+POST http://localhost:5024/api/debug/fake-success-session?focusSeconds=600
+Content-Type: application/json
 
 ###
