@@ -11,6 +11,7 @@ const RECONNECTFAIL_SLEEP = 5;
 // Backend REST API base URL (from `dotnet run` output)
 const API_BASE = "http://localhost:5024"; // 🔧 change port if needed
 const USAGE_ENDPOINT = `${API_BASE}/api/usage`; // you'll implement this on backend
+const FOCUS_ENDPOINT = `${API_BASE}/api/Focus`;
 
 // 🔧 Turn this ON later when your backend WS server is ready
 const USE_GROWIN_WEBSOCKET = false;
@@ -58,6 +59,64 @@ function initGrowin() {
 // =====================================
 // WebSocket handling
 // =====================================
+async function getFocusStatus() {
+  try {
+    const res = await fetch(`${FOCUS_ENDPOINT}/status`);
+    if (!res.ok) return null;
+    const data = await res.json(); // expected: FocusStatusResponse
+    // e.g. { isRunning: true, remainingSeconds: 1234, ... }
+    return data;
+  } catch (err) {
+    console.error("[Growin] FOCUS_GET_STATUS error:", err);
+    return null;
+  }
+}
+
+async function startFocusSession() {
+  // ⚠️ This body must match your StartFocusRequest model
+  const body = {
+    durationSeconds: 25*60,          // 25 minutes default
+    allowedProcesses: ["chrome.exe"],  // simple example, adjust for your app
+    allowedWebsites: []                // optional
+  };
+
+  try {
+    const res = await fetch(`${FOCUS_ENDPOINT}/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      return { success: false, error: errorText };
+    }
+
+    const status = await res.json();
+    return { success: true, status };
+  } catch (err) {
+    console.error("[Growin] FOCUS_START error:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+async function stopFocusSession() {
+  try {
+    const res = await fetch(`${FOCUS_ENDPOINT}/stop`, {
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      return { success: false, error: errorText };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[Growin] FOCUS_STOP error:", err);
+    return { success: false, error: String(err) };
+  }
+}
 
 function connectGrowin() {
   if (!USE_GROWIN_WEBSOCKET) {
@@ -206,29 +265,50 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GROWIN_TIME_UPDATE") {
-    if (growinActivePage && growinActivePage.url) {
-      growinActivePage.duration += Math.round(message.timeSpent / 1000); // ms → s
-    }
+    // ... existing code ...
   } else if (message.type === "GROWIN_TITLE_UPDATE") {
-    if (growinActivePage && growinActivePage.url) {
-      growinActivePage.title = message.title;
-    }
+    // ... existing code ...
   } else if (message.type === "GET_GROWIN_STATUS") {
-    sendResponse({
-      isConnected: isGrowinConnected,
-      isChromeFocused: isChromeFocused,
-      isSleep: isGrowinSleep,
-      activePage: growinActivePage,
-      reconnectFail: reconnectFail,
-    });
-    return true;
-  } else if (message.type === "GROWIN_CONNECT") {
-    console.log("[Growin] Connect request from UI");
+  const isBackendConnected = USE_GROWIN_WEBSOCKET ? isGrowinConnected : true;
+
+  sendResponse({
+    isConnected: isBackendConnected,
+    isChromeFocused: isChromeFocused,
+    isSleep: isGrowinSleep,
+    activePage: growinActivePage,
+    reconnectFail: reconnectFail,
+  });
+  return true;
+} else if (message.type === "GROWIN_CONNECT") {
     connectGrowin();
     sendResponse({ success: true });
     return true;
+
+  // --- NEW: focus APIs for popup ---
+
+  } else if (message.type === "FOCUS_GET_STATUS") {
+    getFocusStatus().then(
+      (status) => sendResponse(status),
+      () => sendResponse(null)
+    );
+    return true; // async
+
+  } else if (message.type === "FOCUS_START") {
+    startFocusSession().then(
+      (result) => sendResponse(result),
+      (err) => sendResponse({ success: false, error: String(err) })
+    );
+    return true;
+
+  } else if (message.type === "FOCUS_STOP") {
+    stopFocusSession().then(
+      (result) => sendResponse(result),
+      (err) => sendResponse({ success: false, error: String(err) })
+    );
+    return true;
   }
 });
+
 
 // =====================================
 // Helper functions

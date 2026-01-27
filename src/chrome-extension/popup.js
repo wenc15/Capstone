@@ -1,66 +1,99 @@
-// popup.js for Growin extension
+document.addEventListener("DOMContentLoaded", () => {
+  const backendStatusEl = document.getElementById("backendStatus");
+  const focusStatusEl = document.getElementById("focusStatus");
+  const startBtn = document.getElementById("startFocusBtn");
+  const stopBtn = document.getElementById("stopFocusBtn");
 
-document.addEventListener('DOMContentLoaded', () => {
-  const statusDiv = document.getElementById('status');
-  const currentPageDiv = document.getElementById('currentPage');
-  const connectBtn = document.getElementById('connectBtn');
+  // --- helpers to render UI ---
 
-  // Ask background for current Growin status
-  function updateGrowinStatus() {
-    chrome.runtime.sendMessage({ type: 'GET_GROWIN_STATUS' }, (response) => {
-      // In case the service worker was reloaded / no response
-      if (chrome.runtime.lastError) {
-        console.warn('[Growin] popup: no response from background:', chrome.runtime.lastError.message);
-        statusDiv.innerHTML = '<span class="disconnected">⚠️ Background not responding</span>';
-        return;
-      }
+  function renderGrowinStatus(status) {
+    // status from background: { isConnected, isChromeFocused, isSleep, activePage, reconnectFail }
+    if (!status.isConnected) {
+      backendStatusEl.className = "status-card status-error";
+      backendStatusEl.textContent = "Not connected to Growin backend";
+    } else {
+      backendStatusEl.className = "status-card status-ok";
+      backendStatusEl.textContent = "Connected to Growin backend";
+    }
 
-      if (response) {
-        displayGrowinStatus(response);
-      }
-    });
   }
 
-  // Connect / reconnect button
-  connectBtn.addEventListener('click', () => {
-    console.log('[Growin] popup: Connect button clicked');
-    chrome.runtime.sendMessage({ type: 'GROWIN_CONNECT' }, (response) => {
-      console.log('[Growin] popup: connect response:', response);
-      // Give background a moment to reconnect, then refresh the UI
-      setTimeout(updateGrowinStatus, 1000);
+  function renderFocusStatus(focus) {
+    // expect from background: { isRunning, remainingSeconds, … } or null
+    if (!focus || focus.isRunning === undefined) {
+      focusStatusEl.className = "status-card status-neutral";
+      focusStatusEl.textContent = "Focus session: unknown";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      return;
+    }
+
+    if (focus.isRunning) {
+      focusStatusEl.className = "status-card status-ok";
+      const minutes = Math.ceil((focus.remainingSeconds || 0) / 60);
+      focusStatusEl.textContent = `Focus is ON · ~${minutes} min left`;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    } else {
+      focusStatusEl.className = "status-card status-neutral";
+      focusStatusEl.textContent = "Focus is OFF";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+  }
+
+  // --- initial load: ask background for status ---
+
+  chrome.runtime.sendMessage({ type: "GET_GROWIN_STATUS" }, (response) => {
+    if (chrome.runtime.lastError) {
+      backendStatusEl.className = "status-card status-error";
+      backendStatusEl.textContent = "Extension error: " + chrome.runtime.lastError.message;
+      return;
+    }
+    if (response) {
+      renderGrowinStatus(response);
+    }
+  });
+
+  chrome.runtime.sendMessage({ type: "FOCUS_GET_STATUS" }, (response) => {
+    if (response) {
+      renderFocusStatus(response);
+    } else {
+      renderFocusStatus(null);
+    }
+  });
+
+  // --- button handlers ---
+
+  startBtn.addEventListener("click", () => {
+    startBtn.disabled = true;
+
+    chrome.runtime.sendMessage({ type: "FOCUS_START" }, (response) => {
+      if (response && response.success) {
+        renderFocusStatus(response.status);
+      } else {
+        // simple error display
+        focusStatusEl.className = "status-card status-error";
+        focusStatusEl.textContent =
+          "Failed to start focus: " + (response && response.error ? response.error : "unknown error");
+        startBtn.disabled = false;
+      }
     });
   });
 
-  function displayGrowinStatus(status) {
-    // Connection state
-    if (status.isConnected) {
-      statusDiv.innerHTML = '<span class="connected">✅ Connected to Growin backend</span>';
-      connectBtn.textContent = 'Reconnect';
-      connectBtn.className = 'reconnect';
-    } else {
-      statusDiv.innerHTML = '<span class="disconnected">❌ Not connected to Growin backend</span>';
-      connectBtn.textContent = 'Connect server';
-      connectBtn.className = 'primary';
-    }
+  stopBtn.addEventListener("click", () => {
+    stopBtn.disabled = true;
 
-    // Current active page info
-    if (status.activePage && status.activePage.url) {
-      const duration = status.activePage.duration || 0;
-
-      currentPageDiv.innerHTML = `
-        <p><strong>Current page:</strong></p>
-        <p>📄 ${status.activePage.title || 'No title'}</p>
-        <p>🌐 ${status.activePage.domain}</p>
-        <p>⏱️ ${duration}s</p>
-      `;
-    } else {
-      currentPageDiv.innerHTML = '<p>No active page tracked yet</p>';
-    }
-  }
-
-  // Initial fetch
-  updateGrowinStatus();
-
-  // Periodically refresh UI every 2 seconds
-  setInterval(updateGrowinStatus, 2000);
+    chrome.runtime.sendMessage({ type: "FOCUS_STOP" }, (response) => {
+      if (response && response.success) {
+        renderFocusStatus({ isRunning: false });
+      } else {
+        focusStatusEl.className = "status-card status-error";
+        focusStatusEl.textContent =
+          "Failed to stop focus: " + (response && response.error ? response.error : "unknown error");
+      }
+      // After stop, allow start again
+      startBtn.disabled = false;
+    });
+  });
 });
