@@ -1,10 +1,15 @@
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - 在用户 Profile 中增加 Inventory 字典，用于存储物品及其数量。
+// 新增的作用：
+//   - 为背包系统提供本地物品存储能力。
+// =============================================================
 // 2026/01/21 edited by Zikai Lu
 // 新增内容：
 //   - 在用户 Profile 中增加 PetGrowth 列表，用于存储宠物成长值（按编号索引）。
 // 新增的作用：
 //   - 为宠物系统提供本地成长值数据来源，便于查询与增减。
 // =============================================================
-
 // 2026/01/16 edited by Zikai
 // 新增内容：
 //   - 在用户 Profile 中增加 Credits 字段，保存当前点数余额。
@@ -33,6 +38,7 @@
 // 开发者（Profile 部分）：Zikai Lu
 // =============================================================
 
+using System;
 using System.Collections.Generic;
 
 namespace CapstoneBackend.Models;
@@ -66,4 +72,10 @@ public class UserProfile
     /// 默认值为 0；预留 -1 表示“未拥有”的情况（未来可用）。
     /// </summary>
     public List<int> PetGrowth { get; set; } = new();
+
+    /// <summary>
+    /// 背包物品字典，key 为物品 id，value 为数量。
+    /// 未包含的物品视为数量 0。
+    /// </summary>
+    public Dictionary<string, int> Inventory { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

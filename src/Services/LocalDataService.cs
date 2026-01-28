@@ -1,3 +1,10 @@
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - 增加 Inventory 相关接口：GetInventory() / AddInventoryItem() / TryConsumeInventoryItem()。
+// 新增的作用：
+//   - 为背包系统提供本地物品存取能力，防止数量为负数。
+// =============================================================
+
 // 2026/01/21 edited by Zikai Lu
 // 新增内容：
 //   - 添加宠物成长值（PetGrowth）读写逻辑：GetPetGrowth() / AddPetGrowth() / ConsumePetGrowth()。
@@ -238,6 +245,96 @@ public class LocalDataService
             SaveUserProfile(profile);
 
             newBalance = profile.Credits;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 获取背包内所有物品及其数量。
+    /// </summary>
+    public Dictionary<string, int> GetInventory()
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+
+            if (profile.Inventory == null)
+            {
+                profile.Inventory = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                SaveUserProfile(profile);
+            }
+
+            return new Dictionary<string, int>(profile.Inventory, StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// 增加指定物品的数量。
+    /// amount 必须为正数；返回增加后的数量。
+    /// </summary>
+    public int AddInventoryItem(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            return 0;
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            if (profile.Inventory == null)
+            {
+                profile.Inventory = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            profile.Inventory.TryGetValue(itemId, out var current);
+            if (current < 0)
+            {
+                current = 0;
+            }
+
+            checked
+            {
+                current += amount;
+            }
+
+            profile.Inventory[itemId] = current;
+            SaveUserProfile(profile);
+            return current;
+        }
+    }
+
+    /// <summary>
+    /// 尝试消耗指定物品的数量。
+    /// - 当库存不足或 amount 非正数时，返回 false，库存不变。
+    /// - 成功时返回 true，并通过 newCount 输出新的数量。
+    /// </summary>
+    public bool TryConsumeInventoryItem(string itemId, int amount, out int newCount)
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            if (profile.Inventory == null)
+            {
+                profile.Inventory = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            profile.Inventory.TryGetValue(itemId, out var current);
+            if (current < 0)
+            {
+                current = 0;
+            }
+
+            if (string.IsNullOrWhiteSpace(itemId) || amount <= 0 || current < amount)
+            {
+                newCount = current;
+                return false;
+            }
+
+            profile.Inventory[itemId] = current - amount;
+            SaveUserProfile(profile);
+
+            newCount = profile.Inventory[itemId];
             return true;
         }
     }

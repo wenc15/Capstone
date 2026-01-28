@@ -1,6 +1,14 @@
+
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - 增加背包（Inventory）相关接口测试。
+// 新增的作用：
+//   - 便于前端联调查询与增减背包物品的接口。
+// =============================================================
 // 2026/01/25 edited by Zhecheng Xu
 // 新增内容：
 //   - 增加方便调试的快捷完成一次对话指令
+// =============================================================
 // 2026/01/21 edited by Zikai Lu
 // 新增内容：
 //   - 增加宠物成长值相关接口测试。
@@ -20,8 +28,9 @@
 #   2. 默认模板接口（WeatherForecast 示例）
 #   3. 用户 Profile 接口
 #   4. 宠物成长值接口：查询 / 增加 / 减少
-#   5. 白名单预设接口：获取 / 保存 / 删除
-#   6. 点数系统接口：查询 / 增加 / 消耗点数
+#   5. 背包接口：查询 / 增加 / 消耗物品
+#   6. 白名单预设接口：获取 / 保存 / 删除
+#   7. 点数系统接口：查询 / 增加 / 消耗点数
 # 使用方式：
 #   - 安装 VS Code 插件 "REST Client"
 #   - 光标放在任意请求块内，点击 "Send Request" 即可。
@@ -81,6 +90,33 @@ Content-Type: application/json
 
 {
   "amount": 2
+}
+
+###
+
+### 查询背包全部物品
+GET http://localhost:5024/api/inventory
+
+###
+
+### 增加背包物品数量
+POST http://localhost:5024/api/inventory/add
+Content-Type: application/json
+
+{
+  "itemId": "testObject1",
+  "amount": 2
+}
+
+###
+
+### 消耗背包物品数量（库存不足会返回 400）
+POST http://localhost:5024/api/inventory/consume
+Content-Type: application/json
+
+{
+  "itemId": "testObject1",
+  "amount": 1
 }
 
 ###
