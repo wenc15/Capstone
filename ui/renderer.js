@@ -1,8 +1,13 @@
+// 2026/01/28 edited by JS
+// Changes:
+//  - Mount Store UI module alongside existing views.
+
 import { collectDom } from './js/dom.js';
 import { mountWidget } from './js/widget.js';
 import { mountTimer } from './js/timer_ui.js';
 import { mountNav } from './js/nav.js';
 import { mountPet } from './js/pet.js';
+import { mountStore } from './js/store.js';
 
 const els = collectDom();      // ← 现在 DOM 都来自这里
 
@@ -10,6 +15,7 @@ mountWidget();
 mountTimer(els);
 mountNav(els);
 mountPet(els);  
+mountStore(els);
 // 2026/1/22 edited by JS:
 // 修改内容：
 //   - 引入 Credits 前端状态管理。
