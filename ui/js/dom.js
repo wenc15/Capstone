@@ -23,9 +23,16 @@ export function collectDom() {
   const viewTimer = document.getElementById('view-timer');
   const viewStats = document.getElementById('view-stats');
   const viewPet   = document.getElementById('view-pet');
+  const viewGacha = document.getElementById('view-gacha');  
+
   const navTimer  = document.getElementById('navTimer');
   const navStats  = document.getElementById('navStats');
-  const navPet    = document.getElementById('navPet');  
+  const navPet    = document.getElementById('navPet');
+  const navGacha  = document.getElementById('navGacha');    
+  
+  // ===== Gacha =====
+  
+  const gachaRoot = document.getElementById('gachaRoot');
 
   // ===== Pet/Store =====
   const storeBtn = document.getElementById('storeBtn');
@@ -61,9 +68,15 @@ export function collectDom() {
     viewTimer,
     viewStats,
     viewPet, 
+    viewGacha,
     navTimer,
     navStats,
     navPet, 
+    navGacha, 
+
+    //Gacha
+    gachaRoot,
+
 
     // Pet/Store
     storeBtn,

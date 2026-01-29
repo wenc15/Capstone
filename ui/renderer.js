@@ -8,7 +8,7 @@ import { mountTimer } from './js/timer_ui.js';
 import { mountNav } from './js/nav.js';
 import { mountPet } from './js/pet.js';
 import { mountStore } from './js/store.js';
-
+import { mountGacha } from './js/gacha.js';
 const els = collectDom();      // ← 现在 DOM 都来自这里
 
 mountWidget();
@@ -16,6 +16,7 @@ mountTimer(els);
 mountNav(els);
 mountPet(els);  
 mountStore(els);
+mountGacha(els);
 // 2026/1/22 edited by JS:
 // 修改内容：
 //   - 引入 Credits 前端状态管理。

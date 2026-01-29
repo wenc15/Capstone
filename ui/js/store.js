@@ -5,7 +5,7 @@
 
 // js/store.js
 
-import { refreshCredits, subscribeCredits } from './creditsStore.js';
+import { refreshCredits, subscribeCredits, consumeCredits as storeConsumeCredits } from './creditsStore.js';
 import { showToast } from './utils.js';
 
 const API_BASE = 'http://localhost:5024';
@@ -52,12 +52,6 @@ async function addInventoryItem(itemId, amount) {
   });
 }
 
-async function consumeCredits(amount) {
-  return fetchJson('/api/credits/consume', {
-    method: 'POST',
-    body: JSON.stringify({ amount }),
-  });
-}
 
 function buildOverlay() {
   const overlay = document.createElement('div');
@@ -174,9 +168,9 @@ export function mountStore(els) {
       btn.innerHTML = 'Buying...';
 
       try {
-        await consumeCredits(product.cost);
+        await storeConsumeCredits(product.cost);
         await addInventoryItem(product.id, 1);
-        await Promise.all([refreshCredits(), refreshInventory()]);
+        await refreshInventory(); // credits 已在 store 里更新了
         showToast(els.toastEl, `Purchased ${product.name} (+${product.exp} EXP).`);
       } catch (e) {
         const msg = e?.body?.message || e?.message || 'Purchase failed.';

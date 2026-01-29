@@ -1,4 +1,8 @@
-/* 2026/01/28 edited by JS
+/* 2026/01/28 added by Zhecheng Xu
+ *  - Add main Gacha view styles (kibble background + two buttons bottom-right).
+ */
+
+ /* 2026/01/28 edited by JS
  * Changes:
  *  - Ensure main panel fills window height across views (Timer/Stats/Pet).
  *  - Add Store overlay styles.
@@ -575,3 +579,163 @@ body{
   .store-card::before{ height: 140px; }
   .store-title{ font-size: 28px; }
 }
+
+#gachaRoot {
+  width: 100%;
+}
+
+/* 主画面：只有背景图 */
+.gacha-stage {
+  position: relative;
+  width: 100%;
+  min-height: 520px;
+  border-radius: 18px;
+  overflow: hidden;
+
+  /* 背景：狗粮图（你自己放到 assets 下） */
+  background: url("assets/gacha_kibble_bg.png") center/cover no-repeat;
+
+  /* 如果背景图太花，加一层轻微柔化，让按钮更清晰 */
+}
+
+/* 轻微蒙层（可选，但我建议保留：按钮对比度会更稳） */
+.gacha-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.00) 0%,
+    rgba(255,255,255,0.18) 60%,
+    rgba(255,255,255,0.28) 100%
+  );
+  pointer-events: none;
+}
+
+/* 右下角按钮容器 */
+.gacha-actions {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  display: flex;
+  gap: 12px;
+  z-index: 2;
+}
+
+/* 主标题 */
+.gacha-ten-title{
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+/* 副标题：更小、更淡一些 */
+.gacha-ten-sub{
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 1;
+  letter-spacing: 0.6px;
+  background: rgba(255,255,255,0.18);   /* 可选：像小标签 */
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+/* ✅ 按钮基础：两个按钮都走主题绿色 */
+.gacha-btn{
+  border: none;
+  background: var(--green);
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 900;
+  box-shadow: 0 10px 22px rgba(75,139,107,.22);
+}
+
+.gacha-btn:hover{
+  filter: brightness(0.98);
+}
+
+.gacha-btn:active{
+  background: var(--green-press);
+  transform: translateY(1px);
+}
+
+/* ✅ 仅 10x 需要两行排版：不要再写 primary，写 gacha-ten 就行 */
+.gacha-btn.gacha-ten{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.05;
+}
+
+
+/* 小屏适配：按钮别贴边太紧 */
+@media (max-width: 700px) {
+  .gacha-stage {
+    min-height: 420px;
+  }
+  .gacha-actions {
+    right: 14px;
+    bottom: 14px;
+  }
+}
+
+.gacha-title{
+  position: absolute;
+  left: 22px;
+  top: 18px;
+  z-index: 2;
+}
+
+.gacha-title-main{
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  color: #c9ffd9;
+}
+
+.gacha-title-sub{
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;   /* 不要加粗 */
+  opacity: 0.9;
+  color: rgb(255, 255, 255);
+}
+
+/* 抽卡结果显示（左下角，不挡按钮） */
+.gacha-result{
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  z-index: 2;
+  max-width: 360px;
+}
+
+.gacha-result-card{
+  border-radius: 16px;
+  border: 1px solid rgba(220, 229, 223, 0.95);
+  background: rgba(255,255,255,0.82);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.08);
+  backdrop-filter: blur(6px);
+  padding: 12px 14px;
+}
+
+.gacha-result-title{
+  font-weight: 900;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.gacha-result-item{
+  font-size: 13px;
+  color: var(--sub);
+  margin: 3px 0;
+}
+
+
+
+
