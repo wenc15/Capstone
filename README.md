@@ -1,3 +1,3 @@
 # Capstone: Growin
 
-This is forcus enhancement tool
+This is a focus enhancement tool
