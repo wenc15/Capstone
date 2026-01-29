@@ -62,11 +62,19 @@ builder.Services.AddSingleton<LocalDataService>();
 // 作为 Singleton，确保整个应用只有一个会话状态源。
 builder.Services.AddSingleton<FocusSessionService>();
 
+// 注册抽卡服务（Draw Card System）
+// Scoped：每个 HTTP 请求一个实例，适合依赖 DbContext 的服务
+builder.Services.AddScoped<ICardDrawService, CardDrawService>();
+
+
 // 注册 EF Core + SQLite 数据库上下文（用于存储网站使用记录等）
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlite("Data Source=growin.db");
 });
+
+
+
 
 // 配置 CORS：开发阶段允许本地前端自由访问
 // 注意：这是开发环境用的“全开放”策略，后期如果要上线可以收紧域名。
