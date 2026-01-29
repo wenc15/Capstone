@@ -1,3 +1,13 @@
+/* 2026/01/29 edited by Zhecheng Xu
+ * Changes:
+ *  - Whitelist search row layout update: place Browse button to the right of the search input (inline row).
+ *  - Add Browse button styles to match Growin theme (rounded, muted border, consistent height).
+ *  - Ensure search input keeps a stable width and doesn't shrink too much when row becomes flex.
+ * =============================================================
+ * Purpose:
+ *  - Keep whitelist UI consistent and usable when adding the new Browse entry.
+ */
+
 /* 2026/01/28 added by Zhecheng Xu
  *  - Add main Gacha view styles (kibble background + two buttons bottom-right).
  */
@@ -225,8 +235,31 @@ body{
   margin-bottom: 4px;
 }
 
+.wl-search-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+} 
+
+.wl-browse-btn{
+  border: none;
+  background: var(--chip);
+  border: 1px solid var(--muted);
+  border-radius: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.wl-browse-btn:hover{ background:#f3f4f3; }
+.wl-browse-btn:active{ transform: translateY(1px); }
+
 .wl-search-row input {
-  width: 100%;
+  flex: 1 1 0;          /* 关键：允许增长，基础宽度从 0 开始参与分配 */
+  min-width: 260px;     /* 关键：防止变得太短（你可以调成 220/300） */
+  width: 100%;          /* 可留可不留，留着更保险 */
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid var(--muted);
