@@ -1,3 +1,10 @@
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - Start 接口为 AllowedWebsites 赋默认空列表。
+// 新增的作用：
+//   - 允许 chrome-extension 传入网站白名单并避免空引用。
+// =============================================================
+
 // 2025/11/18 edited by 京华昼梦
 // 新增内容：
 //   - 在 Start 接口中统一使用 JSON 形式的错误返回（new { error = "..." }）。
@@ -15,6 +22,7 @@
 //   - Stop() 和 Status() 接口保持不变，用于手动结束与轮询状态。
 // =============================================================
 
+using System.Collections.Generic;
 using CapstoneBackend.Models;
 using CapstoneBackend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +50,8 @@ public class FocusController : ControllerBase
 
         if (request.AllowedProcesses == null || request.AllowedProcesses.Count == 0)
             return BadRequest(new { error = "AllowedProcesses cannot be empty" });
+
+        request.AllowedWebsites ??= new List<string>();
 
         // 新增：如果当前已有一个专注会话在运行，则返回 409 Conflict，避免重复启动。
         if (_focusService.IsRunning())

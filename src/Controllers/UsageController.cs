@@ -1,3 +1,10 @@
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - 在 POST /api/usage 中联动 FocusSessionService。
+// 新增的作用：
+//   - 用网站使用上报触发白名单违规判断。
+// =============================================================
+
 // 2025/11/27 created by wenc15
 // 内容：
 //   - 新增 UsageController 处理网页使用记录相关 API。
@@ -20,6 +27,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CapstoneBackend.Data;
 using CapstoneBackend.Models;
+using CapstoneBackend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,11 +39,13 @@ public class UsageController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<UsageController> _logger;
+    private readonly FocusSessionService _focusService;
 
-    public UsageController(AppDbContext db, ILogger<UsageController> logger)
+    public UsageController(AppDbContext db, ILogger<UsageController> logger, FocusSessionService focusService)
     {
         _db = db;
         _logger = logger;
+        _focusService = focusService;
     }
 
     // ---------------------------------------------------------
@@ -86,6 +96,7 @@ public class UsageController : ControllerBase
                 UserId = item.UserId ?? "local"
             };
 
+            _focusService.ReportWebsiteUsage(item.Domain, item.Url, item.Duration);
             _db.WebsiteUsages.Add(usage);
         }
 
