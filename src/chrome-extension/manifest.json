@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Growin",
+  "version": "1.0",
+  "description": "Track webpage usage time with detailed information for better productivity",
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "alarms",
+    "idle"
+  ],
+
+  "host_permissions": [
+    "http://localhost:5024/*"
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Growin"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+

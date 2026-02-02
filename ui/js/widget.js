@@ -18,8 +18,12 @@
 //   - widget 与主计时器之间实现**双向同步**：无论从哪一侧 Start/Stop，
 //     UI 与内部状态都会保持一致，避免重复计时与错乱。
 
+// 2025/11/18 edited by Qinquan Wang:
+// 新增内容：
+// 暂停按钮改为停止按钮，图标和 aria-label 也相应更改。
 
-// widget.js —— 只订阅共享状态，不再自己计时、不再 fetch
+// 12.21 updated by Jingyao: 使独立widget可调用主界面start
+
 import { subscribeFocusStatus, getFocusStatus } from './focusStatusStore.js';
 
 // ---- Mount widget UI ----
@@ -29,7 +33,7 @@ export function mountWidget() {
 
   root.innerHTML = `
     <div class="wg-time" id="wgTime">00:00</div>
-    <button class="wg-btn" id="wgPlay" aria-label="Play/Pause">▶️</button>
+    <button class="wg-btn" id="wgPlay" aria-label="Start/Stop">▶️</button>
   `;
 
   const elTime = root.querySelector('#wgTime');
@@ -44,7 +48,9 @@ export function mountWidget() {
 
   function render(st) {
     elTime.textContent = formatSeconds(st.remainingSeconds ?? 0);
-    btnPlay.textContent = st.isRunning ? '⏸️' : '▶️';
+
+    // ✅ 运行中显示 Stop 图标，不再是 Pause
+    btnPlay.textContent = st.isRunning ? '⏹️' : '▶️';
 
     root.classList.toggle('wg-running', !!st.isRunning);
     root.classList.toggle('wg-failed', !!st.isFailed);
@@ -57,10 +63,32 @@ export function mountWidget() {
   // 订阅：每次 timer UI 更新 status，这里自动重画
   subscribeFocusStatus(render);
 
-  // ✅ widget 不负责 start/stop，只是遥控/镜像
-  // 如果你希望点 widget 也能启动，就简单转发给 main page 的 start 按钮：
+  // ✅ widget 作为“遥控 Start / Stop”：
+  // - 如果当前在运行 → 点一下 = 调用主界面 Stop
+  // - 如果当前没在运行 → 点一下 = 调用主界面 Start
+  //12.21 updated by Jingyao: 使独立widget可调用主界面start
   btnPlay.addEventListener('click', () => {
-    const mainStartBtn = document.getElementById('startBtn'); // 你主页面 start 按钮的 id
-    if (mainStartBtn) mainStartBtn.click();
+    const st = getFocusStatus();
+
+    if (st.isRunning) {
+      // 1) 内置 widget（同一页面）优先直接点按钮
+      const mainStopBtn = document.getElementById('stopBtn');
+      if (mainStopBtn) return mainStopBtn.click();
+
+      // 2) 浮动球（独立窗口）走 IPC 命令
+      if (window.electronAPI?.sendFocusCommand) return window.electronAPI.sendFocusCommand('stop');
+
+      console.warn('stop: no stopBtn and no IPC bridge');
+      return;
+    }
+
+    // st.isRunning === false
+    const mainStartBtn = document.getElementById('startBtn');
+    if (mainStartBtn) return mainStartBtn.click();
+
+    if (window.electronAPI?.sendFocusCommand) return window.electronAPI.sendFocusCommand('start');
+
+    console.warn('start: no startBtn and no IPC bridge');
   });
+
 }

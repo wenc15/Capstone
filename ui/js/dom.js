@@ -1,3 +1,7 @@
+// 2026/01/28 edited by JS
+// Changes:
+//  - Collect Pet view DOM (level/exp) and Store button for the new store overlay.
+
 // js/dom.js
 // Collects all DOM elements needed across the UI.
 
@@ -18,14 +22,36 @@ export function collectDom() {
   // ===== View switching =====
   const viewTimer = document.getElementById('view-timer');
   const viewStats = document.getElementById('view-stats');
+  const viewPet   = document.getElementById('view-pet');
+  const viewGacha = document.getElementById('view-gacha');  
+
   const navTimer  = document.getElementById('navTimer');
   const navStats  = document.getElementById('navStats');
+  const navPet    = document.getElementById('navPet');
+  const navGacha  = document.getElementById('navGacha');    
+  
+  // ===== Gacha =====
+  
+  const gachaRoot = document.getElementById('gachaRoot');
+
+  // ===== Pet/Store =====
+  const storeBtn = document.getElementById('storeBtn');
 
   // ===== Stats area =====
   const statCount    = document.getElementById('statCount');
   const statTotal    = document.getElementById('statTotal');
   const statLastNote = document.getElementById('statLastNote');
   const chartCanvas  = document.getElementById('focusChart');
+
+  //2026/1/22 added token dom
+  const tokenValue = document.getElementById('tokenValue');
+
+  // ===== Pet view =====
+  const feedBtn = document.getElementById('feedBtn');
+  const playBtn = document.getElementById('playBtn');
+  const petSpeechBubble = document.getElementById('petSpeechBubble');
+  const petLevel = document.getElementById('petLevel');
+  const petExpFill = document.getElementById('petExpFill');
 
   return {
     // Timer
@@ -41,8 +67,26 @@ export function collectDom() {
     // Views & Nav
     viewTimer,
     viewStats,
+    viewPet, 
+    viewGacha,
     navTimer,
     navStats,
+    navPet, 
+    navGacha, 
+
+    //Gacha
+    gachaRoot,
+
+
+    // Pet/Store
+    storeBtn,
+
+    // Pet
+    feedBtn,
+    playBtn,
+    petSpeechBubble,
+    petLevel,
+    petExpFill,
 
     // Stats
     statCount,
@@ -55,5 +99,8 @@ export function collectDom() {
 
     // Convenience object for stats.js
     statsEls: { statCount, statTotal, statLastNote, chartCanvas },
+
+    //token/credits
+    tokenValue,
   };
 }

@@ -1,0 +1,117 @@
+
+<!-- 11.27 created by Jingyao Sun:
+     使widget球可以悬浮于其他应用之上
+
+     12.21 edited: 删除多余的style
+-->
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Floating Widget</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    html, body {
+      background: transparent;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* 让整个圆形区域成为可拖动区 */
+    #widget {
+      -webkit-app-region: drag;
+    }
+
+    /* 内部所有可点击/可输入元素都不拦截拖动 */
+    #widget button,
+    #widget a,
+    #widget input,
+    #widget .no-drag {
+      -webkit-app-region: no-drag;
+    }
+
+    /* 兜底样式（若你的 style.css 已有圆球外观，可忽略这几行） */
+    .wg-ball {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: rgba(200,200,200,0.9);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.8) inset,
+                  0 10px 30px rgba(0,0,0,0.2);
+      display: grid;
+      place-items: center;
+    }
+    .wg-time {
+      font: 600 24px/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto;
+      user-select: none;
+      pointer-events: none;
+    }
+    .wg-actions { position: absolute; bottom: 10px; display: flex; gap: 8px; }
+    .wg-actions button { padding: 4px 8px; border-radius: 8px; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="widget"></div>
+
+  <!-- 共享状态仓库（已支持 BroadcastChannel + IPC） -->
+  <script type="module" src="./js/focusStatusStore.js"></script>
+
+  <!-- 1) 优先使用你自己的 widget.js；2) 没有 mount 时，走兜底渲染 -->
+  <script type="module">
+    import { subscribeFocusStatus, getFocusStatus, setFocusStatus } from './js/focusStatusStore.js';
+
+    const root = document.getElementById('widget');
+
+    let mountedByUserCode = false;
+    try {
+      const Widget = await import('./js/widget.js');
+      if (Widget && typeof Widget.mountWidget === 'function') {
+        Widget.mountWidget(root);
+        mountedByUserCode = true;
+      }
+    } catch (e) {
+      // 没有 widget.js 或其未导出 mountWidget，则走兜底
+    }
+
+    if (!mountedByUserCode) {
+      // 兜底：简单渲染一个可用的计时 UI（不侵入你的业务）
+      root.innerHTML = `
+        <div class="wg-ball">
+          <div class="wg-time" id="wg-time">--:--</div>
+          <div class="wg-actions">
+            <button id="wg-start" class="no-drag">Start</button>
+            <button id="wg-stop" class="no-drag">Stop</button>
+          </div>
+        </div>
+      `;
+      const elTime = root.querySelector('#wg-time');
+      const btnStart = root.querySelector('#wg-start');
+      const btnStop = root.querySelector('#wg-stop');
+
+      // 这里仅作为“命令发射”的示例：把意图写进状态，真正的 Start/Stop 仍建议由主窗执行后再广播状态
+      btnStart.addEventListener('click', () => {
+        setFocusStatus({ isRunning: true, isFailed: false, failReason: null });
+      });
+      btnStop.addEventListener('click', () => {
+        setFocusStatus({ isRunning: false });
+      });
+
+      const render = (st) => {
+        const secs = Math.max(0, Math.floor(st.remainingSeconds || 0));
+        const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+        const ss = String(secs % 60).padStart(2, '0');
+        elTime.textContent = `${mm}:${ss}`;
+        btnStart.disabled = !!st.isRunning;
+        btnStop.disabled = !st.isRunning;
+      };
+
+      render(getFocusStatus());
+      subscribeFocusStatus(render);
+    }
+  </script>
+</body>
+</html>
