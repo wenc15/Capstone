@@ -400,6 +400,33 @@ body{
   width: 220px;
   height: auto;
   image-rendering: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pet-video{
+  width: 220px;
+  height: auto;
+  border-radius: 12px;
+}
+
+.pet-sprite.is-egg{
+  transform-origin: 50% 80%;
+  animation: eggWobble 2.6s ease-in-out infinite;
+}
+
+@keyframes eggWobble{
+  0%   { transform: translateY(0) rotate(0deg); }
+  12%  { transform: translateY(-2px) rotate(-2deg); }
+  28%  { transform: translateY(0) rotate(2deg); }
+  44%  { transform: translateY(-1px) rotate(-1deg); }
+  60%  { transform: translateY(0) rotate(1.5deg); }
+  76%  { transform: translateY(-1px) rotate(-1deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .pet-sprite.is-egg{ animation: none; }
 }
 .speech-bubble{
   position:absolute;

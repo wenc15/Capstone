@@ -49,6 +49,8 @@ export function collectDom() {
   // ===== Pet view =====
   const feedBtn = document.getElementById('feedBtn');
   const playBtn = document.getElementById('playBtn');
+  const petMedia = document.getElementById('petMedia');
+  const petImage = document.getElementById('petImage');
   const petSpeechBubble = document.getElementById('petSpeechBubble');
   const petLevel = document.getElementById('petLevel');
   const petExpFill = document.getElementById('petExpFill');
@@ -84,6 +86,8 @@ export function collectDom() {
     // Pet
     feedBtn,
     playBtn,
+    petMedia,
+    petImage,
     petSpeechBubble,
     petLevel,
     petExpFill,
