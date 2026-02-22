@@ -118,6 +118,14 @@ public class FocusSessionService
     private const int AutoTrustMaxParentDepth = 6;
     private const int AutoTrustMaxPerSession = 32;
     private static readonly TimeSpan AutoTrustProcessStartTolerance = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan AutoTrustLauncherFallbackWindow = TimeSpan.FromMinutes(2);
+    private static readonly HashSet<string> LauncherLikeProcessNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "update",
+        "updater",
+        "launcher",
+        "bootstrapper",
+    };
 
 
     public FocusSessionService(LocalDataService dataService)
@@ -340,7 +348,8 @@ public class FocusSessionService
         if (_sessionTrustedProcesses.Count >= AutoTrustMaxPerSession)
             return false;
 
-        if (active.StartTime is null || active.StartTime.Value < _startAt - AutoTrustProcessStartTolerance)
+        var startedInSession = active.StartTime is null || active.StartTime.Value >= _startAt - AutoTrustProcessStartTolerance;
+        if (!startedInSession)
             return false;
 
         var visited = new HashSet<int>();
@@ -361,6 +370,25 @@ public class FocusSessionService
 
             pid = parent.ParentProcessId;
             depth++;
+        }
+
+        if (active.StartTime is not null
+            && active.StartTime.Value <= _startAt + AutoTrustLauncherFallbackWindow
+            && HasLauncherLikeWhitelistEntry())
+        {
+            _sessionTrustedProcesses.Add(activeNormalized);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HasLauncherLikeWhitelistEntry()
+    {
+        foreach (var allowed in _whitelist)
+        {
+            if (LauncherLikeProcessNames.Contains(allowed))
+                return true;
         }
 
         return false;
