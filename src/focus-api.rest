@@ -1,5 +1,9 @@
 
 // 2026/01/27 edited by Zikai Lu
+// 修改内容：
+//   - 修改专注开始测试以便同时测试chrome extention
+// =============================================================
+// 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 增加背包（Inventory）相关接口测试。
 // 新增的作用：
@@ -43,6 +47,7 @@ Content-Type: application/json
 {
   "durationSeconds": 60,
   "allowedProcesses": ["chrome.exe", "notepad.exe", "Code.exe"],
+  "allowedWebsites": ["https://leetcode.com", "github.com"],
   "graceSeconds": 10
 }
 

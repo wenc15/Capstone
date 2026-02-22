@@ -1,3 +1,11 @@
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - 增加网站白名单与违规累计逻辑。
+//   - 新增网站域名规范化与子域名匹配判断。
+// 新增的作用：
+//   - 对接 chrome-extension 的网站使用上报，超出 grace 即失败会话。
+// =============================================================
+
 // 2026/01/21 edited by Zikai Lu
 // 新增内容：
 //   - 使用向上取整计算剩余秒数，避免会话提前结束导致奖励点数不足。
@@ -70,6 +78,7 @@ public class FocusSessionService
     private int _plannedDurationSeconds;
 
     private HashSet<string> _whitelist = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _websiteWhitelist = new(StringComparer.OrdinalIgnoreCase);
 
     private TimeSpan _grace = TimeSpan.FromSeconds(10); // 宽限时间
     private DateTimeOffset? _violationStart;
@@ -82,6 +91,7 @@ public class FocusSessionService
     private bool _isRunning;
     private string? _sessionId;       // 新：用于调试/日志（可选）
     private DateTimeOffset? _startedAt; // 新：用于会话元信息（可选）
+    private int _websiteViolationSeconds;
 
 
     public FocusSessionService(LocalDataService dataService)
@@ -95,6 +105,11 @@ public class FocusSessionService
         {
             _whitelist = new HashSet<string>(
                 req.AllowedProcesses.Select(NormalizeProcessName),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+            _websiteWhitelist = new HashSet<string>(
+                req.AllowedWebsites.Select(NormalizeDomain).Where(x => !string.IsNullOrWhiteSpace(x)),
                 StringComparer.OrdinalIgnoreCase
             );
 
@@ -112,6 +127,7 @@ public class FocusSessionService
             _failReason = null;
             _violationStart = null;
             _violationSeconds = 0;
+            _websiteViolationSeconds = 0;
             _remainingSeconds = req.DurationSeconds;
             _isRunning = true;
 
@@ -233,6 +249,35 @@ public class FocusSessionService
         return name;
     }
 
+    private static string NormalizeDomain(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var raw = value.Trim();
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        if (Uri.TryCreate("https://" + raw, UriKind.Absolute, out uri))
+            return uri.Host;
+
+        return raw.ToLowerInvariant();
+    }
+
+    private bool IsDomainAllowed(string domain)
+    {
+        if (_websiteWhitelist.Contains(domain))
+            return true;
+
+        foreach (var allowed in _websiteWhitelist)
+        {
+            if (domain.EndsWith("." + allowed, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
     public FocusStatusResponse GetStatus()
     {
         lock (_lock)
@@ -247,6 +292,36 @@ public class FocusSessionService
                 ViolationSeconds = _violationSeconds,
                 CurrentProcess = _currentProcess
             };
+        }
+    }
+
+    public void ReportWebsiteUsage(string? domain, string? url, int durationSeconds)
+    {
+        lock (_lock)
+        {
+            if (!_isRunning || durationSeconds <= 0)
+                return;
+
+            if (_websiteWhitelist.Count == 0)
+                return;
+
+            var normalized = NormalizeDomain(!string.IsNullOrWhiteSpace(domain) ? domain : url);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return;
+
+            if (IsDomainAllowed(normalized))
+            {
+                _websiteViolationSeconds = 0;
+                return;
+            }
+
+            _websiteViolationSeconds += durationSeconds;
+            if (_websiteViolationSeconds >= _grace.TotalSeconds)
+            {
+                _failed = true;
+                _failReason = $"Used non-whitelisted website: {normalized}";
+                EndSession(SessionOutcome.Failed);
+            }
         }
     }
 

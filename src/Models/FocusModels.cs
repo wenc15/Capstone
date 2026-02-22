@@ -1,9 +1,17 @@
+// 2026/01/27 edited by Zikai Lu
+// 新增内容：
+//   - StartFocusRequest 新增 AllowedWebsites 字段。
+// 新增的作用：
+//   - 接收 chrome-extension 的网站白名单配置。
+// =============================================================
+
 namespace CapstoneBackend.Models;
 
 public class StartFocusRequest
 {
     public int DurationSeconds { get; set; }                 // 专注时长（秒）
     public List<string> AllowedProcesses { get; set; } = new(); // 白名单：允许的进程名，例如 "chrome.exe"
+    public List<string> AllowedWebsites { get; set; } = new();  // 白名单：允许的域名或 URL，例如 "github.com"
     public int GraceSeconds { get; set; } = 10;              // 宽限时间（秒），超出则判定失败
 }
 
