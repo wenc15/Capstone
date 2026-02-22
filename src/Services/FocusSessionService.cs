@@ -109,6 +109,11 @@ public class FocusSessionService
     private string? _sessionId;       // 新：用于调试/日志（可选）
     private DateTimeOffset? _startedAt; // 新：用于会话元信息（可选）
     private int _websiteViolationSeconds;
+    private int _websiteviolationseconds
+    {
+        get => _websiteViolationSeconds;
+        set => _websiteViolationSeconds = value;
+    }
 
     private const int AutoTrustMaxParentDepth = 6;
     private const int AutoTrustMaxPerSession = 32;
