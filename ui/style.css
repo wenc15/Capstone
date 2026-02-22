@@ -1,3 +1,13 @@
+/* 2026/02/21 edited by Zhecheng Xu
+ * Changes:
+ *  - Updated gacha result panel layout and close button styling.
+ *  - Added fixed skip-button footprint and panel fade classes for stable height/transition.
+ *  - Tuned single/ten draw card grid consistency across desktop/mobile.
+ * =============================================================
+ * Purpose:
+ *  - Keep gacha panel visual behavior consistent while animations and controls change state.
+ */
+
 /* 2026/01/29 edited by Zhecheng Xu
  * Changes:
  *  - Whitelist search row layout update: place Browse button to the right of the search input (inline row).
@@ -715,6 +725,27 @@ body{
     right: 14px;
     bottom: 14px;
   }
+
+  .gacha-reveal-panel{
+    left: 12px;
+    right: 12px;
+    bottom: 108px;
+  }
+
+  .gacha-reveal-grid.is-ten{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gacha-reveal-grid.is-single{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gacha-reveal-grid.is-single .gacha-flip-card{
+    grid-column: 1 / -1;
+    max-width: 240px;
+    width: 100%;
+    justify-self: center;
+  }
 }
 
 .gacha-title{
@@ -737,6 +768,188 @@ body{
   font-weight: 600;   /* 不要加粗 */
   opacity: 0.9;
   color: rgb(255, 255, 255);
+}
+
+.gacha-close-btn{
+  border: none;
+  background: transparent;
+  color: #2f3a34;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.gacha-close-btn:hover{ opacity: 0.8; }
+.gacha-close-btn:active{ transform: translateY(1px); }
+
+.gacha-reveal-panel{
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 122px;
+  z-index: 2;
+  border-radius: 16px;
+  border: 1px solid rgba(220, 229, 223, 0.92);
+  background: rgba(255,255,255,0.78);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 14px 28px rgba(0,0,0,0.1);
+  padding: 12px;
+  opacity: 1;
+  transition: opacity .85s ease;
+}
+
+.gacha-reveal-head{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gacha-reveal-head-actions{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+}
+
+.gacha-reveal-panel.is-hidden{
+  display: none;
+}
+
+.gacha-reveal-panel.is-fading{
+  opacity: 0;
+}
+
+.gacha-reveal-title{
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  color: #2b3b31;
+}
+
+.gacha-skip-btn{
+  border: 1px solid rgba(95,141,109,0.5);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.65);
+  color: #2f3a34;
+  font-weight: 800;
+  padding: 5px 10px;
+  min-width: 54px;
+  cursor: pointer;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gacha-skip-btn:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gacha-reveal-meta{
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--sub);
+  min-height: 18px;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gacha-reveal-grid{
+  margin-top: 10px;
+  display:grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gacha-reveal-grid.is-ten{
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.gacha-reveal-grid.is-single .gacha-flip-card{
+  grid-column: 3;
+}
+
+.gacha-flip-card{
+  perspective: 720px;
+  min-height: 140px;
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.gacha-flip-card.is-dealt{
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.gacha-flip-inner{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+  transform-style: preserve-3d;
+  transition: transform .45s ease;
+}
+
+.gacha-flip-card.is-flipped .gacha-flip-inner{
+  transform: rotateY(180deg);
+}
+
+.gacha-face{
+  position:absolute;
+  inset: 0;
+  border-radius: 12px;
+  backface-visibility: hidden;
+}
+
+.gacha-face-back{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 32px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.9);
+  background: linear-gradient(145deg, #6f9879 0%, #4f775d 100%);
+  border: 1px solid rgba(255,255,255,0.35);
+}
+
+.gacha-face-front{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  gap: 4px;
+  padding: 8px;
+  transform: rotateY(180deg);
+  border: 1px solid rgba(120,130,126,0.35);
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(242,248,244,0.94));
+}
+
+.gacha-item-icon{ font-size: 26px; }
+.gacha-item-name{ font-size: 12px; font-weight: 900; color: #2f3a34; }
+.gacha-item-meta{ font-size: 10px; color: #4f5e55; }
+
+.gacha-item-badge{
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(95,141,109,0.3);
+  background: rgba(95,141,109,0.1);
+  color: #365845;
+  font-weight: 800;
+}
+
+.gacha-flip-card[data-rarity="epic"] .gacha-face-front{
+  background: linear-gradient(180deg, #fff8e8, #f7efd5);
+}
+
+.gacha-flip-card[data-rarity="legendary"] .gacha-face-front{
+  background: linear-gradient(180deg, #fff5c4, #ffe694);
+  box-shadow: 0 0 22px rgba(255, 202, 89, 0.42);
 }
 
 /* 抽卡结果显示（左下角，不挡按钮） */
