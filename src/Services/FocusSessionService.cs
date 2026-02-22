@@ -61,6 +61,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using CapstoneBackend.Models;
 using CapstoneBackend.Utils;
@@ -69,6 +70,21 @@ namespace CapstoneBackend.Services;
 
 public class FocusSessionService
 {
+    // Process alias map (normalized names without .exe)
+    // 1) Support one app corresponding to multiple process names.
+    // 2) Add low-cost launcher mappings to reduce false violations.
+    private static readonly Dictionary<string, string[]> ProcessAliasMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Canonical app -> aliases
+        ["discord"] = new[] { "update" },
+        ["slack"] = new[] { "update" },
+        ["teams"] = new[] { "ms-teams" },
+        ["ms-teams"] = new[] { "teams" },
+
+        // Launcher/updater -> probable app processes
+        ["update"] = new[] { "discord", "slack" },
+    };
+
     private readonly object _lock = new();
     private System.Threading.Timer? _timer;
     private readonly LocalDataService _dataService;
@@ -78,6 +94,7 @@ public class FocusSessionService
     private int _plannedDurationSeconds;
 
     private HashSet<string> _whitelist = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _sessionTrustedProcesses = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _websiteWhitelist = new(StringComparer.OrdinalIgnoreCase);
 
     private TimeSpan _grace = TimeSpan.FromSeconds(10); // 宽限时间
@@ -93,6 +110,10 @@ public class FocusSessionService
     private DateTimeOffset? _startedAt; // 新：用于会话元信息（可选）
     private int _websiteViolationSeconds;
 
+    private const int AutoTrustMaxParentDepth = 6;
+    private const int AutoTrustMaxPerSession = 32;
+    private static readonly TimeSpan AutoTrustProcessStartTolerance = TimeSpan.FromSeconds(5);
+
 
     public FocusSessionService(LocalDataService dataService)
     {
@@ -103,10 +124,7 @@ public class FocusSessionService
     {
         lock (_lock)
         {
-            _whitelist = new HashSet<string>(
-                req.AllowedProcesses.Select(NormalizeProcessName),
-                StringComparer.OrdinalIgnoreCase
-            );
+            _whitelist = ExpandAllowedProcesses(req.AllowedProcesses);
 
             _websiteWhitelist = new HashSet<string>(
                 req.AllowedWebsites.Select(NormalizeDomain).Where(x => !string.IsNullOrWhiteSpace(x)),
@@ -127,6 +145,7 @@ public class FocusSessionService
             _failReason = null;
             _violationStart = null;
             _violationSeconds = 0;
+            _sessionTrustedProcesses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _websiteViolationSeconds = 0;
             _remainingSeconds = req.DurationSeconds;
             _isRunning = true;
@@ -134,6 +153,41 @@ public class FocusSessionService
             _timer?.Dispose();
             _timer = new System.Threading.Timer(CheckLoop, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
         }
+    }
+
+    private static HashSet<string> ExpandAllowedProcesses(IEnumerable<string>? allowedProcesses)
+    {
+        var expanded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var queue = new Queue<string>();
+
+        foreach (var raw in allowedProcesses ?? Enumerable.Empty<string>())
+        {
+            var normalized = NormalizeProcessName(raw);
+            if (string.IsNullOrWhiteSpace(normalized))
+                continue;
+
+            if (expanded.Add(normalized))
+                queue.Enqueue(normalized);
+        }
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (!ProcessAliasMap.TryGetValue(current, out var aliases))
+                continue;
+
+            foreach (var alias in aliases)
+            {
+                var normalizedAlias = NormalizeProcessName(alias);
+                if (string.IsNullOrWhiteSpace(normalizedAlias))
+                    continue;
+
+                if (expanded.Add(normalizedAlias))
+                    queue.Enqueue(normalizedAlias);
+            }
+        }
+
+        return expanded;
     }
 
     public void StopSession()
@@ -164,17 +218,23 @@ public class FocusSessionService
                 return;
             }
 
-            _currentProcess = ActiveWindowHelper.GetActiveProcessName();
+            var active = ActiveWindowHelper.GetActiveProcessInfo();
+            _currentProcess = active?.ProcessName;
 
-            if (string.IsNullOrEmpty(_currentProcess))
+            if (active is null || string.IsNullOrEmpty(active.ProcessName))
             {
                 _violationStart = null;
                 _violationSeconds = 0;
                 return;
             }
 
-            var normalized = NormalizeProcessName(_currentProcess);
-            bool isAllowed = _whitelist.Contains(normalized);
+            var normalized = NormalizeProcessName(active.ProcessName);
+            bool isAllowed = _whitelist.Contains(normalized) || _sessionTrustedProcesses.Contains(normalized);
+
+            if (!isAllowed && TryAutoTrustByParent(active, normalized))
+            {
+                isAllowed = true;
+            }
 
             if (isAllowed)
             {
@@ -244,9 +304,61 @@ public class FocusSessionService
 
     private static string NormalizeProcessName(string name)
     {
-        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            return name[..^4];
-        return name;
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        var raw = name.Trim().Trim('"');
+        if (raw.StartsWith("steam://", StringComparison.OrdinalIgnoreCase))
+            return "steam";
+
+        // Handle command lines like:
+        //   "C:\\Path\\app.exe" --flag
+        //   C:\\Path\\app.exe --flag
+        var token = raw;
+        if (raw.Contains(' '))
+            token = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0].Trim('"');
+
+        var fileName = Path.GetFileName(token.Replace('\\', '/'));
+        var normalized = string.IsNullOrWhiteSpace(fileName) ? token : fileName;
+
+        if (normalized.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            normalized = normalized[..^4];
+
+        return normalized;
+    }
+
+    private bool TryAutoTrustByParent(ProcessSnapshot active, string activeNormalized)
+    {
+        if (string.IsNullOrWhiteSpace(activeNormalized))
+            return false;
+
+        if (_sessionTrustedProcesses.Count >= AutoTrustMaxPerSession)
+            return false;
+
+        if (active.StartTime is null || active.StartTime.Value < _startAt - AutoTrustProcessStartTolerance)
+            return false;
+
+        var visited = new HashSet<int>();
+        var pid = active.ParentProcessId;
+        var depth = 0;
+
+        while (pid > 0 && depth < AutoTrustMaxParentDepth && visited.Add(pid))
+        {
+            if (!ActiveWindowHelper.TryGetProcessInfo(pid, out var parent) || parent is null)
+                break;
+
+            var parentNormalized = NormalizeProcessName(parent.ProcessName);
+            if (_whitelist.Contains(parentNormalized) || _sessionTrustedProcesses.Contains(parentNormalized))
+            {
+                _sessionTrustedProcesses.Add(activeNormalized);
+                return true;
+            }
+
+            pid = parent.ParentProcessId;
+            depth++;
+        }
+
+        return false;
     }
 
     private static string NormalizeDomain(string? value)
