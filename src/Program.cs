@@ -41,6 +41,7 @@
 using CapstoneBackend.Services;
 using CapstoneBackend.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,7 +66,7 @@ builder.Services.AddSingleton<FocusSessionService>();
 // 注册抽卡服务（Draw Card System）
 // Scoped：每个 HTTP 请求一个实例，适合依赖 DbContext 的服务
 builder.Services.AddScoped<ICardDrawService, CardDrawService>();
-
+builder.Services.AddScoped<IFoodGachaService, FoodGachaService>();
 
 // 注册 EF Core + SQLite 数据库上下文（用于存储网站使用记录等）
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -98,6 +99,55 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // -------------------------------------------------------------
+    // Seed FoodDefinitions (local dev only)
+    // -------------------------------------------------------------
+    // Seed FoodDefinitions for local development/testing only.
+    // TODO: Replace with official food config/assets from frontend/content team.
+    if (!db.FoodDefinitions.Any())
+    {
+        db.FoodDefinitions.AddRange(
+            new CapstoneBackend.Models.FoodDefinition
+            {
+                FoodId = "food_001",
+                Name = "Apple",
+                Rarity = "Common",
+                ExpValue = 5,
+                ImageKey = "apple",
+                IsEnabled = true
+            },
+            new CapstoneBackend.Models.FoodDefinition
+            {
+                FoodId = "food_002",
+                Name = "Banana",
+                Rarity = "Common",
+                ExpValue = 6,
+                ImageKey = "banana",
+                IsEnabled = true
+            },
+            new CapstoneBackend.Models.FoodDefinition
+            {
+                FoodId = "food_003",
+                Name = "Sandwich",
+                Rarity = "Rare",
+                ExpValue = 12,
+                ImageKey = "sandwich",
+                IsEnabled = true
+            },
+            new CapstoneBackend.Models.FoodDefinition
+            {
+                FoodId = "food_004",
+                Name = "Cake",
+                Rarity = "Epic",
+                ExpValue = 20,
+                ImageKey = "cake",
+                IsEnabled = true
+            }
+        );
+
+        db.SaveChanges();
+    }
 }
 
 // -------------------------------------------------------------

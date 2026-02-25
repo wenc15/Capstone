@@ -34,4 +34,7 @@ public class AppDbContext : DbContext
     public DbSet<WebsiteUsage> WebsiteUsages { get; set; } = null!;
     public DbSet<CardDefinition> CardDefinitions { get; set; } = null!;
     public DbSet<UserCard> UserCards { get; set; } = null!;
+
+    public DbSet<FoodDefinition> FoodDefinitions { get; set; } = null!;
+    public DbSet<UserFood> UserFoods { get; set; } = null!;
 }
