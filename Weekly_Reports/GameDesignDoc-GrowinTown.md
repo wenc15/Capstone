@@ -2,16 +2,16 @@
 游戏是单机本地，玩家可以在场上布置有不同效果的建筑，在起始点购买建筑，玩家每回合筛一次骰子，然后会触发多个不同建筑的效果赚取点数和建筑经验（包含每回合固定、根据投点、根据骰子数量、经过或者停留，触发获得点数，或指定的建筑的经验，或获得免费建筑，或增加指定建筑的指定属性值，或特殊效果例如下回合会一次投两个骰子），各个建筑的经验独立计算，累计到一定值后会自动升级已加强建筑属性，会在回合数耗尽前攒够足够点数即可通关，可以有多个连续的继承数据的关卡。游戏需和应用有简单的联动，比如通过应用抽卡获得游戏内的皮肤等外观，游戏需通过应用内的UI按钮启动。
 
 # 目标：
-玩家在每一关会被要求在指定回合数内赚取大于指定金额的金币，赚取的金币和玩家手中的现金脱钩。
+玩家在每一关(Level)会被要求在指定回合数内赚取大于指定金额(Goal)的金币(Coin)，赚取的金币和玩家手中的现金(Cash)脱钩。
 赚取的金币为玩家在本关卡时间内累计赚取的金币，玩家消耗现金时不会消耗赚取的金币。进入下一个关卡时清零，溢出的金币无法继承。
-玩家手中的现金通过建筑（和饰品）赚取，可以用于在起点处购买建筑，在起点处刷新可供购买的建筑，在任意时间购买地块。
+玩家手中的现金通过建筑赚取，可以用于在起点处购买建筑，在起点处刷新可供购买的建筑，在任意时间购买地块。
 - 界面顶部需要显示： 现金     当前关卡（e.g. 第1/6关） 当前关卡目标（e.g. 0/15金币）
   
 # 核心机制：
-- 回合：玩家每回合筛一次骰子，然后会触发多个不同建筑（和饰品）的效果赚取点数和建筑经验。筛子默认1个，点数为1-6，投骰子的按钮在右下角，点击后显示本次骰子的点数。
-- 背包：玩家的背包有5格，玩家获得的建筑会存放至背包，以快捷栏的形式显示在界面底部。
-- 商店：玩家每次经过起点时会进入商店，商店会根据玩家的现金随机刷新5个可供玩家购买的建筑。玩家可以花费5*n金币刷新商店里的建筑（n为刷新的次数，从1开始）。商店的UI会显示在界面左侧。
-- 建筑：建筑有4个等级，初始为1级0经验，升级到2，3，4级分别需要5，10，15经验。每合成一个相同类型的建筑（将一个相同类型的建筑从背包内或者地图上拖拽到当前建筑上），可以给当前建筑5经验。
+- 回合(Turn)：玩家每回合筛一次骰子，然后会触发多个不同建筑（和饰品）的效果赚取点数和建筑经验。筛子默认1个，点数为1-6，投骰子的按钮在右下角，点击后显示本次骰子的点数。
+- 背包(Backpack)：玩家的背包有5格，玩家获得的建筑会存放至背包，以快捷栏的形式显示在界面底部。
+- 商店(Store)：玩家每次经过起点时会进入商店，商店会根据玩家的现金随机刷新5个可供玩家购买的建筑。玩家可以花费5*n金币刷新商店里的建筑（n为刷新的次数，从1开始）。商店的UI会显示在界面左侧。
+- 建筑(Buildings)：建筑有4个等级，初始为1级0经验（EXP），升级到2，3，4级分别需要5，10，15经验。每合成一个相同类型的建筑（将一个相同类型的建筑从背包内或者地图上拖拽到当前建筑上），可以给当前建筑5经验。建筑也可以卖出来换取现金。
 
 # 地图：
 |||空地|空地|空地|||
@@ -23,23 +23,156 @@
 ||路径|路径|金币+5|路径|路径||
 |||空地|空地|空地|||
 地图位于界面中央，玩家初始处于起点（商店），可以购买商店内的建筑。
-- 空地：可以放置建筑
-- 路径：玩家根据骰子的点数移动的路径，每一个路径消耗一点点数，点数为0时停留在当前路径点上
-- 起点：经过起点可以进入商店
+- 空地(Foundation)：可以放置建筑
+- 路径(Path)：玩家根据骰子的点数移动的路径，每一个路径消耗一点点数，点数为0时停留在当前路径点上
+- 起点(Start)：经过起点可以进入商店
 - 金币+5：拥有特殊效果的路径，停留时获得5金币
 - 获得随机建筑：拥有特殊效果的路径，停留时获得随机建筑
-- 待开发地块：玩家可以在任何时候购买待开发地块，购买按钮在左下角，总共有6个地块可供购买。每次购买后玩家可以在场上剩余待开发地块里任意挑选一块变成空地。每次购买的价格会增长。
+- 待开发地块：玩家可以在任何时候购买待开发地块，购买按钮(Purchase a Block)在左下角，总共有6个地块可供购买。每次购买后玩家可以在场上剩余待开发地块里任意挑选一块变成空地。每次购买的价格会增长。
 
 # 商店
 玩家每次经过起点时会进入商店，商店会根据玩家的现金随机刷新5个可供玩家购买的建筑。
-- 刷新：玩家可以花费5*n金币刷新商店里的建筑（n为刷新的次数，从1开始）。商店的UI会显示在界面左侧。
+- 刷新(Refresh)：玩家可以花费5*n金币刷新商店里的建筑（n为刷新的次数，从1开始）。商店的UI会显示在界面左侧。
 - 商品池：商店会根据玩家的现金刷新商品，共3个等级。当现金>=20时，商品池为2级，当现金>=30时，商品池为3级。
 
 # 建筑
-TODO
+### 效果触发流程：
+  1. 玩家投出骰子
+  2. 骰子结果出现
+   - 结算**投骰结束（At the end of the dice phase）**和**投出X（When you roll X）**效果（X可以为：指定数字，奇数/偶数，2个骰子） 
+  3. 玩家自动在地图上移动
+      - 结算**经过（When you pass by）**效果和商店（若经过商店路径点）
+  4. 玩家消耗完所有移动点数并停留在一个路径上
+      - 结算**停留（When you land on）**效果和特殊路径格（金币+5, 获得随机建筑）
 
-# 饰品
-可选
+### 金币结算
+建筑效果里出现gain n*X* Coin/gain Coins equal to (A x *X*)需要结算金币，此金币结算受permanently increase Coin gain影响。\
+所有能结算金币的建筑有一个修正值m，默认为0，每次受到到permanently increase Coin gain by n类似效果影响时m += n\
+设建筑自私效果提及的金币结算公式为f(x), x为建筑等级。\
+则最终的金币结算为f(x)+m\
+
+### 建筑稀有度1（Common）：
+- Small Coin Pouch 
+  - 建筑id: 00
+  - 建筑稀有度：1
+  - 建筑卖出价（对应等级1-4级）：[5,10,15,20]
+  - 建筑效果：
+    - At the end of the dice phase, gain *X* Coins. *X*为建筑等级
+
+- Insurance Sellor
+  - 建筑id: 01
+  - 建筑稀有度：1
+  - 建筑卖出价（对应等级1-4级）：[5,20,40,75]
+  - 建筑效果：
+    - When you roll a 1, gain 2*X* Coins and 2 EXP. *X*为建筑等级
+
+- Dice Sculpture
+  - 建筑id: 02
+  - 建筑稀有度：1
+  - 建筑卖出价（对应等级1-4级）：[5,10,15,20]
+  - 建筑效果：
+    - When you roll a 6, gain 6*X* Coins. *X*为建筑等级
+
+### 建筑稀有度2（Rare）：
+- Piggy Bank
+  - 建筑id: 03
+  - 建筑稀有度：2
+  - 建筑卖出价（对应等级1-4级）：[15,35,60,100]
+  - 建筑效果：
+    - At the end of the dice phase, gain 1 EXP.
+
+- Bookstore
+  - 建筑id: 04
+  - 建筑稀有度：2
+  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑效果：
+    - When you land on this building, it grants (*X*+1) EXP to itself and adjacent buildings. *X*为建筑等级
+    - When you pass by, gain 2*X* Coins. *X*为建筑等级
+
+- Money Tree
+  - 建筑id: 05
+  - 建筑稀有度：2
+  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑效果：
+    - When you land on this building, permanently increase adjacent buildings’ Coin gain by *X*. *X*为建筑等级
+    - When you roll a 3, gain (*X*+1) Coins. *X*为建筑等级
+
+- Four-Leaf Clover House
+  - 建筑id: 06
+  - 建筑稀有度：2
+  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑效果：
+    - When you roll an even number, gain 2*X* Coins. *X*为建筑等级
+    - When you roll a 6, permanently increase this building's Coin gain by 1.
+
+- Wishing Well
+  - 建筑id: 07
+  - 建筑稀有度：2
+  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑效果：
+    - At the end of the dice phase, gain *X* Coins. *X*为建筑等级
+    - Each time you clear a stage, permanently increase the Coin gain by 1.
+
+### 建筑稀有度3（Epic）：
+- Fortune Coin Pool
+  - 建筑id: 08
+  - 建筑稀有度：3
+  - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
+  - 建筑效果：
+    - When you roll two dice, gain 6*X* Coins. *X*为建筑等级
+    - When you roll a 1, your next action will roll two dice.
+
+- Lucky Gate
+  - 建筑id: 09
+  - 建筑稀有度：3
+  - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
+  - 建筑效果：
+    - When you roll a 1 or 6, gain Coins equal to (number of buildings on the field × *X*). *X*为建筑等级
+
+- Vault
+  - 建筑id: 10
+  - 建筑稀有度：3
+  - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
+  - 建筑效果：
+    - At the end of the dice phase, all [Piggy Bank] and [Insurance Sellor] gain *X* EXP. *X*为建筑等级
+    - When you pass by, gain *X* Coins. *X*为建筑等级
+    - Each time you sell a [Piggy Bank] or [Insurance Sellor], permanently increase the Coin gain by 1.
+
+- Hall of Fortune
+  - 建筑id: 11
+  - 建筑稀有度：3
+  - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
+  - 建筑效果：
+    - When you roll a 3 or 4, trigger the dice effects of adjacent buildings.
+    - When you land on this building, permanently increase all buildings' Coin gain by *X*. *X*为建筑等级
+
+### 建筑稀有度4（Legendary）：
+- Bunny Restaurant
+  - 建筑id: 12
+  - 建筑稀有度：4
+  - 建筑卖出价（对应等级1-4级）：[25,50,75,100]
+  - 建筑效果：
+    - When you pass by, gain 5*X* Coins. *X*为建筑等级
+    - When you pass by, and permanently increase one random building’s Coin gain by 1. 
+
+- Holographic Experience House
+  - 建筑id: 13
+  - 建筑稀有度：4
+  - 建筑卖出价（对应等级1-4级）：[25,50,75,100]
+  - 建筑效果：
+    - When you pass by, your next action will roll two dice.
+    - When you roll two dice, gain Coins equal to (sum of both dice results x *X*). *X*为建筑等级
+  
+- Fox Antique Shop
+  - 建筑id: 14
+  - 建筑稀有度：4
+  - 建筑卖出价（对应等级1-4级）：[25,50,75,100]
+  - 建筑效果：
+    - When you roll a 5, this building and *X* random buildings gain *X* EXP. *X*为建筑等级
+    - When you pass by, grant one [Piggy Bank] or [Insurance Sellor]. 
+
+# UI
+TODO
 
 # 可调参数：
 关卡数：6\
@@ -54,4 +187,9 @@ TODO
 商店商品池现金下限（对应商品池等级1-3级）：[0，20，30]\
 1级商品池刷新概率（对建筑等级1-4级）：[70，30，0，0]\
 2级商品池刷新概率（对建筑等级1-4级）：[30，40，30，0]\
-3级商品池刷新概率（对建筑等级1-4级）：[10，30，30，30]
+3级商品池刷新概率（对建筑等级1-4级）：[10，30，30，30]\
+初始建筑(按照建筑id): [00,01,02]\
+特殊路径格随机建筑池：所有建筑（00-14）相同概率\
+所有商品池中，同一稀有度的刷新概率被所有该稀有度的建筑平分\
+Bunny Restaurant和Fox Antique Shop中的random building指所有被放置在地图上的建筑，所有地图上放置的建筑有相同的概率\
+Fox Antique Shop中grant one [Piggy Bank] or [Insurance Sellor]，两者的概率各50%
