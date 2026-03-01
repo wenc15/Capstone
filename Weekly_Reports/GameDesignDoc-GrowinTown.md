@@ -2,16 +2,48 @@
 游戏是单机本地，玩家可以在场上布置有不同效果的建筑，在起始点购买建筑，玩家每回合筛一次骰子，然后会触发多个不同建筑的效果赚取点数和建筑经验（包含每回合固定、根据投点、根据骰子数量、经过或者停留，触发获得点数，或指定的建筑的经验，或获得免费建筑，或增加指定建筑的指定属性值，或特殊效果例如下回合会一次投两个骰子），各个建筑的经验独立计算，累计到一定值后会自动升级已加强建筑属性，会在回合数耗尽前攒够足够点数即可通关，可以有多个连续的继承数据的关卡。游戏需和应用有简单的联动，比如通过应用抽卡获得游戏内的皮肤等外观，游戏需通过应用内的UI按钮启动。
 
 # 目标：
-玩家在每一关(Level)会被要求在指定回合数内赚取大于指定金额(Goal)的金币(Coin)，赚取的金币和玩家手中的现金(Cash)脱钩。
+玩家在每一关(Level)会被要求在指定回合数内赚取达到该关目标金额(Goal)的金币(Coin)，赚取的金币和玩家手中的现金(Cash)脱钩。
 赚取的金币为玩家在本关卡时间内累计赚取的金币，玩家消耗现金时不会消耗赚取的金币。进入下一个关卡时清零，溢出的金币无法继承。
 玩家手中的现金通过建筑赚取，可以用于在起点处购买建筑，在起点处刷新可供购买的建筑，在任意时间购买地块。
 - 界面顶部需要显示： 现金     当前关卡（e.g. 第1/6关） 当前关卡目标（e.g. 0/15金币）
   
 # 核心机制：
 - 回合(Turn)：玩家每回合筛一次骰子，然后会触发多个不同建筑（和饰品）的效果赚取点数和建筑经验。筛子默认1个，点数为1-6，投骰子的按钮在右下角，点击后显示本次骰子的点数。
-- 背包(Backpack)：玩家的背包有5格，玩家获得的建筑会存放至背包，以快捷栏的形式显示在界面底部。
-- 商店(Store)：玩家每次经过起点时会进入商店，商店会根据玩家的现金随机刷新5个可供玩家购买的建筑。玩家可以花费5*n金币刷新商店里的建筑（n为刷新的次数，从1开始）。商店的UI会显示在界面左侧。
-- 建筑(Buildings)：建筑有4个等级，初始为1级0经验（EXP），升级到2，3，4级分别需要5，10，15经验。每合成一个相同类型的建筑（将一个相同类型的建筑从背包内或者地图上拖拽到当前建筑上），可以给当前建筑5经验。建筑也可以卖出来换取现金。
+- 背包(Backpack)：玩家的背包有5格，玩家获得的建筑会存放至背包，以竖向快捷栏的形式显示在界面右侧。
+- 商店(Store)：商店固定显示在界面底部，每次经过起点时会进入商店。商店根据玩家现金随机刷新5个可购买建筑；玩家可花费5*n金币刷新（n从1开始）。
+- 建筑(Buildings)：建筑有4个等级，初始为1级0经验（EXP），升级到2，3，4级分别需要6，12，18经验。合成同类建筑时，目标建筑获得的经验=被消耗建筑的“当前等级基础经验+当前已累计经验+6（合成基础经验）”。建筑也可以卖出来换取现金。
+- 建筑类型(Building Types)：统一分为3类，可多标签：Star Coin（星幣）、Dice（骰子）、Utility（功能）。
+- 初始资源：玩家初始拥有6块地皮、3座建筑（Small Coin Pouch / Insurance Sellor / Dice Sculpture）与5格仓库，初始3座建筑置于仓库内。
+
+## 可选系统：立牌（Standee）
+- 立牌为可选构筑系统，可在对局中提供被动效果或充能触发效果。
+- 立牌总表（按当前规则）：
+  - 猪猪立牌（蓝）：卖出建筑时充能+1；充能4时，获得1个【小猪银行】。
+  - 兔兔立牌（蓝）：经过起始点时，使随机1个Star Coin（星幣）建筑的骰点星币获取量永久+1。
+  - 刷新立牌（蓝）：刷新时充能+1；充能3时，使随机1个建筑的骰点效果永久+1。
+  - 三叶草立牌（蓝）：骰出6时充能+1；充能6时，获得1个Dice（骰子）随机建筑。
+  - 银行卡立牌（蓝）：回合开始时，获得1星币。
+  - 眼镜立牌（蓝）：回合开始时，随机1个建筑获得1经验。
+  - 小浣熊立牌（紫）：经过Star Coin（星幣）建筑时，获得1星币。
+  - 炸虾立牌（紫）：骰出1后，下次骰点必定为6。
+  - 书本立牌（紫）：停留在【金币】或【卡牌】地块时，使该地块对应的建筑获得5经验。
+  - 背包立牌（紫）：经过起始点时，随机获得1个场上已部署的建筑。
+  - 轮滑立牌（彩）：骰点时充能+1；充能4时，下次行动可掷出两枚骰子。
+  - 购物车立牌（彩）：购买建筑价格-25%，出售建筑售价+25%。
+  - 金矿立牌（彩）：骰点后，使随机1个star coin（星幣）建筑的骰点星币获取量永久+1。
+
+
+## 关卡与投骰次数（Stage & Roll Limit）
+- 总关卡数为6关，每个小关允许投骰8次。
+- 每次投骰后计数+1；总投骰次数按当前规则显示为48（例如 1/48）。
+- 每小关第8次投骰并完成结算后，检查当前关卡目标金币是否达成：
+  - 达成且当前不是第6关：进入下一关。
+  - 达成且当前是第6关：进入胜利结算。
+  - 未达成：进入失败结算。
+- 关卡目标星币：第1-6关分别为[15,35,80,120,233,350]。
+- 结算分数公式：
+  - Score = 当前持有金币（Cash）/2（向上取整）+ 已完成关卡需求星币之和（不计算最后一关溢出的数量）
+    + Σ(场上与背包内每个建筑的当前卖出价格)
 
 # 地图：
 |||空地|空地|空地|||
@@ -25,25 +57,46 @@
 地图位于界面中央，玩家初始处于起点（商店），可以购买商店内的建筑。
 - 空地(Foundation)：可以放置建筑
 - 路径(Path)：玩家根据骰子的点数移动的路径，每一个路径消耗一点点数，点数为0时停留在当前路径点上
-- 起点(Start)：经过起点可以进入商店
+- 起点(Start)：经过起点会进入商店，且玩家经过该格时必定停留在起点再结算后续。
 - 金币+5：拥有特殊效果的路径，停留时获得5金币
 - 获得随机建筑：拥有特殊效果的路径，停留时获得随机建筑
 - 待开发地块：玩家可以在任何时候购买待开发地块，购买按钮(Purchase a Block)在左下角，总共有6个地块可供购买。每次购买后玩家可以在场上剩余待开发地块里任意挑选一块变成空地。每次购买的价格会增长。
 
+## 可选：立牌与地图交互
+- 起点（Start）相关：
+  - 兔兔立牌：经过起点触发，强化随机1个Star Coin建筑的骰点星币获取量。
+  - 背包立牌：经过起点触发，随机获得1个场上已部署建筑。
+- 路径经过相关：
+  - 小浣熊立牌：经过Star Coin建筑所在路径点时额外获得1星币。
+- 停留地块相关：
+  - 书本立牌：停留在金币/卡牌地块时，给对应建筑+5经验。
+
 # 商店
 玩家每次经过起点时会进入商店，商店会根据玩家的现金随机刷新5个可供玩家购买的建筑。
-- 刷新(Refresh)：玩家可以花费5*n金币刷新商店里的建筑（n为刷新的次数，从1开始）。商店的UI会显示在界面左侧。
-- 商品池：商店会根据玩家的现金刷新商品，共3个等级。当现金>=20时，商品池为2级，当现金>=30时，商品池为3级。
+- 刷新(Refresh)：玩家可以花费星币刷新商店。首次刷新价格为5，此后每次+5，最高50；刷新次数无上限。商店UI固定显示在界面底部。
+- 商品池概率按关卡变化：
+  - 关卡1：绿70% / 蓝28% / 紫2% / 金0%
+  - 关卡2：绿60% / 蓝34% / 紫5% / 金1%
+  - 关卡3：绿50% / 蓝40% / 紫8% / 金2%
+  - 关卡4：绿34% / 蓝48% / 紫15% / 金3%
+  - 关卡5：绿31% / 蓝45% / 紫20% / 金4%
+  - 关卡6：绿30% / 蓝42% / 紫23% / 金5%
+- 购入规则：商店出售建筑的购入价按稀有度固定为8/16/30/50，且购入时建筑均为1级。
+
+## 可选：立牌与商店交互
+- 购物车立牌：对商店价格生效（购买建筑-25%），并提升出售收益（卖价+25%）。
+- 刷新立牌：每次刷新商店时获得1点充能；充能达到3触发一次“随机建筑骰点效果永久+1”。
+- 猪猪立牌：在商店/详情面板执行卖出行为时累计充能。
 
 # 建筑
 ### 效果触发流程：
   1. 玩家投出骰子
   2. 骰子结果出现
-   - 结算**投骰结束（At the end of the dice phase）**和**投出X（When you roll X）**效果（X可以为：指定数字，奇数/偶数，2个骰子） 
+   - 结算**投骰结束（At the end of the dice phase）** 和 **投出X（When you roll X）** 效果（X可以为：指定数字，奇数/偶数，2个骰子） 
   3. 玩家自动在地图上移动
-      - 结算**经过（When you pass by）**效果和商店（若经过商店路径点）
+      - 结算**经过（When you pass by）** 效果和商店（若经过商店路径点）
   4. 玩家消耗完所有移动点数并停留在一个路径上
-      - 结算**停留（When you land on）**效果和特殊路径格（金币+5, 获得随机建筑）
+      - 结算**停留（When you land on）** 效果和特殊路径格（金币+5, 获得随机建筑）
 
 ### 金币结算
 建筑效果里出现gain n*X* Coin/gain Coins equal to (A x *X*)需要结算金币，此金币结算受permanently increase Coin gain影响。\
@@ -51,145 +104,316 @@
 设建筑自私效果提及的金币结算公式为f(x), x为建筑等级。\
 则最终的金币结算为f(x)+m\
 
+### 卖出价规则
+- 建筑“售价”统一指卖出价（Sell Value）。
+- 各稀有度卖出价（等级1-4）为：
+  - 绿色建筑：[4,8,12,16]
+  - 蓝色建筑：[8,16,24,32]
+  - 紫色建筑：[15,30,45,60]
+  - 金色建筑：[25,50,75,100]
+- 特例：Piggy Bank与Insurance Sellor额外卖出收益并入其最终卖出价数值。
+
 ### 建筑稀有度1（Common）：
 - Small Coin Pouch 
   - 建筑id: 00
   - 建筑稀有度：1
-  - 建筑卖出价（对应等级1-4级）：[5,10,15,20]
+  - 建筑类型：Star Coin（星幣）
+  - 建筑卖出价（对应等级1-4级）：[4,8,12,16]
   - 建筑效果：
-    - At the end of the dice phase, gain *X* Coins. *X*为建筑等级
+    - At the end of the dice phase, gain 1/2/3/4 Coins.
 
 - Insurance Sellor
   - 建筑id: 01
   - 建筑稀有度：1
-  - 建筑卖出价（对应等级1-4级）：[5,20,40,75]
+  - 建筑类型：Utility（功能）
+  - 建筑卖出价（对应等级1-4级）：[5,16,37,61]
   - 建筑效果：
-    - When you roll a 1, gain 2*X* Coins and 2 EXP. *X*为建筑等级
+    - When you roll a 1, gain 2 Coins and 2 EXP.
+    - 卖出时，额外获得1/8/25/45星币。
 
 - Dice Sculpture
   - 建筑id: 02
   - 建筑稀有度：1
-  - 建筑卖出价（对应等级1-4级）：[5,10,15,20]
+  - 建筑类型：Dice（骰子）
+  - 建筑卖出价（对应等级1-4级）：[4,8,12,16]
   - 建筑效果：
-    - When you roll a 6, gain 6*X* Coins. *X*为建筑等级
+    - When you roll a 6, gain 6/12/18/24 Coins.
 
 ### 建筑稀有度2（Rare）：
 - Piggy Bank
   - 建筑id: 03
   - 建筑稀有度：2
-  - 建筑卖出价（对应等级1-4级）：[15,35,60,100]
+  - 建筑类型：Utility（功能）
+  - 建筑卖出价（对应等级1-4级）：[11,31,59,97]
   - 建筑效果：
     - At the end of the dice phase, gain 1 EXP.
+    - 卖出时，额外获得3/15/35/65星币。
 
 - Bookstore
   - 建筑id: 04
   - 建筑稀有度：2
-  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑类型：Utility（功能）
+  - 建筑卖出价（对应等级1-4级）：[8,16,24,32]
   - 建筑效果：
-    - When you land on this building, it grants (*X*+1) EXP to itself and adjacent buildings. *X*为建筑等级
-    - When you pass by, gain 2*X* Coins. *X*为建筑等级
+    - When you pass by this building, it grants 1/2/3/4 EXP to itself and adjacent buildings.
+    - When you pass by, gain 2/4/6/8 Coins.
 
 - Money Tree
   - 建筑id: 05
   - 建筑稀有度：2
-  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑类型：Star Coin（星幣）
+  - 建筑卖出价（对应等级1-4级）：[8,16,24,32]
   - 建筑效果：
-    - When you land on this building, permanently increase adjacent buildings’ Coin gain by *X*. *X*为建筑等级
-    - When you roll a 3, gain (*X*+1) Coins. *X*为建筑等级
+    - When you land on this building, permanently increase adjacent Star Coin buildings’ Coin gain by 1/2/3/4.
+    - When you roll a 3, gain 2/3/4/5 Coins.
 
 - Four-Leaf Clover House
   - 建筑id: 06
   - 建筑稀有度：2
-  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑类型：Dice（骰子）
+  - 建筑卖出价（对应等级1-4级）：[8,16,24,32]
   - 建筑效果：
-    - When you roll an even number, gain 2*X* Coins. *X*为建筑等级
+    - When you roll an even number, gain 2/4/6/8 Coins.
     - When you roll a 6, permanently increase this building's Coin gain by 1.
 
 - Wishing Well
   - 建筑id: 07
   - 建筑稀有度：2
-  - 建筑卖出价（对应等级1-4级）：[10,20,30,40]
+  - 建筑类型：Star Coin（星幣）
+  - 建筑卖出价（对应等级1-4级）：[8,16,24,32]
   - 建筑效果：
-    - At the end of the dice phase, gain *X* Coins. *X*为建筑等级
+    - At the end of the dice phase, gain 1/2/3/4 Coins.
     - Each time you clear a stage, permanently increase the Coin gain by 1.
 
 ### 建筑稀有度3（Epic）：
 - Fortune Coin Pool
   - 建筑id: 08
   - 建筑稀有度：3
+  - 建筑类型：Dice（骰子）
   - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
   - 建筑效果：
-    - When you roll two dice, gain 6*X* Coins. *X*为建筑等级
+    - When you roll two dice, gain 6/12/18/24 Coins.
     - When you roll a 1, your next action will roll two dice.
 
 - Lucky Gate
   - 建筑id: 09
   - 建筑稀有度：3
+  - 建筑类型：Star Coin（星幣）, Dice（骰子）
   - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
   - 建筑效果：
-    - When you roll a 1 or 6, gain Coins equal to (number of buildings on the field × *X*). *X*为建筑等级
+    - When you roll a 1 or 6, gain Coins equal to (number of buildings on the field × 1/2/3/4).
 
 - Vault
   - 建筑id: 10
   - 建筑稀有度：3
+  - 建筑类型：Utility（功能）
   - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
   - 建筑效果：
-    - At the end of the dice phase, all [Piggy Bank] and [Insurance Sellor] gain *X* EXP. *X*为建筑等级
-    - When you pass by, gain *X* Coins. *X*为建筑等级
+    - At the end of the dice phase, all [Piggy Bank] and [Insurance Sellor] gain 1/1/2/2 EXP.
+    - When you pass by, gain 1/2/3/4 Coins.
     - Each time you sell a [Piggy Bank] or [Insurance Sellor], permanently increase the Coin gain by 1.
 
 - Hall of Fortune
   - 建筑id: 11
   - 建筑稀有度：3
+  - 建筑类型：Star Coin（星幣）
   - 建筑卖出价（对应等级1-4级）：[15,30,45,60]
   - 建筑效果：
-    - When you roll a 3 or 4, trigger the dice effects of adjacent buildings.
-    - When you land on this building, permanently increase all buildings' Coin gain by *X*. *X*为建筑等级
+    - When you roll a 3 or 4, trigger adjacent Star Coin buildings' dice effects.
+    - When you land on this building, permanently increase all Star Coin buildings' Coin gain by 1/2/3/4.
 
 ### 建筑稀有度4（Legendary）：
 - Bunny Restaurant
   - 建筑id: 12
   - 建筑稀有度：4
+  - 建筑类型：Star Coin（星幣）
   - 建筑卖出价（对应等级1-4级）：[25,50,75,100]
   - 建筑效果：
-    - When you pass by, gain 5*X* Coins. *X*为建筑等级
-    - When you pass by, and permanently increase one random building’s Coin gain by 1. 
+    - When you pass by, gain 5/10/15/20 Coins.
+    - When you pass by, permanently increase one random Star Coin building’s Coin gain by 1/2/3/4.
 
 - Holographic Experience House
   - 建筑id: 13
   - 建筑稀有度：4
+  - 建筑类型：Dice（骰子）
   - 建筑卖出价（对应等级1-4级）：[25,50,75,100]
   - 建筑效果：
     - When you pass by, your next action will roll two dice.
-    - When you roll two dice, gain Coins equal to (sum of both dice results x *X*). *X*为建筑等级
+    - When you roll two dice, gain Coins equal to (sum of both dice results x 1/2/3/4).
   
 - Fox Antique Shop
   - 建筑id: 14
   - 建筑稀有度：4
+  - 建筑类型：Utility（功能）
   - 建筑卖出价（对应等级1-4级）：[25,50,75,100]
   - 建筑效果：
-    - When you roll a 5, this building and *X* random buildings gain *X* EXP. *X*为建筑等级
+    - At the end of the dice phase, this building and 1/2/2/3 random buildings gain 1/1/2/2 EXP.
     - When you pass by, grant one [Piggy Bank] or [Insurance Sellor]. 
 
+### 建筑类型归类（按当前图鉴规范）
+- Star Coin（星幣）：00 Small Coin Pouch、05 Money Tree、07 Wishing Well、09 Lucky Gate、11 Hall of Fortune、12 Bunny Restaurant。
+- Dice（骰子）：02 Dice Sculpture、06 Four-Leaf Clover House、08 Fortune Coin Pool、09 Lucky Gate、13 Holographic Experience House。
+- Utility（功能）：01 Insurance Sellor、03 Piggy Bank、04 Bookstore、10 Vault、14 Fox Antique Shop。
+
+### 可选：立牌与建筑触发
+- 回合开始触发：银行卡立牌（+1星币）、眼镜立牌（随机建筑+1经验）。
+- 投骰过程触发：三叶草立牌（掷6充能）、炸虾立牌（掷1后下次必6）、轮滑立牌（投骰充能）、金矿立牌（投骰后随机建筑骰点星币+1）。
+- 建筑卖出触发：猪猪立牌（卖出充能，充能4送小猪银行）。
+- 建筑效果增强：刷新立牌（充能3后使随机建筑骰点效果永久+1）。
+
 # UI
-TODO
+
+## 1) Main Menu（主菜单）
+- 左侧约 65% 区域：展示 3D 棋盘场景预览（不可交互）。
+- 右侧约 35% 区域：纵向按钮组。
+- 默认（无存档）按钮顺序：
+  - Start（开始游戏）
+  - History（游戏历史记录）
+  - Quit（退出）
+- 有存档时按钮顺序：
+  - Continue（继续游戏）
+  - Restart（重新开始）
+  - History（游戏历史记录）
+  - Quit（退出）
+- Continue（继续游戏）仅在检测到有效存档时显示；无存档时不显示该按钮。
+- 背景使用浅色纹理，保证按钮高对比可读。
+
+## 2) In-Game HUD（对局主界面）
+
+### Center Board（中央棋盘区）
+- 主地图位于中央（约 60~70% 视觉占比）。
+- 显示地图格类型：Start Tile（起点）、Path（路径）、Foundation（空地）、Locked Block（待开发地块）、Special Tile（特殊格）。
+- 玩家棋子按掷骰点数自动移动；经过/停留触发时显示浮字反馈（如 +5 Coin（+5金币）、Get Building（获得建筑））。
+- 左上角常驻 Hamburger（菜单，三横杠）按钮。
+
+### Top Status Bar（顶部状态栏）
+- 左：Cash（现金）+ 当前数值 + 进度条。
+- 进度条：
+-- 左：Level 1/6（第1/6关）。
+-- 右：Goal 0/15（目标 0/15 coins）。
+- 次级提示：N dice remaining（还有N个骰子结束本小关）。
+
+### Bottom Composite Panel（底部复合区）
+- 底部区域固定为 Store（商店）区：显示 5 个商品位（建筑图标、稀有度、价格）与 Refresh（刷新）按钮（Cost 5*n（花费 5*n））。
+- 左侧竖栏为 Buff / Accessory（增益/饰品）槽位（若饰品系统启用，则展示饰品栏）。
+- 右侧竖栏为 Backpack（背包）槽位（5格），用于存放已获得建筑。
+- 拖拽交互：
+  - 商品 -> 背包/地块（购买后）
+  - 背包 -> 空地（放置）
+  - 同类建筑叠放（合成并转化经验）
+
+### Right Bottom Primary Action（右下主操作）
+- 主按钮：Roll Dice!（掷骰子！）。
+- 默认规则：在未触发建筑/特殊效果时，只投 1 个六面骰（1d6，点数 1-6）。
+- 触发特效后才会变为 2 Dice（2颗骰子）。
+- 按钮附近显示当前投骰进度：Roll Count（投骰次数）= 当前次数/总次数（例如 1/48）。
+- 点击后显示本次点数（如 Rolled 4（掷出4点）），再进入结算流程。
+
+### Pause Menu（暂停菜单）
+- 点击左上角 Hamburger（三横杠）进入暂停菜单（覆盖层）。
+- 暂停菜单按钮顺序：
+  - Continue（继续）
+  - Settings（设置）
+  - Restart（重新开始）
+  - Leave Match（离开对局）
+- 点击 Continue（继续）关闭暂停菜单并返回对局。
+- 点击 Leave Match（离开对局）弹出二次确认框（提示：离开游戏后，你的进度将会被保存）。
+  - Cancel（取消）：关闭确认框并返回暂停菜单。
+  - Confirm（确定）：执行 Save（存档）并 Exit（退出到主界面）。
+
+### Left Bottom Functional Action（左下功能）
+- 按钮：Buy Block!（买地！）。
+- 显示当前买地价格：Cost X（花费X）。
+- 点击后高亮剩余 Locked Block（待开发地块），玩家选择其中一块解锁为 Foundation（空地）。
+
+### Building Display & Merge Rule（建筑显示与合成规则）
+- 地图上已放置建筑需要显示 Level（等级）与 EXP Bar（经验条）。
+- 合成时，作为“被喂给目标建筑”的建筑，其经验按“当前等级基础经验 + 当前已累积经验 + 本次合成基础经验6”计入目标建筑。
+- 示例：一个 Level 2 且已有 6 点经验的建筑，被用于合成时计入经验为：6（Lv2基础） + 6（当前已有） + 6（合成基础） = 18。
+
+### Building Detail Popup（建筑点击详情弹窗）
+- 玩家点击场上或背包中的建筑后，弹出 Building Detail（建筑详情）面板。
+- 弹窗信息包含：
+  - Name（建筑名称）
+  - Trigger Icon（建筑流派图标）
+  - Effect Text（效果描述）
+  - Sell Value（出售价格）
+- 弹窗操作按钮：Sell（出售）。
+- 点击空白区域或再次点击当前建筑可关闭弹窗。
+- 弹窗出现时不暂停主地图显示，仅用于查看与快速出售。
+
+### 可选：立牌UI
+- 左侧 Buff / Accessory 区显示已装备立牌图标、品质颜色与充能值。
+- 当立牌拥有充能技时，UI展示当前充能/目标充能（如 2/4, 5/6）。
+- 结算画面可追加本局立牌统计（可选）。
+
+## 3) Result Screen（结算画面）
+- 关卡/对局结束后进入结算弹窗或独立结算层。
+- 结算信息至少包含：
+  - Score（本局得分）
+  - Best Score（历史最高）
+- 底部按钮：
+  - Exit（退出）
+  - Detail（查看详情/可选（如果有立牌））
+  - Replay（再玩一局）
 
 # 可调参数：
 关卡数：6\
-关卡目标（对应第1-6关）：[10，40，80，120，240，360]\
+关卡目标（对应第1-6关）：[15，35，80，120，233，350]\
 建筑等级：4\
-建筑经验（对应等级1-4级）：[0，5，10，15]\
+建筑经验（对应等级1-4级）：[0，6，12，18]\
 建筑稀有度：4\
-建筑价格（对应稀有度1-4级）：[10，20，30，50]\
-购买待开发地块价格：[10，20，40，60，80，80]\
+绿色建筑卖出价（等级1-4）：[4，8，12，16]\
+蓝色建筑卖出价（等级1-4）：[8，16，24，32]\
+紫色建筑卖出价（等级1-4）：[15，30，45，60]\
+金色建筑卖出价（等级1-4）：[25，50，75，100]\
+Piggy Bank卖出额外收益（等级1-4）：[3，15，35，65]\
+Insurance Sellor卖出额外收益（等级1-4）：[1，8，25，45]\
+建筑购入价（对应稀有度1-4）：[8，16，30，50]（商店售出的均为1级建筑）\
+购买待开发地块价格：[10，25，40，55，70，85]\
 商店商品池等级：3\
-商店商品池建筑稀有度上限（对应商品池等级1-3级）：[2，3，4]\
-商店商品池现金下限（对应商品池等级1-3级）：[0，20，30]\
-1级商品池刷新概率（对建筑等级1-4级）：[70，30，0，0]\
-2级商品池刷新概率（对建筑等级1-4级）：[30，40，30，0]\
-3级商品池刷新概率（对建筑等级1-4级）：[10，30，30，30]\
+商店刷新价格：首次5，之后每次+5，最高50（刷新次数无上限）\
+关卡1商品池概率（绿/蓝/紫/金）：[70，28，2，0]\
+关卡2商品池概率（绿/蓝/紫/金）：[60，34，5，1]\
+关卡3商品池概率（绿/蓝/紫/金）：[50，40，8，2]\
+关卡4商品池概率（绿/蓝/紫/金）：[34，48，15，3]\
+关卡5商品池概率（绿/蓝/紫/金）：[31，45，20，4]\
+关卡6商品池概率（绿/蓝/紫/金）：[30，42，23，5]\
+初始地皮数量：6（最多12）\
 初始建筑(按照建筑id): [00,01,02]\
+初始建筑位置：仓库（Backpack）\
+仓库格数：5\
 特殊路径格随机建筑池：所有建筑（00-14）相同概率\
 所有商品池中，同一稀有度的刷新概率被所有该稀有度的建筑平分\
-Bunny Restaurant和Fox Antique Shop中的random building指所有被放置在地图上的建筑，所有地图上放置的建筑有相同的概率\
+Fox Antique Shop中的random building指所有被放置在地图上的建筑，所有地图上放置的建筑有相同的概率\
 Fox Antique Shop中grant one [Piggy Bank] or [Insurance Sellor]，两者的概率各50%
+
+## 可选参数：立牌系统
+
+- 品质标签：1/2/3（蓝 / 紫 / 彩）
+
+- 立牌池（名称-品质-核心效果）：
+  - 猪猪立牌（蓝）：卖出建筑充能；充能4获得【小猪银行】
+  - 兔兔立牌（蓝）：经过起始点，随机1个Star Coin建筑骰点星币获取量永久+1
+  - 刷新立牌（蓝）：刷新充能；充能3使随机1个建筑骰点效果永久+1
+  - 三叶草立牌（蓝）：骰出6充能；充能6获得1个Dice随机建筑
+  - 银行卡立牌（蓝）：回合开始+1星币
+  - 眼镜立牌（蓝）：回合开始随机1个建筑+1经验
+  - 小浣熊立牌（紫）：经过Star Coin建筑+1星币
+  - 炸虾立牌（紫）：骰出1后，下次骰点必定为6
+  - 书本立牌（紫）：停留金币/卡牌地块时，对应建筑+5经验
+  - 背包立牌（紫）：经过起始点，随机获得1个场上已部署建筑
+  - 轮滑立牌（彩）：骰点充能；充能4使下次行动可掷两枚骰子
+  - 购物车立牌（彩）：购买建筑-25%，出售建筑+25%
+  - 金矿立牌（彩）：骰点后，随机1个Star Coin建筑骰点星币获取量永久+1
+
+- 充能阈值：
+  - 猪猪4，三叶草6，轮滑4，刷新3
+
+- 立牌获得概率（按关卡）：
+  - 关卡1：蓝70% / 紫28% / 彩2%
+  - 关卡2：蓝60% / 紫34% / 彩5%
+  - 关卡3：蓝50% / 紫40% / 彩8%
+  - 关卡4：蓝34% / 紫48% / 彩15%
+  - 关卡5：蓝31% / 紫45% / 彩20%
+  - 关卡6：蓝30% / 紫42% / 彩23%
