@@ -1,3 +1,6 @@
 node_modules
-
+# SQLite
+*.db
+*.db-wal
+*.db-shm
 .fake

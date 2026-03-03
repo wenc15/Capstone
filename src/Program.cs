@@ -40,8 +40,10 @@
 
 using CapstoneBackend.Services;
 using CapstoneBackend.Data;
+using CapstoneBackend.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,9 +65,8 @@ builder.Services.AddSingleton<LocalDataService>();
 // 作为 Singleton，确保整个应用只有一个会话状态源。
 builder.Services.AddSingleton<FocusSessionService>();
 
-// 注册抽卡服务（Draw Card System）
+// 注册抽卡服务（Food Gacha System）
 // Scoped：每个 HTTP 请求一个实例，适合依赖 DbContext 的服务
-builder.Services.AddScoped<ICardDrawService, CardDrawService>();
 builder.Services.AddScoped<IFoodGachaService, FoodGachaService>();
 
 // 注册 EF Core + SQLite 数据库上下文（用于存储网站使用记录等）
@@ -101,52 +102,63 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
 
     // -------------------------------------------------------------
-    // Seed FoodDefinitions (local dev only)
+    // Seed/Sync FoodDefinitions from Data/foods.json (dev-friendly, no hardcode)
     // -------------------------------------------------------------
-    // Seed FoodDefinitions for local development/testing only.
-    // TODO: Replace with official food config/assets from frontend/content team.
-    if (!db.FoodDefinitions.Any())
-    {
-        db.FoodDefinitions.AddRange(
-            new CapstoneBackend.Models.FoodDefinition
-            {
-                FoodId = "food_001",
-                Name = "Apple",
-                Rarity = "Common",
-                ExpValue = 5,
-                ImageKey = "apple",
-                IsEnabled = true
-            },
-            new CapstoneBackend.Models.FoodDefinition
-            {
-                FoodId = "food_002",
-                Name = "Banana",
-                Rarity = "Common",
-                ExpValue = 6,
-                ImageKey = "banana",
-                IsEnabled = true
-            },
-            new CapstoneBackend.Models.FoodDefinition
-            {
-                FoodId = "food_003",
-                Name = "Sandwich",
-                Rarity = "Rare",
-                ExpValue = 12,
-                ImageKey = "sandwich",
-                IsEnabled = true
-            },
-            new CapstoneBackend.Models.FoodDefinition
-            {
-                FoodId = "food_004",
-                Name = "Cake",
-                Rarity = "Epic",
-                ExpValue = 20,
-                ImageKey = "cake",
-                IsEnabled = true
-            }
-        );
+    var foodsPath = Path.Combine(app.Environment.ContentRootPath, "Data", "foods.json");
 
-        db.SaveChanges();
+    if (File.Exists(foodsPath))
+    {
+        var json = File.ReadAllText(foodsPath);
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        var foods = JsonSerializer.Deserialize<List<FoodDefinition>>(json, options) ?? new();
+
+        // remove empty ids + dedupe by FoodId (case-insensitive)
+        var normalized = foods
+            .Where(f => !string.IsNullOrWhiteSpace(f.FoodId))
+            .GroupBy(f => f.FoodId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        // Upsert by FoodId
+        var existing = await db.FoodDefinitions
+            .ToDictionaryAsync(f => f.FoodId, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var f in normalized)
+        {
+            var key = f.FoodId.Trim();
+
+            if (existing.TryGetValue(key, out var row))
+            {
+                row.Name = f.Name ?? "";
+                row.Rarity = f.Rarity;
+                row.ExpValue = f.ExpValue;
+                row.ImageKey = f.ImageKey;
+                row.IsEnabled = f.IsEnabled;
+            }
+            else
+            {
+                db.FoodDefinitions.Add(new FoodDefinition
+                {
+                    FoodId = key,
+                    Name = f.Name ?? "",
+                    Rarity = f.Rarity,
+                    ExpValue = f.ExpValue,
+                    ImageKey = f.ImageKey,
+                    IsEnabled = f.IsEnabled
+                });
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+    else
+    {
+        Console.WriteLine($"[FoodGacha] foods.json not found at: {foodsPath}");
     }
 }
 
