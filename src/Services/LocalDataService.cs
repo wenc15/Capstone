@@ -111,6 +111,10 @@ public class LocalDataService
             File.WriteAllText(path, json);
         }
     }
+     public void SaveUserProfilePublic(UserProfile profile)
+    {
+        SaveUserProfile(profile);
+    }
 
     private static bool EnsurePetGrowthList(UserProfile profile, int petId)
     {

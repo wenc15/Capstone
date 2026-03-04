@@ -75,6 +75,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=growin.db");
 });
 
+// 注册成就系统服务（Achievements）
+// 作为 Singleton：
+//   - 成就定义（achievements.json）可以被缓存，避免每次请求都读文件
+//   - 成就状态依赖 LocalDataService（同为 Singleton），保持一致的本地数据读写与线程安全
+builder.Services.AddSingleton<AchievementService>();
+
 
 
 
