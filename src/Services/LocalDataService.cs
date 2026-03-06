@@ -185,8 +185,17 @@ public class LocalDataService
             if (minutes > 0)
             {
                 profile.Credits += minutes;
-            }
 
+
+            // 成就系统：累计获得点数（历史总获得 Credits，不受花费影响）
+                if (profile.AchievementCounters == null)
+                {
+                profile.AchievementCounters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                }
+                profile.AchievementCounters.TryGetValue("credits_earned_total", out var earned);
+                profile.AchievementCounters["credits_earned_total"] = checked(earned + minutes);
+
+            }
             SaveUserProfile(profile);
         }
     }

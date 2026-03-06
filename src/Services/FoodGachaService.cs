@@ -31,11 +31,13 @@ public class FoodGachaService : IFoodGachaService
 {
     private readonly AppDbContext _db;
     private readonly LocalDataService _dataService;
+    private readonly AchievementService _achievementService;
 
-    public FoodGachaService(AppDbContext db, LocalDataService dataService)
+    public FoodGachaService(AppDbContext db, LocalDataService dataService, AchievementService achievementService)
     {
         _db = db;
         _dataService = dataService;
+        _achievementService = achievementService;
     }
 
     public async Task<FoodDrawResultDto> DrawOneAsync(string userId, int cost)
@@ -60,13 +62,15 @@ public class FoodGachaService : IFoodGachaService
         var drawn = PickUniform(pool);
 
         // 4) Inventory upsert (LOCAL JSON inventory)
-        // Prefix avoids collisions with other inventory types (cards/materials/etc.)
         var itemId = $"food:{drawn.FoodId}";
 
         var inv = _dataService.GetInventory();
         var before = inv.TryGetValue(itemId, out var c) ? c : 0;
 
         _dataService.AddInventoryItem(itemId, 1);
+
+        // ✅ Hook achievements: count total food draws
+        _achievementService.IncrementCounter("food_draws_total", 1);
 
         var isNew = before == 0;
 
