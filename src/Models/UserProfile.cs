@@ -78,4 +78,21 @@ public class UserProfile
     /// 未包含的物品视为数量 0。
     /// </summary>
     public Dictionary<string, int> Inventory { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+/// Achievement counters (event-style), e.g.:
+/// - "food_draws_total": 3
+/// - "credits_earned_total": 120
+/// </summary>
+public Dictionary<string, int> AchievementCounters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+/// <summary>
+/// Unlocked achievement ids, e.g. "first_focus", "first_food_draw".
+/// </summary>
+public HashSet<string> UnlockedAchievements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+/// <summary>
+/// Unlock timestamps (UTC), keyed by achievement id.
+/// </summary>
+public Dictionary<string, DateTimeOffset> AchievementUnlockedAt { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

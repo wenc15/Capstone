@@ -38,6 +38,8 @@ import { updateSessionSummary } from './session_summary.js';
 
 import { refreshCredits } from './creditsStore.js';
 
+import { offerRelaxAfterFocus } from './relax_prompt.js';
+
 
 export function mountTimer(els) {
   const {
@@ -237,6 +239,7 @@ export function mountTimer(els) {
             if (focusLast) focusLast.textContent = `${completedMins} min`;
             showToast(toastEl, `Session complete (synced): ${completedMins} min ✅`);
             notifySystem('Focus session complete', 'Synced from backend');
+            offerRelaxAfterFocus(els, { minutes: completedMins });
 
             if (viewStats && viewStats.style.display !== 'none') {
                 renderStats({ els: statsEls, chartRef });
@@ -416,6 +419,7 @@ export function mountTimer(els) {
         showToast(toastEl, `Session complete: ${lastStartedMins} min ✅`);
         notifySystem('Focus session complete', `${lastStartedMins} minutes`);
         refreshCredits(); // ✅ Session success -> update Token immediately
+        offerRelaxAfterFocus(els, { minutes: lastStartedMins });
 
         if (viewStats && viewStats.style.display !== 'none') {
           renderStats({ els: statsEls, chartRef });

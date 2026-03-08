@@ -1,0 +1,6 @@
+[
+    { "id": "first_focus", "title": "First Focus", "desc": "Complete 1 focus session", "type": "total_sessions", "target": 1 },
+    { "id": "focus_10", "title": "Getting Started", "desc": "Complete 10 focus sessions", "type": "total_sessions", "target": 10 },
+    { "id": "first_food_draw", "title": "First Bite", "desc": "Draw your first food", "type": "food_draws_total", "target": 1 },
+    { "id": "food_draw_10", "title": "Snack Time", "desc": "Draw 10 foods", "type": "food_draws_total", "target": 10 }
+  ]

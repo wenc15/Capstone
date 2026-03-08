@@ -129,6 +129,88 @@
           </div>
         </div>
 
+        <div id="view-minigame" style="display:none;">
+          <div class="mg-shell" id="mgRoot" aria-label="Dice & Build minigame">
+            <header class="mg-topbar" aria-label="Status bar">
+              <button class="mg-menu" id="mgMenuBtn" type="button" aria-label="Menu">☰</button>
+              <div class="mg-topbar-mid">
+                <div class="mg-cash"><span class="mg-cash-ico">💰</span><span id="mgCash">0</span></div>
+                <div class="mg-stage" id="mgStage">Stage 1/6</div>
+                <div class="mg-goal">
+                  <div class="mg-goal-row"><span id="mgGoal">0/15</span></div>
+                  <div class="mg-goalbar" aria-hidden="true"><div id="mgGoalFill" class="mg-goalbar-fill"></div></div>
+                </div>
+              </div>
+              <div class="mg-topbar-right" id="mgRolls">🎲 4 left | 0/24</div>
+              <button class="mg-exit" id="mgExitBtn" type="button" aria-label="Exit minigame">×</button>
+            </header>
+
+            <main class="mg-body">
+              <section class="mg-center" aria-label="Board">
+                <div class="mg-board-wrap">
+                  <div class="mg-board-grid" id="mgBoard"></div>
+                </div>
+                <div class="mg-float" id="mgFloat" aria-live="polite"></div>
+              </section>
+
+              <aside class="mg-backpack" aria-label="Backpack">
+                <div class="mg-backpack-title">BACKPACK</div>
+                <div class="mg-backpack-grid" id="mgBackpack"></div>
+              </aside>
+            </main>
+
+            <button class="mg-buyblock" id="mgBuyBlockBtn" type="button">🏕 Buy <span id="mgBuyBlockCost">(10)</span></button>
+
+            <button class="mg-roll" id="mgRollBtn" type="button">🎲 Roll!!</button>
+            <div class="mg-last" id="mgLastRoll">—</div>
+
+            <footer class="mg-storebar" aria-label="Store">
+              <div class="mg-storebar-head">
+                <div class="mg-storebar-title">Store</div>
+                <div class="mg-storebar-actions">
+                  <button class="mg-refresh" id="mgRefreshBtn" type="button">Refresh <span id="mgRefreshCost">(5)</span></button>
+                  <button class="mg-sell" id="mgSellBtn" type="button" disabled>Sell</button>
+                </div>
+              </div>
+              <div class="mg-store-grid" id="mgStore"></div>
+              <div class="mg-hint" id="mgHint"></div>
+            </footer>
+
+            <div class="mg-modal mg-hidden" id="mgResult" role="dialog" aria-modal="true" aria-label="Minigame result">
+              <div class="mg-modal-card">
+                <div class="mg-modal-title" id="mgResultTitle">Result</div>
+                <div class="mg-modal-meta" id="mgResultMeta">—</div>
+                <div class="mg-modal-actions">
+                  <button class="mg-modal-btn primary" id="mgResultExit" type="button">Exit</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mg-modal mg-hidden" id="mgDetail" role="dialog" aria-modal="true" aria-label="Building details">
+              <div class="mg-detail-card">
+                <div class="mg-detail-ico" id="mgDetailIcon">🏗️</div>
+                <div class="mg-detail-title" id="mgDetailName">Building</div>
+                <div class="mg-detail-badges">
+                  <span class="mg-badge" id="mgDetailRarity">Common</span>
+                  <span class="mg-badge" id="mgDetailTag">Coin</span>
+                </div>
+                <div class="mg-detail-bars">
+                  <div class="mg-detail-bars-row">
+                    <div id="mgDetailLevel">Level 1/4</div>
+                    <div id="mgDetailExp">0/6 EXP</div>
+                  </div>
+                  <div class="mg-expbar"><div class="mg-expbar-fill" id="mgDetailExpFill"></div></div>
+                </div>
+                <div class="mg-detail-effect" id="mgDetailEffect">—</div>
+                <div class="mg-detail-actions">
+                  <button class="mg-detail-sell" id="mgDetailSell" type="button">Sell</button>
+                  <button class="mg-detail-close" id="mgDetailClose" type="button">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
 
 
       </div>
@@ -136,6 +218,17 @@
   </div>
 
   <div id="doneToast" class="toast" aria-live="polite"></div>
+
+  <div class="relax mg-hidden" id="relaxPrompt" role="dialog" aria-modal="true" aria-label="Relax prompt">
+    <div class="relax-card">
+      <div class="relax-title">Session Complete</div>
+      <div class="relax-sub">Want a short break? Play one run of Dice & Build.</div>
+      <div class="relax-actions">
+        <button class="relax-btn primary" id="relaxPlayBtn" type="button">Play</button>
+        <button class="relax-btn" id="relaxLaterBtn" type="button">Not Now</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   

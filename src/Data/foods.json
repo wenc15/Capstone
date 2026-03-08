@@ -1,0 +1,6 @@
+[
+  { "foodId": "food_001", "name": "Apple", "rarity": "Common", "expValue": 5,  "imageKey": "apple",    "isEnabled": true },
+  { "foodId": "food_002", "name": "Banana","rarity": "Common", "expValue": 6,  "imageKey": "banana",   "isEnabled": true },
+  { "foodId": "food_003", "name": "Sandwich","rarity": "Rare", "expValue": 12, "imageKey": "sandwich", "isEnabled": true },
+  { "foodId": "food_004", "name": "Cake",  "rarity": "Epic",   "expValue": 20, "imageKey": "cake",     "isEnabled": true }
+]

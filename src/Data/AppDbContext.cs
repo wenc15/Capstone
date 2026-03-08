@@ -32,10 +32,11 @@ public class AppDbContext : DbContext
     /// 通过 _db.WebsiteUsages 进行增删改查。
     /// </summary>
     public DbSet<WebsiteUsage> WebsiteUsages { get; set; } = null!;
+
+    // Cards
     public DbSet<CardDefinition> CardDefinitions { get; set; } = null!;
     public DbSet<UserCard> UserCards { get; set; } = null!;
 
-    // Food gacha
     public DbSet<FoodDefinition> FoodDefinitions { get; set; } = null!;
     public DbSet<UserFood> UserFoods { get; set; } = null!;
 }
