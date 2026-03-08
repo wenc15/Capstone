@@ -85,8 +85,8 @@ export function mountRelaxPrompt(els) {
 
   relaxPlayBtn.addEventListener('click', () => {
     hidePrompt(els);
-    import('./minigame_dicebuild.js')
-      .then((mod) => mod.openDiceBuild?.(els, { reason: 'post-focus' }))
+    import('./minigame_hub.js')
+      .then((mod) => mod.openMinigameHub?.(els, { reason: 'post-focus' }))
       .catch(() => {});
   });
 

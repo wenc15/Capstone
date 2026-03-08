@@ -6,6 +6,7 @@
 //  - MVP supports 3 starter buildings and basic shop/backpack/placement/merge.
 
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
+import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
 import { showToast } from './utils.js';
 
 const API_BASE = 'http://localhost:5024';
@@ -545,22 +546,8 @@ function showFloat(ui, text) {
   el.classList.add('is-on');
 }
 
-function hideAllViews(els) {
-  const ids = ['view-timer', 'view-stats', 'view-pet', 'view-gacha', 'view-minigame'];
-  ids.forEach((id) => {
-    const v = document.getElementById(id);
-    if (v) v.style.display = id === 'view-minigame' ? 'block' : 'none';
-  });
-
-  // reset sidebar active state
-  ['navTimer', 'navStats', 'navPet', 'navGacha'].forEach((id) => {
-    const b = document.getElementById(id);
-    if (!b) return;
-    b.classList.remove('active');
-    b.setAttribute('aria-current', 'false');
-  });
-
-  // extra hint
+function showDiceBuildView(els) {
+  showMinigamePanel(els, 'dicebuild');
   if (els?.mgHint) els.mgHint.textContent = '';
 }
 
@@ -725,6 +712,10 @@ function mergeExpValue(inst) {
 
 function attachHandlers(els, stRef) {
   const ui = els;
+
+  ui.mgMenuBtn?.addEventListener('click', () => {
+    openMinigameHub(ui, { bypassGate: true, reason: 'hub' });
+  });
 
   ui.mgExitBtn?.addEventListener('click', () => {
     closeDiceBuild(ui);
@@ -1014,7 +1005,8 @@ export function mountDiceBuild(els) {
 export function openDiceBuild(els, meta) {
   if (!els?.viewMinigame) return;
 
-  const ok = hasDiceBuildEligibility() || meta?.reason === 'dev';
+  const bypass = meta?.bypassGate === true;
+  const ok = bypass || hasDiceBuildEligibility() || meta?.reason === 'dev';
   if (!ok) {
     enableGateHint(els, false);
     showToast(els.toastEl, 'Minigame is only available after focus completion.');
@@ -1022,9 +1014,10 @@ export function openDiceBuild(els, meta) {
   }
 
   // Consume eligibility when opening (unless dev)
-  if (meta?.reason !== 'dev') consumeDiceBuildEligibility();
+  if (!bypass && meta?.reason !== 'dev') consumeDiceBuildEligibility();
 
-  hideAllViews(els);
+  showMinigameSection(els);
+  showDiceBuildView(els);
   enableGateHint(els, true);
 
   const stRef = els.__dicebuild;
@@ -1037,15 +1030,5 @@ export function openDiceBuild(els, meta) {
 }
 
 export function closeDiceBuild(els) {
-  // Exit returns to Timer view
-  const timer = els?.viewTimer || document.getElementById('view-timer');
-  const mg = els?.viewMinigame || document.getElementById('view-minigame');
-  if (mg) mg.style.display = 'none';
-  if (timer) timer.style.display = 'block';
-
-  const navTimer = document.getElementById('navTimer');
-  if (navTimer) {
-    navTimer.classList.add('active');
-    navTimer.setAttribute('aria-current', 'page');
-  }
+  closeMinigameSection(els);
 }

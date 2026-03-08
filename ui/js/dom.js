@@ -30,6 +30,7 @@ export function collectDom() {
   const navStats  = document.getElementById('navStats');
   const navPet    = document.getElementById('navPet');
   const navGacha  = document.getElementById('navGacha');    
+  const navMinigame = document.getElementById('navMinigame');
 
   // ===== Minigame (Dice & Build) =====
   const mgRoot = document.getElementById('mgRoot');
@@ -121,6 +122,7 @@ export function collectDom() {
     navStats,
     navPet, 
     navGacha, 
+    navMinigame,
 
     //Gacha
     gachaRoot,
@@ -196,5 +198,36 @@ export function collectDom() {
     relaxPrompt,
     relaxPlayBtn,
     relaxLaterBtn,
+
+    // Minigame hub
+    mgHubView: document.getElementById('mgHubView'),
+    mgHubCloseBtn: document.getElementById('mgHubCloseBtn'),
+    mgOpenDicebuildBtn: document.getElementById('mgOpenDicebuildBtn'),
+    mgOpenTetrisBtn: document.getElementById('mgOpenTetrisBtn'),
+    mgOpenSnakeBtn: document.getElementById('mgOpenSnakeBtn'),
+
+    // Tetris
+    tetRoot: document.getElementById('tetrisRoot'),
+    tetHubBtn: document.getElementById('tetHubBtn'),
+    tetExitBtn: document.getElementById('tetExitBtn'),
+    tetBoard: document.getElementById('tetBoard'),
+    tetScore: document.getElementById('tetScore'),
+    tetLevel: document.getElementById('tetLevel'),
+    tetLines: document.getElementById('tetLines'),
+    tetStatus: document.getElementById('tetStatus'),
+    tetNext: document.getElementById('tetNext'),
+    tetStartBtn: document.getElementById('tetStartBtn'),
+    tetHint: document.getElementById('tetHint'),
+
+    // Snake
+    snakeRoot: document.getElementById('snakeRoot'),
+    snakeHubBtn: document.getElementById('snakeHubBtn'),
+    snakeExitBtn: document.getElementById('snakeExitBtn'),
+    snakeBoard: document.getElementById('snakeBoard'),
+    snakeScore: document.getElementById('snakeScore'),
+    snakeHighScore: document.getElementById('snakeHighScore'),
+    snakeStartBtn: document.getElementById('snakeStartBtn'),
+    snakeHint: document.getElementById('snakeHint'),
+    snakeStatus: document.getElementById('snakeStatus'),
   };
 }

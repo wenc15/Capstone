@@ -12,6 +12,7 @@ import { mountGacha } from './js/gacha.js';
 import { mountMusic } from './js/music.js';
 import { mountDiceBuild } from './js/minigame_dicebuild.js';
 import { mountRelaxPrompt } from './js/relax_prompt.js';
+import { mountMinigameDevtools } from './js/minigame_devtools.js';
 const els = collectDom();      // ← 现在 DOM 都来自这里
 
 mountWidget();
@@ -23,6 +24,7 @@ mountGacha(els);
 mountMusic();
 mountDiceBuild(els);
 mountRelaxPrompt(els);
+mountMinigameDevtools(els);
 // 2026/1/22 edited by JS:
 // 修改内容：
 //   - 引入 Credits 前端状态管理。

@@ -19,17 +19,22 @@
 
 import { renderStats } from './stats.js';
 import { onEnterGacha } from './gacha.js';
+import { mountMinigameHub, openMinigameHub } from './minigame_hub.js';
+import { mountTetris } from './minigame_tetris.js';
+import { mountSnake } from './minigame_snake.js';
 
 export function mountNav(els) {
   const {
     navTimer,
     navStats,
     navPet,
-    navGacha,   
+    navGacha,
+    navMinigame,
     viewTimer,
     viewStats,
     viewPet,
-    viewGacha,   
+    viewGacha,
+    viewMinigame,
     statsEls,
     gachaRoot,
     chartRef
@@ -39,31 +44,34 @@ export function mountNav(els) {
   const btnStats = navStats;
   const btnPet   = navPet;
   const btnGacha = navGacha; 
+  const btnMinigame = navMinigame;
 
  // Defensive check: log exactly what's missing
-const missing = {
-  navTimer: !navTimer,
-  navStats: !navStats,
-  navPet: !navPet,
-  navGacha: !navGacha,
-  viewTimer: !viewTimer,
-  viewStats: !viewStats,
-  viewPet: !viewPet,
-  viewGacha: !viewGacha,
-};
+ const missing = {
+   navTimer: !navTimer,
+   navStats: !navStats,
+   navPet: !navPet,
+   navGacha: !navGacha,
+   navMinigame: !navMinigame,
+   viewTimer: !viewTimer,
+   viewStats: !viewStats,
+   viewPet: !viewPet,
+   viewGacha: !viewGacha,
+   viewMinigame: !viewMinigame,
+ };
 
-const hasMissing = Object.values(missing).some(Boolean);
-if (hasMissing) {
-  console.warn('[Nav] Missing nav or view elements. Navigation not mounted.', missing, {
-    navTimer, navStats, navPet, navGacha,
-    viewTimer, viewStats, viewPet, viewGacha, gachaRoot
-  });
-  return;
-}
+ const hasMissing = Object.values(missing).some(Boolean);
+ if (hasMissing) {
+   console.warn('[Nav] Missing nav or view elements. Navigation not mounted.', missing, {
+     navTimer, navStats, navPet, navGacha, navMinigame,
+     viewTimer, viewStats, viewPet, viewGacha, viewMinigame, gachaRoot
+   });
+   return;
+ }
 
 
-  const allBtns  = [btnTimer, btnStats, btnPet, btnGacha];
-  const allViews = [viewTimer, viewStats, viewPet, viewGacha];
+ const allBtns  = [btnTimer, btnStats, btnPet, btnGacha, btnMinigame];
+ const allViews = [viewTimer, viewStats, viewPet, viewGacha, viewMinigame];
 
   function setActive(btn, view) {
     allViews.forEach((v) => {
@@ -97,6 +105,14 @@ if (hasMissing) {
   btnStats.addEventListener('click', () => setActive(btnStats, viewStats));
   btnPet.addEventListener('click', () => setActive(btnPet, viewPet));
   btnGacha.addEventListener('click', () => setActive(btnGacha, viewGacha));
+  btnMinigame.addEventListener('click', () => {
+    try { openMinigameHub(els); } catch (err) { console.error('[Nav] Failed to open Minigame hub:', err); }
+  });
+
+  // Mount minigames
+  try { mountMinigameHub(els); } catch (err) { console.error('[Nav] Failed to mount Minigame hub:', err); }
+  try { mountTetris(els); } catch (err) { console.error('[Nav] Failed to mount Tetris:', err); }
+  try { mountSnake(els); } catch (err) { console.error('[Nav] Failed to mount Snake:', err); }
 
   setActive(btnTimer, viewTimer);
 }
