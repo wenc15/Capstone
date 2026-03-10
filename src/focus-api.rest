@@ -1,4 +1,10 @@
 
+// 2026/03/09 edited by Zikai Lu
+// 新增内容：
+//   - 增加 Collection（收藏品）相关接口测试：查询完整列表 / 获取指定藏品。
+// 新增的作用：
+//   - 便于前端联调皮肤等收藏品的拥有状态（0/1）与获取逻辑。
+// =============================================================
 // 2026/01/27 edited by Zikai Lu
 // 修改内容：
 //   - 修改专注开始测试以便同时测试chrome extention
@@ -185,5 +191,20 @@ Content-Type: application/json
 #   - 600 秒 -> 预期 addedMinutes = 10，credits += 10
 POST http://localhost:5024/api/debug/fake-success-session?focusSeconds=600
 Content-Type: application/json
+
+###
+
+### 查询 Collection 全部藏品（预设列表 + 0/1 拥有状态）
+GET http://localhost:5024/api/collection
+
+###
+
+### 获取指定藏品（未拥有会置为 1；已拥有会返回 alreadyOwned=true）
+POST http://localhost:5024/api/collection/acquire
+Content-Type: application/json
+
+{
+  "itemId": "skin_cat_sakura"
+}
 
 ###

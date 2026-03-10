@@ -1,3 +1,12 @@
+// 2026/03/09 edited by Zikai Lu
+// 新增内容：
+//   - 增加 Collection 相关接口：GetCollection() / TryAcquireCollectionItem()。
+//   - 引入预设收藏品目录，返回完整收藏列表及 0/1 拥有状态。
+// 新增的作用：
+//   - 为皮肤等收藏品提供固定目录查询能力。
+//   - 支持“获取指定收藏品”：未拥有时置为 1，已拥有时返回已拥有状态。
+// =============================================================
+
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 增加 Inventory 相关接口：GetInventory() / AddInventoryItem() / TryConsumeInventoryItem()。
@@ -14,7 +23,7 @@
 //   - 保证成长值不低于 0，并兼容未来使用 -1 表示未拥有的场景。
 // =============================================================
 
-// 2026/01/16 edited by Zikai
+// 2026/01/16 edited by Zikai Lu
 // 新增内容：
 //   - 在 RecordSession(...) 中根据本次会话时长按 Ceil(秒 / 60) 累积点数（Credits）。
 //   - 新增 GetCredits() / AddCredits() / TryConsumeCredits() 三个点数接口供 Controller 使用。
@@ -348,6 +357,102 @@ public class LocalDataService
             SaveUserProfile(profile);
 
             newCount = profile.Inventory[itemId];
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 查询 Collection 完整列表（预设目录 + 拥有状态 0/1）。
+    /// </summary>
+    public List<CollectionItemStatus> GetCollection()
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            if (profile.Collection == null)
+            {
+                profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var result = new List<CollectionItemStatus>();
+            foreach (var def in CollectionCatalog.PresetItems)
+            {
+                profile.Collection.TryGetValue(def.ItemId, out var state);
+                result.Add(new CollectionItemStatus
+                {
+                    ItemId = def.ItemId,
+                    DisplayName = def.DisplayName,
+                    State = state > 0 ? 1 : 0,
+                });
+            }
+
+            // 清理无效状态值（非 0/1）并持久化，防止脏数据扩散。
+            var changed = false;
+            foreach (var key in profile.Collection.Keys.ToList())
+            {
+                var normalized = profile.Collection[key] > 0 ? 1 : 0;
+                if (profile.Collection[key] != normalized)
+                {
+                    profile.Collection[key] = normalized;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                SaveUserProfile(profile);
+            }
+
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// 获取指定收藏品：
+    /// - 若状态为 0，更新为 1；
+    /// - 若状态为 1，返回已拥有；
+    /// - 若 itemId 不在预设目录中，返回 false。
+    /// </summary>
+    public bool TryAcquireCollectionItem(string itemId, out bool alreadyOwned, out int state)
+    {
+        lock (_fileLock)
+        {
+            alreadyOwned = false;
+            state = 0;
+
+            if (string.IsNullOrWhiteSpace(itemId))
+            {
+                return false;
+            }
+
+            var matched = CollectionCatalog.PresetItems
+                .FirstOrDefault(x => string.Equals(x.ItemId, itemId, StringComparison.OrdinalIgnoreCase));
+            if (matched is null)
+            {
+                return false;
+            }
+
+            var profile = GetUserProfile();
+            if (profile.Collection == null)
+            {
+                profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            profile.Collection.TryGetValue(matched.ItemId, out var current);
+            current = current > 0 ? 1 : 0;
+
+            if (current == 1)
+            {
+                alreadyOwned = true;
+                state = 1;
+                return true;
+            }
+
+            profile.Collection[matched.ItemId] = 1;
+            SaveUserProfile(profile);
+
+            alreadyOwned = false;
+            state = 1;
             return true;
         }
     }
