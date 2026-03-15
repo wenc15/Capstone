@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+  2026/03/14 edited by JS
+  Changes:
+    - Default Pet view placeholder to pet3 phase-1 asset.
+    - Add a small +1000 token test button in topbar.
+    - Add a Pet view Backpack button.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -12,13 +19,18 @@
     <header class="topbar">
       <div class="brand">Growin</div>
       <div class="weather-chip">☁️ <span>16°C</span></div>
-      <div class="token-chip">🪙 <span id="tokenValue">0</span></div>
+      <div class="token-chip">
+        <span aria-hidden="true">🪙</span>
+        <span id="tokenValue">0</span>
+        <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button>
+      </div>
     </header>
 
     <section class="main">
       <aside class="sidebar">
         <button class="nav-btn" id="navTimer">🕑 <span>Timer</span></button>
         <button class="nav-btn" id="navStats">📊 <span>Statistics</span></button>
+        <button class="nav-btn" id="navAchievements">🏆 <span>Achievements</span></button>
         <button class="nav-btn" id="navPet">🌿 <span>Pet</span></button>
         <button class="nav-btn" id="navGacha">🎲 <span>Gacha</span></button>
         <button class="nav-btn" id="navMinigame">🕹️ <span>Minigame</span></button>
@@ -88,11 +100,31 @@
           </div>
         </div>
 
+        <div id="view-achievements" style="display:none;">
+          <div class="achv-pane" role="region" aria-label="Achievements">
+            <div class="achv-head">
+              <div>
+                <div class="achv-kicker">Grow With Every Focus</div>
+                <h2 class="achv-title">Achievements</h2>
+              </div>
+
+              <div class="achv-head-right">
+                <div class="achv-meta" id="achvMeta">—</div>
+                <button class="achv-refresh" id="achvRefreshBtn" type="button" aria-label="Refresh achievements">Refresh</button>
+              </div>
+            </div>
+
+            <div class="achv-list" id="achvList" aria-live="polite"></div>
+            <div class="achv-empty" id="achvEmpty" style="display:none;">No achievements yet.</div>
+            <div class="achv-error" id="achvError" style="display:none;"></div>
+          </div>
+        </div>
+
         <div id="view-pet" style="display:none;">
           <div class="pet-container">
             <div class="pet-stage">
               <div id="petMedia" class="pet-media">
-                <img id="petImage" src="assets/egg.png" alt="Pet" class="pet-sprite is-egg" style="width: 200px">
+                <img id="petImage" src="assets/pet3_1.png" alt="Pet" class="pet-sprite is-egg" style="width: 200px">
               </div>
               <div id="petSpeechBubble" class="speech-bubble" style="display:none;">Ready to focus?</div>
             </div>
@@ -102,11 +134,12 @@
               <div class="exp-bar">
                 <div id="petExpFill" class="exp-fill"></div>
               </div>
+              <div id="petEvoHint" class="pet-evo-hint">Evolves at Lv 5 and Lv 20.</div>
             </div>
 
             <div class="pet-actions">
               <button class="action-btn" id="feedBtn">🍎 Feed</button>
-              <button class="action-btn" id="playBtn">🎾 Play</button>
+              <button class="action-btn" id="backpackBtn">🎒 Bag</button>
               <button class="action-btn" id="storeBtn">🛒 Store</button>
             </div>
           </div>

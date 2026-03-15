@@ -14,6 +14,11 @@
 //   - 保证成长值不低于 0，并兼容未来使用 -1 表示未拥有的场景。
 // =============================================================
 
+// 2026/03/14 edited by JS
+// Changes:
+//   - Add pet ownership/active state helpers.
+//   - Enforce unlock chain 3 -> 2 -> 1 based on previous pet max (growth >= 2300).
+
 // 2026/01/16 edited by Zikai
 // 新增内容：
 //   - 在 RecordSession(...) 中根据本次会话时长按 Ceil(秒 / 60) 累积点数（Credits）。
@@ -145,6 +150,61 @@ public class LocalDataService
         return value < 0 ? 0 : value;
     }
 
+    private const int PetMaxGrowthThreshold = 1900; // 对齐前端：阶段 3（Lv 20）阈值
+
+    private static bool IsValidPetId(int petId)
+    {
+        return petId == 1 || petId == 2 || petId == 3;
+    }
+
+    private static int? GetPrerequisitePetId(int petId)
+    {
+        // 解锁顺序：3 -> 2 -> 1
+        return petId switch
+        {
+            2 => 3,
+            1 => 2,
+            _ => null
+        };
+    }
+
+    private static bool EnsurePetState(UserProfile profile)
+    {
+        var changed = false;
+
+        if (profile.UnlockedPetIds == null || profile.UnlockedPetIds.Count == 0)
+        {
+            profile.UnlockedPetIds = new List<int> { 3 };
+            changed = true;
+        }
+
+        // 清理非法 id / 去重
+        var set = new HashSet<int>();
+        var normalized = new List<int>();
+        foreach (var id in profile.UnlockedPetIds)
+        {
+            if (!IsValidPetId(id)) continue;
+            if (set.Add(id)) normalized.Add(id);
+        }
+        if (normalized.Count == 0)
+        {
+            normalized.Add(3);
+        }
+        if (profile.UnlockedPetIds.Count != normalized.Count)
+        {
+            profile.UnlockedPetIds = normalized;
+            changed = true;
+        }
+
+        if (!IsValidPetId(profile.ActivePetId) || !profile.UnlockedPetIds.Contains(profile.ActivePetId))
+        {
+            profile.ActivePetId = profile.UnlockedPetIds[0];
+            changed = true;
+        }
+
+        return changed;
+    }
+
     // 作用：根据一次专注会话结果更新用户 profile 里的统计信息。
     //       现在会额外统计 Aborted -> CanceledSessions，同时按照 ceil(专注分钟数) 奖励点数（Credits）。
     // =============================================================
@@ -258,6 +318,128 @@ public class LocalDataService
             SaveUserProfile(profile);
 
             newBalance = profile.Credits;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 设置点数余额为指定值（用于测试/调试）。
+    /// </summary>
+    public int SetCredits(int credits)
+    {
+        var safe = credits < 0 ? 0 : credits;
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            profile.Credits = safe;
+            SaveUserProfile(profile);
+            return profile.Credits;
+        }
+    }
+
+    /// <summary>
+    /// 获取宠物拥有/激活状态。
+    /// </summary>
+    public PetStateResponse GetPetState()
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            var changed = EnsurePetState(profile);
+            if (changed) SaveUserProfile(profile);
+
+            return new PetStateResponse
+            {
+                ActivePetId = profile.ActivePetId,
+                UnlockedPetIds = new List<int>(profile.UnlockedPetIds)
+            };
+        }
+    }
+
+    /// <summary>
+    /// 设置当前激活宠物（必须已解锁）。
+    /// </summary>
+    public bool TrySetActivePet(int petId, out PetStateResponse state, out string error)
+    {
+        error = string.Empty;
+        state = new PetStateResponse();
+
+        if (!IsValidPetId(petId))
+        {
+            error = "invalid petId.";
+            return false;
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            EnsurePetState(profile);
+
+            if (!profile.UnlockedPetIds.Contains(petId))
+            {
+                error = "pet is not unlocked.";
+                state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                return false;
+            }
+
+            profile.ActivePetId = petId;
+            SaveUserProfile(profile);
+
+            state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 解锁指定宠物（满足上一个宠物满级：阶段 3 阈值）。
+    /// </summary>
+    public bool TryUnlockPet(int petId, out PetStateResponse state, out string error)
+    {
+        error = string.Empty;
+        state = new PetStateResponse();
+
+        if (!IsValidPetId(petId))
+        {
+            error = "invalid petId.";
+            return false;
+        }
+
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            EnsurePetState(profile);
+
+            if (profile.UnlockedPetIds.Contains(petId))
+            {
+                state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                return true;
+            }
+
+            var prereq = GetPrerequisitePetId(petId);
+            if (prereq.HasValue)
+            {
+                // 未拥有前置也不行（避免跳关）
+                if (!profile.UnlockedPetIds.Contains(prereq.Value))
+                {
+                    error = "previous pet must be unlocked first.";
+                    state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                    return false;
+                }
+
+                var prereqGrowth = GetPetGrowth(prereq.Value);
+                if (prereqGrowth < PetMaxGrowthThreshold)
+                {
+                    error = "previous pet must be max level first.";
+                    state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                    return false;
+                }
+            }
+
+            profile.UnlockedPetIds.Add(petId);
+            SaveUserProfile(profile);
+
+            state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
             return true;
         }
     }

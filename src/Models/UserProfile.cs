@@ -37,6 +37,10 @@
 //   - Credits:           当前点数余额（按专注分钟数累计）
 // 开发者（Profile 部分）：Zikai Lu
 // =============================================================
+// 2026/03/14 edited by JS
+// Changes:
+//   - Add pet ownership state (ActivePetId / UnlockedPetIds).
+//   - Default active/unlocked pet to 3.
 
 using System;
 using System.Collections.Generic;
@@ -72,6 +76,18 @@ public class UserProfile
     /// 默认值为 0；预留 -1 表示“未拥有”的情况（未来可用）。
     /// </summary>
     public List<int> PetGrowth { get; set; } = new();
+
+    /// <summary>
+    /// 当前激活的宠物编号。
+    /// 约定：本版本仅有 1/2/3 三只宠物；默认使用宠物 3。
+    /// </summary>
+    public int ActivePetId { get; set; } = 3;
+
+    /// <summary>
+    /// 已解锁/拥有的宠物编号列表。
+    /// 默认解锁宠物 3。
+    /// </summary>
+    public List<int> UnlockedPetIds { get; set; } = new() { 3 };
 
     /// <summary>
     /// 背包物品字典，key 为物品 id，value 为数量。

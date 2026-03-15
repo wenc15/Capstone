@@ -10,6 +10,10 @@
 //  - Own all sidebar navigation behavior in one place.
 //  - Ensure only one main view is visible at a time and UI state stays consistent.
 //  - Trigger per-view refresh hooks (e.g., renderStats) on navigation when needed.
+//
+// 2026/03/14 edited by JS
+// Changes:
+//  - Add Achievements view navigation + onEnter hook.
 // 11.19 edited by Claire (Qinquan) Wang
 // Changes:
 //  - Keep Timer/Stats navigation logic in one place.
@@ -19,6 +23,7 @@
 
 import { renderStats } from './stats.js';
 import { onEnterGacha } from './gacha.js';
+import { onEnterAchievements } from './achievements.js';
 import { mountMinigameHub, openMinigameHub } from './minigame_hub.js';
 import { mountTetris } from './minigame_tetris.js';
 import { mountSnake } from './minigame_snake.js';
@@ -27,11 +32,13 @@ export function mountNav(els) {
   const {
     navTimer,
     navStats,
+    navAchievements,
     navPet,
     navGacha,
     navMinigame,
     viewTimer,
     viewStats,
+    viewAchievements,
     viewPet,
     viewGacha,
     viewMinigame,
@@ -42,23 +49,26 @@ export function mountNav(els) {
 
   const btnTimer = navTimer;
   const btnStats = navStats;
+  const btnAchievements = navAchievements;
   const btnPet   = navPet;
   const btnGacha = navGacha; 
   const btnMinigame = navMinigame;
 
  // Defensive check: log exactly what's missing
- const missing = {
-   navTimer: !navTimer,
-   navStats: !navStats,
-   navPet: !navPet,
-   navGacha: !navGacha,
-   navMinigame: !navMinigame,
-   viewTimer: !viewTimer,
-   viewStats: !viewStats,
-   viewPet: !viewPet,
-   viewGacha: !viewGacha,
-   viewMinigame: !viewMinigame,
- };
+  const missing = {
+    navTimer: !navTimer,
+    navStats: !navStats,
+    navAchievements: !navAchievements,
+    navPet: !navPet,
+    navGacha: !navGacha,
+    navMinigame: !navMinigame,
+    viewTimer: !viewTimer,
+    viewStats: !viewStats,
+    viewAchievements: !viewAchievements,
+    viewPet: !viewPet,
+    viewGacha: !viewGacha,
+    viewMinigame: !viewMinigame,
+  };
 
  const hasMissing = Object.values(missing).some(Boolean);
  if (hasMissing) {
@@ -70,8 +80,8 @@ export function mountNav(els) {
  }
 
 
- const allBtns  = [btnTimer, btnStats, btnPet, btnGacha, btnMinigame];
- const allViews = [viewTimer, viewStats, viewPet, viewGacha, viewMinigame];
+  const allBtns  = [btnTimer, btnStats, btnAchievements, btnPet, btnGacha, btnMinigame];
+  const allViews = [viewTimer, viewStats, viewAchievements, viewPet, viewGacha, viewMinigame];
 
   function setActive(btn, view) {
     allViews.forEach((v) => {
@@ -92,6 +102,14 @@ export function mountNav(els) {
       }
     }
 
+    if (view === viewAchievements) {
+      try {
+        onEnterAchievements(els);
+      } catch (err) {
+        console.error('[Nav] Failed to render achievements view:', err);
+      }
+    }
+
     if (view === viewGacha) {
       try {
         onEnterGacha(els);
@@ -103,6 +121,7 @@ export function mountNav(els) {
 
   btnTimer.addEventListener('click', () => setActive(btnTimer, viewTimer));
   btnStats.addEventListener('click', () => setActive(btnStats, viewStats));
+  btnAchievements.addEventListener('click', () => setActive(btnAchievements, viewAchievements));
   btnPet.addEventListener('click', () => setActive(btnPet, viewPet));
   btnGacha.addEventListener('click', () => setActive(btnGacha, viewGacha));
   btnMinigame.addEventListener('click', () => {

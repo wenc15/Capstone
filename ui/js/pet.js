@@ -2,19 +2,56 @@
 // Changes:
 //  - Wire Pet Feed to backend Inventory/PetGrowth APIs.
 //  - Update level/exp UI based on stored growth.
+//
+// 2026/03/14 edited by JS
+// Changes:
+//  - Support 3 pets (1/2/3) with 3 phases each (1/2/3).
+//  - Default active pet = 3; other pets unlock in order 3 -> 2 -> 1.
 
 // js/pet.js
 
+import { getPetsState, onPetsChanged } from './petsApi.js';
+
 const API_BASE = 'http://localhost:5024';
-const PET_ID = 0;
 const EXP_PER_LEVEL = 100;
 
-// Stage thresholds (cumulative growth EXP)
-//  - Egg -> Juvenile: 300
-//  - Juvenile -> Adult: +2000 (i.e. Adult at 2300 total)
-const EGG_TO_JUVENILE_EXP = 300;
-const JUVENILE_TO_ADULT_EXP = 2000;
-const ADULT_EXP_THRESHOLD = EGG_TO_JUVENILE_EXP + JUVENILE_TO_ADULT_EXP;
+// Evolution thresholds (derived from Level)
+//  - Phase 1 -> Phase 2: Lv 5
+//  - Phase 2 -> Phase 3: Lv 20
+const EVO_LV_PHASE2 = 5;
+const EVO_LV_PHASE3 = 20;
+const PHASE2_GROWTH_THRESHOLD = (EVO_LV_PHASE2 - 1) * EXP_PER_LEVEL;
+const PHASE3_GROWTH_THRESHOLD = (EVO_LV_PHASE3 - 1) * EXP_PER_LEVEL;
+
+const PET_CATALOG = {
+  3: {
+    id: 3,
+    name: 'Pet 3',
+    phases: {
+      1: { kind: 'img', src: 'assets/pet3_1.png', wobble: true },
+      2: { kind: 'img', src: 'assets/pet3-2.gif' },
+      3: { kind: 'img', src: 'assets/pet3-3.gif' },
+    },
+  },
+  2: {
+    id: 2,
+    name: 'Pet 2',
+    phases: {
+      1: { kind: 'img', src: 'assets/pet2-1.gif' },
+      2: { kind: 'img', src: 'assets/pet2-2.gif' },
+      3: { kind: 'img', src: 'assets/pet2-3.gif' },
+    },
+  },
+  1: {
+    id: 1,
+    name: 'Pet 1',
+    phases: {
+      1: { kind: 'img', src: 'assets/pet1-1.png' },
+      2: { kind: 'img', src: 'assets/pet1-2.gif' },
+      3: { kind: 'video', src: 'assets/pet1-3.webm' },
+    },
+  },
+};
 
 const PET_SPEECH = {
   egg: [
@@ -93,10 +130,6 @@ const PET_SPEECH = {
   ],
 };
 
-const EGG_IMG_SRC = 'assets/egg.png';
-const ADULT_VIDEO_SRC = 'assets/adult1.webm';
-const JUVENILE_IMG_SRC = 'assets/pet1.gif';
-
 const FOOD_PRIORITY = [
   { id: 'adv_food', exp: 30 },
   { id: 'meat_snack', exp: 15 },
@@ -139,13 +172,13 @@ async function consumeInventoryItem(itemId, amount) {
   });
 }
 
-async function getPetGrowth() {
-  const data = await fetchJson(`/api/pets/${PET_ID}/growth`);
+async function getPetGrowth(petId) {
+  const data = await fetchJson(`/api/pets/${petId}/growth`);
   return data?.growth ?? 0;
 }
 
-async function addPetGrowth(amount) {
-  const data = await fetchJson(`/api/pets/${PET_ID}/growth/add`, {
+async function addPetGrowth(petId, amount) {
+  const data = await fetchJson(`/api/pets/${petId}/growth/add`, {
     method: 'POST',
     body: JSON.stringify({ amount }),
   });
@@ -162,43 +195,51 @@ function renderGrowthUI(els, growth) {
 
   els.petLevel.textContent = String(level);
   els.petExpFill.style.width = `${pct}%`;
+
+  if (els.petEvoHint) {
+    if (level < EVO_LV_PHASE2) {
+      els.petEvoHint.textContent = `Evolves at Lv ${EVO_LV_PHASE2} (in ${EVO_LV_PHASE2 - level} lv).`;
+    } else if (level < EVO_LV_PHASE3) {
+      els.petEvoHint.textContent = `Next evolution at Lv ${EVO_LV_PHASE3} (in ${EVO_LV_PHASE3 - level} lv).`;
+    } else {
+      els.petEvoHint.textContent = `Fully evolved (Lv ${EVO_LV_PHASE3}+).`;
+    }
+  }
 }
 
-function getPetStageFromGrowth(growth) {
+function getPetPhaseFromGrowth(growth) {
   const safe = Math.max(0, Number(growth) || 0);
-  if (safe < EGG_TO_JUVENILE_EXP) return 'egg';
-  if (safe < ADULT_EXP_THRESHOLD) return 'juvenile';
-  return 'adult';
+  if (safe < PHASE2_GROWTH_THRESHOLD) return 1;
+  if (safe < PHASE3_GROWTH_THRESHOLD) return 2;
+  return 3;
 }
 
-function renderPetMedia(els, stage, juvenileSrc) {
+function renderPetMedia(els, petId, phase) {
   const host = els?.petMedia;
   if (!host) return;
 
-  if (stage === 'egg') {
+  const pet = PET_CATALOG[petId] || PET_CATALOG[3];
+  const cfg = pet?.phases?.[phase] || pet?.phases?.[1];
+
+  if (!cfg) return;
+
+  if (cfg.kind === 'video') {
     host.innerHTML = `
-      <img id="petImage" src="${EGG_IMG_SRC}" alt="Pet" class="pet-sprite is-egg" style="width: 200px">
+      <video id="petVideo" class="pet-sprite pet-video" width="200" height="200" muted autoplay loop playsinline preload="auto">
+        <source src="${cfg.src}" type="video/webm" />
+      </video>
     `.trim();
+
+    const video = host.querySelector('video');
+    const p = video?.play?.();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
     return;
   }
 
-  if (stage === 'juvenile') {
-    const src = juvenileSrc || JUVENILE_IMG_SRC;
-    host.innerHTML = `
-      <img id="petImage" src="${src}" alt="Pet" class="pet-sprite" style="width: 200px">
-    `.trim();
-    return;
-  }
-
+  const extraClass = cfg.wobble ? ' is-egg' : '';
   host.innerHTML = `
-    <video id="petVideo" class="pet-sprite pet-video" width="200" height="200" muted autoplay loop playsinline preload="auto">
-      <source src="${ADULT_VIDEO_SRC}" type="video/webm" />
-    </video>
+    <img id="petImage" src="${cfg.src}" alt="Pet" class="pet-sprite${extraClass}" style="width: 200px">
   `.trim();
-
-  const video = host.querySelector('video');
-  const p = video?.play?.();
-  if (p && typeof p.catch === 'function') p.catch(() => {});
 }
 
 function pickRandom(list) {
@@ -207,48 +248,84 @@ function pickRandom(list) {
   return list[idx];
 }
 
+const speechTimers = new WeakMap();
+
 function speak(petSpeechBubble, text, ms = 1200) {
   if (!petSpeechBubble) return;
+
+  const prev = speechTimers.get(petSpeechBubble);
+  if (prev) clearTimeout(prev);
+
   petSpeechBubble.textContent = text;
   petSpeechBubble.style.display = 'block';
-  setTimeout(() => (petSpeechBubble.style.display = 'none'), ms);
+  const timer = setTimeout(() => {
+    petSpeechBubble.style.display = 'none';
+    speechTimers.delete(petSpeechBubble);
+  }, ms);
+
+  speechTimers.set(petSpeechBubble, timer);
 }
 
 export function mountPet(els) {
-  const { feedBtn, playBtn, petMedia, petImage, petSpeechBubble, storeBtn } = els;
+  const { feedBtn, petMedia, petImage, petSpeechBubble, storeBtn } = els;
 
+  let currentPetId = 3;
   let currentGrowth = 0;
-  let currentStage = null;
-  const juvenileSrc = petImage?.getAttribute('src') || JUVENILE_IMG_SRC;
+  let currentPhase = null;
+  let lastPetClickSpeakAt = 0;
 
-  function maybeUpgradeMedia(growth) {
-    const stage = getPetStageFromGrowth(growth);
-    if (stage === currentStage) return;
-    currentStage = stage;
-    renderPetMedia(els, stage, juvenileSrc);
+  function refreshMedia() {
+    const phase = getPetPhaseFromGrowth(currentGrowth);
+    if (phase === currentPhase) return;
+    currentPhase = phase;
+    renderPetMedia(els, currentPetId, phase);
   }
 
-  // Default to egg visuals immediately; update once growth loads.
-  renderGrowthUI(els, currentGrowth);
-  maybeUpgradeMedia(currentGrowth);
+  async function loadActivePetAndGrowth() {
+    try {
+      const st = await getPetsState();
+      currentPetId = Number(st?.activePetId) || 3;
+    } catch (e) {
+      console.warn('[Pet] Failed to load pet state:', e);
+      currentPetId = 3;
+    }
 
-  getPetGrowth()
-    .then((growth) => {
+    // Default to phase-1 visuals immediately; update once growth loads.
+    currentGrowth = 0;
+    currentPhase = null;
+    renderGrowthUI(els, currentGrowth);
+    renderPetMedia(els, currentPetId, 1);
+
+    try {
+      const growth = await getPetGrowth(currentPetId);
       currentGrowth = growth;
       renderGrowthUI(els, growth);
-      maybeUpgradeMedia(growth);
-    })
-    .catch((e) => {
+      refreshMedia();
+    } catch (e) {
       console.warn('[Pet] Failed to load growth:', e);
-      // Keep the default egg state if we cannot load.
       currentGrowth = 0;
       renderGrowthUI(els, currentGrowth);
-      maybeUpgradeMedia(currentGrowth);
-    });
+      refreshMedia();
+    }
+  }
+
+  loadActivePetAndGrowth();
+
+  onPetsChanged((st) => {
+    const next = Number(st?.activePetId);
+    if (!next || next === currentPetId) return;
+    currentPetId = next;
+    loadActivePetAndGrowth();
+  });
 
   petMedia?.addEventListener('click', () => {
-    const stage = getPetStageFromGrowth(currentGrowth);
-    const text = pickRandom(PET_SPEECH[stage]);
+    const now = Date.now();
+    if (now - lastPetClickSpeakAt < 1000) return; // at most one response per second
+    lastPetClickSpeakAt = now;
+
+    const phase = getPetPhaseFromGrowth(currentGrowth);
+    const key = phase === 1 ? 'egg' : phase === 2 ? 'juvenile' : 'adult';
+    const text = pickRandom(PET_SPEECH[key]);
     speak(petSpeechBubble, text || '...', 1400);
   });
 
@@ -264,10 +341,10 @@ export function mountPet(els) {
       }
 
       await consumeInventoryItem(best.id, 1);
-      const growth = await addPetGrowth(best.exp);
+      const growth = await addPetGrowth(currentPetId, best.exp);
       currentGrowth = growth;
       renderGrowthUI(els, growth);
-      maybeUpgradeMedia(growth);
+      refreshMedia();
       speak(petSpeechBubble, `Yum! +${best.exp} EXP`, 1400);
     } catch (e) {
       console.warn('[Pet] Feed failed:', e);
@@ -275,7 +352,4 @@ export function mountPet(els) {
     }
   });
 
-  playBtn?.addEventListener('click', () => {
-    speak(petSpeechBubble, 'Let\'s play!');
-  });
 }

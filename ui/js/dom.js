@@ -1,6 +1,11 @@
 // 2026/01/28 edited by JS
 // Changes:
 //  - Collect Pet view DOM (level/exp) and Store button for the new store overlay.
+//
+// 2026/03/14 edited by JS
+// Changes:
+//  - Collect topbar test button DOM for +1000 tokens.
+//  - Collect Pet view Backpack button + evolution hint DOM.
 
 // js/dom.js
 // Collects all DOM elements needed across the UI.
@@ -22,15 +27,24 @@ export function collectDom() {
   // ===== View switching =====
   const viewTimer = document.getElementById('view-timer');
   const viewStats = document.getElementById('view-stats');
+  const viewAchievements = document.getElementById('view-achievements');
   const viewPet   = document.getElementById('view-pet');
   const viewGacha = document.getElementById('view-gacha');  
   const viewMinigame = document.getElementById('view-minigame');
 
   const navTimer  = document.getElementById('navTimer');
   const navStats  = document.getElementById('navStats');
+  const navAchievements = document.getElementById('navAchievements');
   const navPet    = document.getElementById('navPet');
   const navGacha  = document.getElementById('navGacha');    
   const navMinigame = document.getElementById('navMinigame');
+
+  // ===== Achievements view =====
+  const achvList = document.getElementById('achvList');
+  const achvMeta = document.getElementById('achvMeta');
+  const achvEmpty = document.getElementById('achvEmpty');
+  const achvError = document.getElementById('achvError');
+  const achvRefreshBtn = document.getElementById('achvRefreshBtn');
 
   // ===== Minigame (Dice & Build) =====
   const mgRoot = document.getElementById('mgRoot');
@@ -82,6 +96,7 @@ export function collectDom() {
 
   // ===== Pet/Store =====
   const storeBtn = document.getElementById('storeBtn');
+  const backpackBtn = document.getElementById('backpackBtn');
 
   // ===== Stats area =====
   const statCount    = document.getElementById('statCount');
@@ -91,15 +106,16 @@ export function collectDom() {
 
   //2026/1/22 added token dom
   const tokenValue = document.getElementById('tokenValue');
+  const tokenAdd1000Btn = document.getElementById('tokenAdd1000Btn');
 
   // ===== Pet view =====
   const feedBtn = document.getElementById('feedBtn');
-  const playBtn = document.getElementById('playBtn');
   const petMedia = document.getElementById('petMedia');
   const petImage = document.getElementById('petImage');
   const petSpeechBubble = document.getElementById('petSpeechBubble');
   const petLevel = document.getElementById('petLevel');
   const petExpFill = document.getElementById('petExpFill');
+  const petEvoHint = document.getElementById('petEvoHint');
 
   return {
     // Timer
@@ -115,14 +131,23 @@ export function collectDom() {
     // Views & Nav
     viewTimer,
     viewStats,
+    viewAchievements,
     viewPet, 
     viewGacha,
     viewMinigame,
     navTimer,
     navStats,
+    navAchievements,
     navPet, 
     navGacha, 
     navMinigame,
+
+    // Achievements
+    achvList,
+    achvMeta,
+    achvEmpty,
+    achvError,
+    achvRefreshBtn,
 
     //Gacha
     gachaRoot,
@@ -130,15 +155,16 @@ export function collectDom() {
 
     // Pet/Store
     storeBtn,
+    backpackBtn,
 
     // Pet
     feedBtn,
-    playBtn,
     petMedia,
     petImage,
     petSpeechBubble,
     petLevel,
     petExpFill,
+    petEvoHint,
 
     // Stats
     statCount,
@@ -154,6 +180,7 @@ export function collectDom() {
 
     //token/credits
     tokenValue,
+    tokenAdd1000Btn,
 
     // Minigame
     mgRoot,
