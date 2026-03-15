@@ -42,6 +42,11 @@
 //   - Add pet ownership state (ActivePetId / UnlockedPetIds).
 //   - Default active/unlocked pet to 3.
 
+// 2026/03/14 edited by JS
+// Changes:
+//   - Track the current "feeding" pet separately (FeedingPetId).
+//   - Buying a new pet is gated by FeedingPetId reaching max level.
+
 using System;
 using System.Collections.Generic;
 
@@ -82,6 +87,12 @@ public class UserProfile
     /// 约定：本版本仅有 1/2/3 三只宠物；默认使用宠物 3。
     /// </summary>
     public int ActivePetId { get; set; } = 3;
+
+    /// <summary>
+    /// 当前正在喂养/推进进度的宠物编号。
+    /// 规则：必须让这只宠物满级（Lv20）才能购买下一只新宠物。
+    /// </summary>
+    public int FeedingPetId { get; set; } = 3;
 
     /// <summary>
     /// 已解锁/拥有的宠物编号列表。

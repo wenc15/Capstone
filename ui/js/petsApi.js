@@ -2,6 +2,10 @@
 // Changes:
 //  - Add Pets API helpers (state/unlock/active) and a small event bus.
 
+// 2026/03/14 edited by JS
+// Changes:
+//  - Include FeedingPetId in state payload.
+
 // ui/js/petsApi.js
 
 const API_BASE = 'http://localhost:5024';
@@ -34,6 +38,7 @@ export async function getPetsState() {
   const data = await fetchJson('/api/pets/state');
   return {
     activePetId: Number(data?.activePetId ?? 3),
+    feedingPetId: Number(data?.feedingPetId ?? data?.activePetId ?? 3),
     unlockedPetIds: Array.isArray(data?.unlockedPetIds) ? data.unlockedPetIds.map(Number) : [3],
   };
 }
@@ -45,6 +50,7 @@ export async function setActivePet(petId) {
   });
   const state = {
     activePetId: Number(data?.activePetId ?? petId),
+    feedingPetId: Number(data?.feedingPetId ?? data?.activePetId ?? 3),
     unlockedPetIds: Array.isArray(data?.unlockedPetIds) ? data.unlockedPetIds.map(Number) : [],
   };
   emitPetsChanged(state);
@@ -58,6 +64,7 @@ export async function unlockPet(petId) {
   });
   const state = {
     activePetId: Number(data?.activePetId ?? 3),
+    feedingPetId: Number(data?.feedingPetId ?? data?.activePetId ?? 3),
     unlockedPetIds: Array.isArray(data?.unlockedPetIds) ? data.unlockedPetIds.map(Number) : [],
   };
   emitPetsChanged(state);

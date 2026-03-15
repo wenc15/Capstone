@@ -17,7 +17,13 @@
 // 2026/03/14 edited by JS
 // Changes:
 //   - Add pet ownership/active state helpers.
-//   - Enforce unlock chain 3 -> 2 -> 1 based on previous pet max (growth >= 2300).
+//   - Pet purchase/equip gated by current pet max (Lv 20).
+//   - Clamp pet growth at Lv 20 cap.
+
+// 2026/03/14 edited by JS
+// Changes:
+//   - Track FeedingPetId and gate new pet purchase by FeedingPetId max.
+//   - Allow switching ActivePetId freely; only purchase is gated.
 
 // 2026/01/16 edited by Zikai
 // 新增内容：
@@ -150,22 +156,32 @@ public class LocalDataService
         return value < 0 ? 0 : value;
     }
 
-    private const int PetMaxGrowthThreshold = 1900; // 对齐前端：阶段 3（Lv 20）阈值
+    private const int PetMaxGrowthThreshold = 1900; // Lv 20 cap: (20-1)*100
 
     private static bool IsValidPetId(int petId)
     {
         return petId == 1 || petId == 2 || petId == 3;
     }
 
-    private static int? GetPrerequisitePetId(int petId)
+    private static int ClampPetGrowth(int value)
     {
-        // 解锁顺序：3 -> 2 -> 1
-        return petId switch
+        var normalized = NormalizePetGrowthValue(value);
+        return normalized > PetMaxGrowthThreshold ? PetMaxGrowthThreshold : normalized;
+    }
+
+    private static int GetPetGrowthFromProfile(UserProfile profile, int petId, out bool changed)
+    {
+        changed = EnsurePetGrowthList(profile, petId);
+
+        var raw = petId >= 0 && profile.PetGrowth.Count > petId ? profile.PetGrowth[petId] : 0;
+        var clamped = ClampPetGrowth(raw);
+        if (raw != clamped)
         {
-            2 => 3,
-            1 => 2,
-            _ => null
-        };
+            profile.PetGrowth[petId] = clamped;
+            changed = true;
+        }
+
+        return clamped;
     }
 
     private static bool EnsurePetState(UserProfile profile)
@@ -199,6 +215,13 @@ public class LocalDataService
         if (!IsValidPetId(profile.ActivePetId) || !profile.UnlockedPetIds.Contains(profile.ActivePetId))
         {
             profile.ActivePetId = profile.UnlockedPetIds[0];
+            changed = true;
+        }
+
+        // Current on-stage pet is the one being fed/leveled.
+        if (profile.FeedingPetId != profile.ActivePetId)
+        {
+            profile.FeedingPetId = profile.ActivePetId;
             changed = true;
         }
 
@@ -352,6 +375,7 @@ public class LocalDataService
             return new PetStateResponse
             {
                 ActivePetId = profile.ActivePetId,
+                FeedingPetId = profile.FeedingPetId,
                 UnlockedPetIds = new List<int>(profile.UnlockedPetIds)
             };
         }
@@ -379,20 +403,21 @@ public class LocalDataService
             if (!profile.UnlockedPetIds.Contains(petId))
             {
                 error = "pet is not unlocked.";
-                state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
                 return false;
             }
 
             profile.ActivePetId = petId;
+            profile.FeedingPetId = petId;
             SaveUserProfile(profile);
 
-            state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+            state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
             return true;
         }
     }
 
     /// <summary>
-    /// 解锁指定宠物（满足上一个宠物满级：阶段 3 阈值）。
+    /// 解锁指定宠物（要求当前 FeedingPetId 满级：阶段 3 阈值）。
     /// </summary>
     public bool TryUnlockPet(int petId, out PetStateResponse state, out string error)
     {
@@ -410,36 +435,52 @@ public class LocalDataService
             var profile = GetUserProfile();
             EnsurePetState(profile);
 
-            if (profile.UnlockedPetIds.Contains(petId))
+            // Must max the current on-stage (active) pet before buying a new one.
+            var anyGrowthChanged = false;
+            var activeGrowth = GetPetGrowthFromProfile(profile, profile.ActivePetId, out var activeGrowthChanged);
+            anyGrowthChanged = anyGrowthChanged || activeGrowthChanged;
+            if (activeGrowth < PetMaxGrowthThreshold)
             {
-                state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-                return true;
+                if (anyGrowthChanged) SaveUserProfile(profile);
+                error = "current active pet must be max level first.";
+                state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                return false;
             }
 
-            var prereq = GetPrerequisitePetId(petId);
-            if (prereq.HasValue)
+            // Only allow buying one new pet at a time.
+            // If player already owns any other pet that is not max level (in backpack), block purchase.
+            foreach (var ownedId in profile.UnlockedPetIds)
             {
-                // 未拥有前置也不行（避免跳关）
-                if (!profile.UnlockedPetIds.Contains(prereq.Value))
+                if (ownedId == profile.ActivePetId) continue;
+                var g = GetPetGrowthFromProfile(profile, ownedId, out var ownedGrowthChanged);
+                anyGrowthChanged = anyGrowthChanged || ownedGrowthChanged;
+                if (g < PetMaxGrowthThreshold)
                 {
-                    error = "previous pet must be unlocked first.";
-                    state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                    if (anyGrowthChanged) SaveUserProfile(profile);
+                    error = "you already have a non-max pet in backpack.";
+                    state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
                     return false;
                 }
+            }
 
-                var prereqGrowth = GetPetGrowth(prereq.Value);
-                if (prereqGrowth < PetMaxGrowthThreshold)
-                {
-                    error = "previous pet must be max level first.";
-                    state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-                    return false;
-                }
+            if (anyGrowthChanged) SaveUserProfile(profile);
+
+            if (profile.UnlockedPetIds.Contains(petId))
+            {
+                // Allow re-buying an owned pet to restart its growth loop.
+                // This will reset that pet's growth to 0 (egg) while keeping ownership.
+                EnsurePetGrowthList(profile, petId);
+                profile.PetGrowth[petId] = 0;
+                SaveUserProfile(profile);
+
+                state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+                return true;
             }
 
             profile.UnlockedPetIds.Add(petId);
             SaveUserProfile(profile);
 
-            state = new PetStateResponse { ActivePetId = profile.ActivePetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
+            state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
             return true;
         }
     }
@@ -548,14 +589,8 @@ public class LocalDataService
         lock (_fileLock)
         {
             var profile = GetUserProfile();
-            var changed = EnsurePetGrowthList(profile, petId);
-            var growth = profile.PetGrowth[petId];
-
-            if (changed)
-            {
-                SaveUserProfile(profile);
-            }
-
+            var growth = GetPetGrowthFromProfile(profile, petId, out var changed);
+            if (changed) SaveUserProfile(profile);
             return growth;
         }
     }
@@ -576,11 +611,9 @@ public class LocalDataService
             var profile = GetUserProfile();
             EnsurePetGrowthList(profile, petId);
 
-            var current = NormalizePetGrowthValue(profile.PetGrowth[petId]);
-            checked
-            {
-                current += amount;
-            }
+            var current = ClampPetGrowth(profile.PetGrowth[petId]);
+            checked { current += amount; }
+            current = current > PetMaxGrowthThreshold ? PetMaxGrowthThreshold : current;
 
             profile.PetGrowth[petId] = current;
             SaveUserProfile(profile);
@@ -604,7 +637,7 @@ public class LocalDataService
             var profile = GetUserProfile();
             EnsurePetGrowthList(profile, petId);
 
-            var current = NormalizePetGrowthValue(profile.PetGrowth[petId]);
+            var current = ClampPetGrowth(profile.PetGrowth[petId]);
             var newValue = current - amount;
             if (newValue < 0)
             {

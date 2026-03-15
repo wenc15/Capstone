@@ -8,12 +8,19 @@
 //  - Support 3 pets (1/2/3) with 3 phases each (1/2/3).
 //  - Default active pet = 3; other pets unlock in order 3 -> 2 -> 1.
 
+// 2026/03/14 edited by JS
+// Changes:
+//  - Cap pet level at Lv 20 for UI.
+//  - Rename pets: 1=Sprig, 2=Nomo, 3=Lyra.
+
 // js/pet.js
 
 import { getPetsState, onPetsChanged } from './petsApi.js';
 
 const API_BASE = 'http://localhost:5024';
 const EXP_PER_LEVEL = 100;
+const MAX_LEVEL = 20;
+const MAX_GROWTH = (MAX_LEVEL - 1) * EXP_PER_LEVEL;
 
 // Evolution thresholds (derived from Level)
 //  - Phase 1 -> Phase 2: Lv 5
@@ -26,7 +33,7 @@ const PHASE3_GROWTH_THRESHOLD = (EVO_LV_PHASE3 - 1) * EXP_PER_LEVEL;
 const PET_CATALOG = {
   3: {
     id: 3,
-    name: 'Pet 3',
+    name: 'Lyra',
     phases: {
       1: { kind: 'img', src: 'assets/pet3_1.png', wobble: true },
       2: { kind: 'img', src: 'assets/pet3-2.gif' },
@@ -35,7 +42,7 @@ const PET_CATALOG = {
   },
   2: {
     id: 2,
-    name: 'Pet 2',
+    name: 'Nomo',
     phases: {
       1: { kind: 'img', src: 'assets/pet2-1.gif' },
       2: { kind: 'img', src: 'assets/pet2-2.gif' },
@@ -44,13 +51,18 @@ const PET_CATALOG = {
   },
   1: {
     id: 1,
-    name: 'Pet 1',
+    name: 'Sprig',
     phases: {
       1: { kind: 'img', src: 'assets/pet1-1.png' },
       2: { kind: 'img', src: 'assets/pet1-2.gif' },
       3: { kind: 'video', src: 'assets/pet1-3.webm' },
     },
   },
+};
+
+const PET_PREVIEW_OVERRIDE = {
+  // Sidebar preview prefers static adult images.
+  1: { 3: 'assets/pet1-3.png' },
 };
 
 const PET_SPEECH = {
@@ -189,9 +201,10 @@ function renderGrowthUI(els, growth) {
   if (!els?.petLevel || !els?.petExpFill) return;
 
   const safe = Math.max(0, Number(growth) || 0);
-  const level = Math.floor(safe / EXP_PER_LEVEL) + 1;
-  const inLevel = safe % EXP_PER_LEVEL;
-  const pct = Math.max(0, Math.min(100, Math.round((inLevel / EXP_PER_LEVEL) * 100)));
+  const capped = Math.min(MAX_GROWTH, safe);
+  const level = Math.min(MAX_LEVEL, Math.floor(capped / EXP_PER_LEVEL) + 1);
+  const inLevel = level >= MAX_LEVEL ? EXP_PER_LEVEL : (capped % EXP_PER_LEVEL);
+  const pct = level >= MAX_LEVEL ? 100 : Math.max(0, Math.min(100, Math.round((inLevel / EXP_PER_LEVEL) * 100)));
 
   els.petLevel.textContent = String(level);
   els.petExpFill.style.width = `${pct}%`;
@@ -202,13 +215,13 @@ function renderGrowthUI(els, growth) {
     } else if (level < EVO_LV_PHASE3) {
       els.petEvoHint.textContent = `Next evolution at Lv ${EVO_LV_PHASE3} (in ${EVO_LV_PHASE3 - level} lv).`;
     } else {
-      els.petEvoHint.textContent = `Fully evolved (Lv ${EVO_LV_PHASE3}+).`;
+      els.petEvoHint.textContent = `Max level (Lv ${MAX_LEVEL}).`;
     }
   }
 }
 
 function getPetPhaseFromGrowth(growth) {
-  const safe = Math.max(0, Number(growth) || 0);
+  const safe = Math.min(MAX_GROWTH, Math.max(0, Number(growth) || 0));
   if (safe < PHASE2_GROWTH_THRESHOLD) return 1;
   if (safe < PHASE3_GROWTH_THRESHOLD) return 2;
   return 3;
@@ -240,6 +253,20 @@ function renderPetMedia(els, petId, phase) {
   host.innerHTML = `
     <img id="petImage" src="${cfg.src}" alt="Pet" class="pet-sprite${extraClass}" style="width: 200px">
   `.trim();
+}
+
+function renderSidebarPreview(els, petId, growth) {
+  const img = els?.sidebarPetPreview;
+  if (!img) return;
+
+  const phase = getPetPhaseFromGrowth(growth);
+  const pet = PET_CATALOG[petId] || PET_CATALOG[3];
+  const override = PET_PREVIEW_OVERRIDE?.[pet?.id]?.[phase] || null;
+  const cfg = pet?.phases?.[phase] || pet?.phases?.[1] || null;
+
+  const src = override || (cfg?.kind === 'img' ? cfg?.src : null);
+  img.src = src || 'assets/pet.png';
+  img.alt = `${pet?.name || 'Pet'} Preview`;
 }
 
 function pickRandom(list) {
@@ -279,6 +306,7 @@ export function mountPet(els) {
     if (phase === currentPhase) return;
     currentPhase = phase;
     renderPetMedia(els, currentPetId, phase);
+    renderSidebarPreview(els, currentPetId, currentGrowth);
   }
 
   async function loadActivePetAndGrowth() {
@@ -295,11 +323,12 @@ export function mountPet(els) {
     currentPhase = null;
     renderGrowthUI(els, currentGrowth);
     renderPetMedia(els, currentPetId, 1);
+    renderSidebarPreview(els, currentPetId, currentGrowth);
 
     try {
       const growth = await getPetGrowth(currentPetId);
-      currentGrowth = growth;
-      renderGrowthUI(els, growth);
+      currentGrowth = Math.min(MAX_GROWTH, Math.max(0, Number(growth) || 0));
+      renderGrowthUI(els, currentGrowth);
       refreshMedia();
     } catch (e) {
       console.warn('[Pet] Failed to load growth:', e);
@@ -331,6 +360,11 @@ export function mountPet(els) {
 
   feedBtn?.addEventListener('click', async () => {
     try {
+      if (currentGrowth >= MAX_GROWTH) {
+        speak(petSpeechBubble, `Already max level (Lv ${MAX_LEVEL}).`, 1400);
+        return;
+      }
+
       const inv = await getInventory();
       const best = FOOD_PRIORITY.find((f) => (inv[f.id] || 0) > 0);
 
@@ -342,8 +376,8 @@ export function mountPet(els) {
 
       await consumeInventoryItem(best.id, 1);
       const growth = await addPetGrowth(currentPetId, best.exp);
-      currentGrowth = growth;
-      renderGrowthUI(els, growth);
+      currentGrowth = Math.min(MAX_GROWTH, Math.max(0, Number(growth) || 0));
+      renderGrowthUI(els, currentGrowth);
       refreshMedia();
       speak(petSpeechBubble, `Yum! +${best.exp} EXP`, 1400);
     } catch (e) {

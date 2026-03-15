@@ -7,6 +7,10 @@
 //  - Collect topbar test button DOM for +1000 tokens.
 //  - Collect Pet view Backpack button + evolution hint DOM.
 
+// 2026/03/14 edited by JS
+// Changes:
+//  - Collect sidebar pet preview DOM.
+
 // js/dom.js
 // Collects all DOM elements needed across the UI.
 
@@ -117,6 +121,9 @@ export function collectDom() {
   const petExpFill = document.getElementById('petExpFill');
   const petEvoHint = document.getElementById('petEvoHint');
 
+  // ===== Sidebar pet preview =====
+  const sidebarPetPreview = document.getElementById('sidebarPetPreview');
+
   return {
     // Timer
     display,
@@ -165,6 +172,9 @@ export function collectDom() {
     petLevel,
     petExpFill,
     petEvoHint,
+
+    // Sidebar pet preview
+    sidebarPetPreview,
 
     // Stats
     statCount,

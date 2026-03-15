@@ -142,6 +142,14 @@ body{
     font-size:15px; color:var(--sub); background:#fafbfa;
 }
 
+.sidebar-pet-preview{
+    width: 92%;
+    height: auto;
+    max-height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.08));
+}
+
 .content{ flex:1; padding:28px 32px; position:relative; overflow:auto; min-height: 0; }
 .timer{ font-size:92px; font-weight:800; text-align:center; color:#2f3a34; letter-spacing:2px; }
 
@@ -386,6 +394,16 @@ body{
     place-items:center;
     border: 1px solid rgba(95,141,109,0.32);
     background: linear-gradient(180deg, #eaf4ea 0%, #d8ecd9 100%);
+}
+
+/* Locked achievements: grey icon */
+.achv-row:not(.is-unlocked) .achv-ico{
+    border-color: rgba(120, 132, 126, 0.40);
+    background: linear-gradient(180deg, rgba(238, 241, 239, 0.95) 0%, rgba(226, 232, 228, 0.92) 100%);
+}
+
+.achv-row:not(.is-unlocked) .achv-ico-svg path{
+    fill: rgba(58, 68, 63, 0.40);
 }
 
 .achv-row.is-unlocked .achv-ico{
@@ -903,6 +921,31 @@ body{
   margin-bottom: 10px;
 }
 
+.bag-subtitle{
+  margin-top: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(47, 58, 52, 0.62);
+}
+
+.bag-btn{
+  appearance: none;
+  border: 1px solid rgba(220, 229, 223, 0.95);
+  background: rgba(255,255,255,0.75);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.bag-btn:hover{ background: rgba(255,255,255,0.95); }
+.bag-btn:active{ transform: translateY(1px); }
+.bag-btn:disabled{ opacity: 0.65; cursor: not-allowed; }
+
 .bag-list{
   display:flex;
   flex-direction: column;
@@ -1097,6 +1140,42 @@ body{
   color: var(--sub);
   font-size: 13px;
   margin-bottom: 12px;
+}
+
+.store-qty{
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+}
+
+.store-qty-btn{
+  width: 36px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(220, 229, 223, 0.95);
+  background: rgba(255,255,255,0.72);
+  color: var(--text);
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.store-qty-btn:hover{ background: rgba(255,255,255,0.95); }
+.store-qty-btn:active{ transform: translateY(1px); }
+
+.store-qty-input{
+  width: 72px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(220, 229, 223, 0.95);
+  background: rgba(255,255,255,0.78);
+  color: var(--text);
+  font-weight: 900;
+  text-align: center;
+  outline: none;
 }
 
 .store-buy{
