@@ -1,3 +1,11 @@
+// 2026/03/16 edited by Zikai Lu
+// 新增内容：
+//   - GET /api/focus/history 适配新结构，返回 records-only（不含汇总）。
+//   - 新增 GET /api/focus/history/summary，返回按日期聚合统计。
+// 新增的作用：
+//   - 前端可以直接显示可读时间明细与每日汇总。
+// =============================================================
+
 // 2025/11/19 created by 京华昼梦
 // 新增内容：
 //   - 新增 API GET /api/focus/history，用于向前端返回所有专注会话历史。
@@ -35,13 +43,23 @@ namespace CapstoneBackend.Controllers
         }
 
         /// <summary>
-        /// 返回所有历史会话记录。
+        /// 返回所有历史会话记录（records-only，不含汇总）。
         /// </summary>
         [HttpGet("history")]
-        public ActionResult<List<SessionHistoryItem>> Get()
+        public ActionResult<SessionHistoryRecordsResponse> Get()
         {
-            var list = _data.GetSessionHistory();
-            return Ok(list);
+            var items = _data.GetSessionHistoryRecords();
+            return Ok(new SessionHistoryRecordsResponse { Items = items });
+        }
+
+        /// <summary>
+        /// 返回按日期聚合后的会话历史汇总。
+        /// </summary>
+        [HttpGet("history/summary")]
+        public ActionResult<SessionHistoryDailySummaryResponse> GetSummary()
+        {
+            var daily = _data.GetSessionHistoryDailySummary();
+            return Ok(new SessionHistoryDailySummaryResponse { Daily = daily });
         }
     }
 }
