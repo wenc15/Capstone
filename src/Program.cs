@@ -81,7 +81,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 //   - 成就状态依赖 LocalDataService（同为 Singleton），保持一致的本地数据读写与线程安全
 builder.Services.AddSingleton<AchievementService>();
 
+// 注册皮肤目录服务（从 skins.json 读取并缓存）
+builder.Services.AddSingleton<SkinCatalogService>();
 
+// 注册 Skin Pool 抽卡服务
+builder.Services.AddScoped<ISkinGachaService, SkinGachaService>();
 
 
 // 配置 CORS：开发阶段允许本地前端自由访问

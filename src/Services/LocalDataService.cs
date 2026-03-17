@@ -423,48 +423,46 @@ public class LocalDataService
     /// - 若 itemId 不在预设目录中，返回 false。
     /// </summary>
     public bool TryAcquireCollectionItem(string itemId, out bool alreadyOwned, out int state)
+{
+    lock (_fileLock)
     {
-        lock (_fileLock)
+        alreadyOwned = false;
+        state = 0;
+
+        if (string.IsNullOrWhiteSpace(itemId))
         {
-            alreadyOwned = false;
-            state = 0;
+            return false;
+        }
 
-            if (string.IsNullOrWhiteSpace(itemId))
-            {
-                return false;
-            }
+        // 说明：
+        // - 不再依赖硬编码的 CollectionCatalog.PresetItems 校验
+        // - SkinGachaService 从 skins.json 抽取，保证 itemId 合法
+        // - CollectionController 的 acquire 入口也可继续使用（前端传入 id）
 
-            var matched = CollectionCatalog.PresetItems
-                .FirstOrDefault(x => string.Equals(x.ItemId, itemId, StringComparison.OrdinalIgnoreCase));
-            if (matched is null)
-            {
-                return false;
-            }
+        var profile = GetUserProfile();
+        if (profile.Collection == null)
+        {
+            profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
 
-            var profile = GetUserProfile();
-            if (profile.Collection == null)
-            {
-                profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            }
+        profile.Collection.TryGetValue(itemId, out var current);
+        current = current > 0 ? 1 : 0;
 
-            profile.Collection.TryGetValue(matched.ItemId, out var current);
-            current = current > 0 ? 1 : 0;
-
-            if (current == 1)
-            {
-                alreadyOwned = true;
-                state = 1;
-                return true;
-            }
-
-            profile.Collection[matched.ItemId] = 1;
-            SaveUserProfile(profile);
-
-            alreadyOwned = false;
+        if (current == 1)
+        {
+            alreadyOwned = true;
             state = 1;
             return true;
         }
+
+        profile.Collection[itemId] = 1;
+        SaveUserProfile(profile);
+
+        alreadyOwned = false;
+        state = 1;
+        return true;
     }
+}
 
     /// <summary>
     /// 获取指定宠物的成长值。
