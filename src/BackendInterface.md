@@ -9,6 +9,7 @@
 - 背包接口开发者：**Zikai Lu（Team 31 后端）**
 - 点数系统接口开发者：**Zikai Lu（Team 31 后端）**
 - 白名单预设相关接口开发者：**Zikai Lu（Team 31 后端）**
+- 专注历史与本地档案接口开发者：**Zikai Lu（Team 31 后端）**
 - 收藏品（Collection）接口开发者：**OpenCode（Team 31 后端）**
 ---
 
@@ -102,7 +103,116 @@
 
 ---
 
-## 3. 宠物成长值接口（/api/pets/{petId}/growth）
+## 3. 专注历史与本地档案接口（/api/focus/history, /api/archive）
+
+> 开发者：**Zikai Lu**
+
+### 3.1 获取专注历史明细（records-only）
+
+- **方法**：`GET`
+- **路径**：`/api/focus/history`
+- **功能**：读取所有会话明细记录（不返回汇总），并附带可读时间字段。
+- **请求体**：无
+- **响应体字段**（`SessionHistoryRecordsResponse`）
+
+| 字段    | 类型                       | 说明                                  |
+| ------- | -------------------------- | ------------------------------------- |
+| `items` | SessionHistoryRecordView[] | 会话明细列表（按时间倒序）。          |
+
+- **列表项字段**（`SessionHistoryRecordView`）
+
+| 字段      | 类型   | 说明 |
+| --------- | ------ | ---- |
+| `ts`      | number | 原始时间戳（毫秒）。 |
+| `time`    | string | 可读时间（本地时区，格式 `yyyy-MM-dd HH:mm:ss`）。 |
+| `date`    | string | 可读日期（本地时区，格式 `yyyy-MM-dd`）。 |
+| `minutes` | number | 本次会话时长（分钟）。 |
+| `note`    | string | 备注（如白名单应用列表）。 |
+| `outcome` | string | 会话结果：`success` / `failed` / `aborted`。 |
+
+- **响应状态码**
+  - `200 OK`：返回会话明细列表（可能为空）。
+
+---
+
+### 3.2 获取按日期汇总的专注历史
+
+- **方法**：`GET`
+- **路径**：`/api/focus/history/summary`
+- **功能**：按本地日期聚合会话历史，返回每日统计。
+- **请求体**：无
+- **响应体字段**（`SessionHistoryDailySummaryResponse`）
+
+| 字段    | 类型                            | 说明                       |
+| ------- | ------------------------------- | -------------------------- |
+| `daily` | SessionHistoryDailySummaryItem[]| 按日期聚合的统计列表。     |
+
+- **列表项字段**（`SessionHistoryDailySummaryItem`）
+
+| 字段           | 类型   | 说明 |
+| -------------- | ------ | ---- |
+| `date`         | string | 日期（`yyyy-MM-dd`）。 |
+| `sessions`     | number | 当天总会话数。 |
+| `totalMinutes` | number | 当天累计分钟数。 |
+| `success`      | number | 当天成功会话数。 |
+| `failed`       | number | 当天失败会话数。 |
+| `aborted`      | number | 当天取消会话数。 |
+
+- **响应状态码**
+  - `200 OK`：返回按日期统计列表（可能为空）。
+
+---
+
+### 3.3 导出本地配置与档案
+
+- **方法**：`GET`
+- **路径**：`/api/archive/export`
+- **功能**：导出当前本地数据为 JSON 文件（用于备份/迁移）。
+- **请求体**：无
+- **响应头**：`Content-Type: application/json`
+- **响应体字段**（`LocalArchiveExportData`）
+
+| 字段               | 类型                  | 说明 |
+| ------------------ | --------------------- | ---- |
+| `schemaVersion`    | number                | 导出结构版本号（当前为 `1`）。 |
+| `exportedAt`       | string                | 导出时间（ISO8601，UTC）。 |
+| `userProfile`      | UserProfile           | 用户档案数据。 |
+| `sessionHistory`   | SessionHistoryItem[]  | 专注历史原始记录列表。 |
+| `whitelistPresets` | WhitelistPreset[]     | 白名单预设列表。 |
+
+- **响应状态码**
+  - `200 OK`：返回 JSON 文件下载。
+
+---
+
+### 3.4 导入本地配置与档案
+
+- **方法**：`POST`
+- **路径**：`/api/archive/import`
+- **功能**：从外部 JSON 文件导入本地配置与档案（导入前会自动备份当前本地数据）。
+- **请求头**：`Content-Type: multipart/form-data`
+- **请求体字段**
+
+| 字段   | 类型 | 必填 | 说明 |
+| ------ | ---- | ---- | ---- |
+| `file` | file | 是   | 导出的 `.json` 档案文件。 |
+
+- **响应体字段**（`LocalArchiveImportResult`）
+
+| 字段                 | 类型   | 说明 |
+| -------------------- | ------ | ---- |
+| `schemaVersion`      | number | 导入文件结构版本号。 |
+| `sessionHistoryCount`| number | 导入的历史记录条数。 |
+| `whitelistPresetCount`| number| 导入的白名单预设条数。 |
+| `importedAt`         | string | 导入完成时间（ISO8601，UTC）。 |
+
+- **响应状态码**
+  - `200 OK`：导入成功。
+  - `400 Bad Request`：文件为空、不是 JSON、或 JSON 结构非法。
+
+---
+
+## 4. 宠物成长值接口（/api/pets/{petId}/growth）
 
 > 开发者：**Zikai Lu**
 
@@ -112,7 +222,7 @@
 - 成长值为整数，减少时最低为 0。
 - 预留 `-1` 作为“未拥有”的标记（未来可能启用）。
 
-### 3.1 查询指定宠物成长值
+### 4.1 查询指定宠物成长值
 
 - **方法**：`GET`
 - **路径**：`/api/pets/{petId}/growth`
@@ -131,7 +241,7 @@
 
 ---
 
-### 3.2 增加指定宠物成长值
+### 4.2 增加指定宠物成长值
 
 - **方法**：`POST`
 - **路径**：`/api/pets/{petId}/growth/add`
@@ -157,7 +267,7 @@
 
 ---
 
-### 3.3 减少指定宠物成长值
+### 4.3 减少指定宠物成长值
 
 - **方法**：`POST`
 - **路径**：`/api/pets/{petId}/growth/consume`
@@ -183,7 +293,7 @@
 
 ---
 
-## 4. 背包接口（/api/inventory）
+## 5. 背包接口（/api/inventory）
 
 > 开发者：**Zikai Lu**
 
@@ -192,7 +302,7 @@
 - 背包默认为空；未包含的物品视为数量 0。
 - 物品数量为整数，消耗时库存不得为负。
 
-### 4.1 查询背包全部物品
+### 5.1 查询背包全部物品
 
 - **方法**：`GET`
 - **路径**：`/api/inventory`
@@ -209,7 +319,7 @@
 
 ---
 
-### 4.2 增加指定物品数量
+### 5.2 增加指定物品数量
 
 - **方法**：`POST`
 - **路径**：`/api/inventory/add`
@@ -235,7 +345,7 @@
 
 ---
 
-### 4.3 消耗指定物品数量
+### 5.3 消耗指定物品数量
 
 - **方法**：`POST`
 - **路径**：`/api/inventory/consume`
@@ -268,7 +378,7 @@
 
 ---
 
-## 5. 点数系统接口（/api/credits）
+## 6. 点数系统接口（/api/credits）
 
 > 开发者：**Zikai Lu**
 
@@ -279,7 +389,7 @@
   - 例如：5 分 01 秒 → 6 点；0 分 10 秒 → 1 点（若本次有时长）。
 - 点数同时可以通过接口手动增加或消耗，供抽奖系统、商店系统等使用。
 
-### 5.1 查询当前点数
+### 6.1 查询当前点数
 
 - **方法**：`GET`
 - **路径**：`/api/credits`
@@ -296,7 +406,7 @@
 
 ---
 
-### 5.2 增加指定数量的点数
+### 6.2 增加指定数量的点数
 
 - **方法**：`POST`
 - **路径**：`/api/credits/add`
@@ -321,7 +431,7 @@
 
 ---
 
-### 5.3 消耗指定数量的点数
+### 6.3 消耗指定数量的点数
 
 - **方法**：`POST`
 - **路径**：`/api/credits/consume`
@@ -353,11 +463,11 @@
 
 ---
 
-## 6. 白名单预设接口（/api/whitelistpresets）
+## 7. 白名单预设接口（/api/whitelistpresets）
 
 > 开发者：**Zikai Lu**
 
-### 6.1 获取所有白名单预设
+### 7.1 获取所有白名单预设
 
 - **方法**：`GET`
 - **路径**：`/api/whitelistpresets`
@@ -380,7 +490,7 @@
 
 ---
 
-### 6.2 保存白名单预设（创建 / 更新）
+### 7.2 保存白名单预设（创建 / 更新）
 
 - **方法**：`POST`
 - **路径**：`/api/whitelistpresets`
@@ -411,7 +521,7 @@
 
 ---
 
-### 6.3 删除白名单预设
+### 7.3 删除白名单预设
 
 - **方法**：`DELETE`
 - **路径**：`/api/whitelistpresets/{id}`
@@ -429,7 +539,7 @@
 
 ---
 
-## 7. 收藏品接口（/api/collection）
+## 8. 收藏品接口（/api/collection）
 
 > 开发者：**Zikai Lu**
 
@@ -439,7 +549,7 @@
 - 每个收藏品只有两种状态：`0`（未拥有）或 `1`（已拥有）。
 - “获取藏品”接口不会重复发放：已拥有时返回 `alreadyOwned=true`。
 
-### 7.1 查询收藏品完整列表
+### 8.1 查询收藏品完整列表
 
 - **方法**：`GET`
 - **路径**：`/api/collection`
@@ -464,7 +574,7 @@
 
 ---
 
-### 7.2 获取指定收藏品
+### 8.2 获取指定收藏品
 
 - **方法**：`POST`
 - **路径**：`/api/collection/acquire`
@@ -491,11 +601,11 @@
   - `400 Bad Request`：`itemId` 为空。
   - `404 Not Found`：`itemId` 不在预设目录中。
 
-## 8. 默认模板接口（仅调试用）
+## 9. 默认模板接口（仅调试用）
 
 > 开发者：模板自动生成（非业务接口）
 
-### 7.1 WeatherForecast 示例
+### 9.1 WeatherForecast 示例
 
 - **方法**：`GET`
 - **路径**：`/weatherforecast`

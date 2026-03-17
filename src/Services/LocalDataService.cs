@@ -1,3 +1,12 @@
+// 2026/03/16 edited by Zikai Lu
+// 新增内容：
+//   - 增加 SessionHistory 可读时间明细与按日期汇总查询方法。
+//   - 增加本地档案导出/导入方法（user_profile/session_history/whitelist_presets）。
+// 新增的作用：
+//   - 让前端可直接使用可读时间和每日统计数据。
+//   - 支持用户导出和导入本地配置与档案。
+// =============================================================
+
 // 2026/03/09 edited by Zikai Lu
 // 新增内容：
 //   - 增加 Collection 相关接口：GetCollection() / TryAcquireCollectionItem()。
@@ -570,6 +579,59 @@ public class LocalDataService
     }
 
     /// <summary>
+    /// 返回会话历史明细（包含可读时间和日期字段，不包含汇总）。
+    /// </summary>
+    public List<SessionHistoryRecordView> GetSessionHistoryRecords()
+    {
+        lock (_fileLock)
+        {
+            var list = GetSessionHistory();
+
+            return list
+                .OrderByDescending(x => x.Ts)
+                .Select(x =>
+                {
+                    var localTime = DateTimeOffset.FromUnixTimeMilliseconds(x.Ts).ToLocalTime();
+                    return new SessionHistoryRecordView
+                    {
+                        Ts = x.Ts,
+                        Time = localTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        Date = localTime.ToString("yyyy-MM-dd"),
+                        Minutes = x.Minutes,
+                        Note = x.Note,
+                        Outcome = x.Outcome ?? "success"
+                    };
+                })
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// 按日期汇总会话历史（本地时区）。
+    /// </summary>
+    public List<SessionHistoryDailySummaryItem> GetSessionHistoryDailySummary()
+    {
+        lock (_fileLock)
+        {
+            var records = GetSessionHistoryRecords();
+
+            return records
+                .GroupBy(x => x.Date, StringComparer.Ordinal)
+                .Select(g => new SessionHistoryDailySummaryItem
+                {
+                    Date = g.Key,
+                    Sessions = g.Count(),
+                    TotalMinutes = g.Sum(x => Math.Max(0, x.Minutes)),
+                    Success = g.Count(x => string.Equals(x.Outcome, "success", StringComparison.OrdinalIgnoreCase)),
+                    Failed = g.Count(x => string.Equals(x.Outcome, "failed", StringComparison.OrdinalIgnoreCase)),
+                    Aborted = g.Count(x => string.Equals(x.Outcome, "aborted", StringComparison.OrdinalIgnoreCase))
+                })
+                .OrderByDescending(x => x.Date)
+                .ToList();
+        }
+    }
+
+    /// <summary>
     /// 追加一条专注会话历史记录到 session_history.json。
     /// </summary>
     public void AddSessionHistory(SessionHistoryItem entry)
@@ -578,10 +640,88 @@ public class LocalDataService
         {
             var list = GetSessionHistory();
             list.Add(entry);
+            SaveSessionHistoryList(list);
+        }
+    }
 
-            var path = LocalStoragePaths.SessionHistoryFilePath;
-            var json = JsonSerializer.Serialize(list, JsonOptions);
-            File.WriteAllText(path, json);
+    public LocalArchiveExportData ExportArchive()
+    {
+        lock (_fileLock)
+        {
+            return new LocalArchiveExportData
+            {
+                SchemaVersion = 1,
+                ExportedAt = DateTimeOffset.UtcNow,
+                UserProfile = GetUserProfile(),
+                SessionHistory = GetSessionHistory(),
+                WhitelistPresets = GetWhitelistPresets()
+            };
+        }
+    }
+
+    public LocalArchiveImportResult ImportArchive(LocalArchiveExportData archive)
+    {
+        if (archive is null)
+        {
+            throw new ArgumentNullException(nameof(archive));
+        }
+
+        if (archive.UserProfile is null)
+        {
+            throw new ArgumentException("userProfile is required.");
+        }
+
+        archive.SessionHistory ??= new List<SessionHistoryItem>();
+        archive.WhitelistPresets ??= new List<WhitelistPreset>();
+
+        lock (_fileLock)
+        {
+            BackupArchiveFiles();
+
+            SaveUserProfile(archive.UserProfile);
+            SaveSessionHistoryList(archive.SessionHistory);
+            SaveWhitelistPresetList(archive.WhitelistPresets);
+
+            return new LocalArchiveImportResult
+            {
+                SchemaVersion = archive.SchemaVersion,
+                SessionHistoryCount = archive.SessionHistory.Count,
+                WhitelistPresetCount = archive.WhitelistPresets.Count,
+                ImportedAt = DateTimeOffset.UtcNow
+            };
+        }
+    }
+
+    private void SaveSessionHistoryList(List<SessionHistoryItem> list)
+    {
+        var path = LocalStoragePaths.SessionHistoryFilePath;
+        var json = JsonSerializer.Serialize(list, JsonOptions);
+        File.WriteAllText(path, json);
+    }
+
+    private void SaveWhitelistPresetList(List<WhitelistPreset> presets)
+    {
+        var path = LocalStoragePaths.WhitelistPresetsFilePath;
+        var json = JsonSerializer.Serialize(presets, JsonOptions);
+        File.WriteAllText(path, json);
+    }
+
+    private void BackupArchiveFiles()
+    {
+        var backupDir = Path.Combine(LocalStoragePaths.BaseDirectory, "backups");
+        Directory.CreateDirectory(backupDir);
+
+        var suffix = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+        BackupIfExists(LocalStoragePaths.UserProfileFilePath, Path.Combine(backupDir, $"user_profile.{suffix}.bak.json"));
+        BackupIfExists(LocalStoragePaths.SessionHistoryFilePath, Path.Combine(backupDir, $"session_history.{suffix}.bak.json"));
+        BackupIfExists(LocalStoragePaths.WhitelistPresetsFilePath, Path.Combine(backupDir, $"whitelist_presets.{suffix}.bak.json"));
+    }
+
+    private static void BackupIfExists(string sourcePath, string targetPath)
+    {
+        if (File.Exists(sourcePath))
+        {
+            File.Copy(sourcePath, targetPath, overwrite: true);
         }
     }
 
