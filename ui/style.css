@@ -1,3 +1,9 @@
+/* 2026/03/19 edited by Zhecheng Xu
+ * Changes:
+ *  - Add Settings entry/data-management modal visuals.
+ *  - Add subtle shadows for Settings buttons to match Start button depth.
+ */
+
 /* 2026/02/21 edited by Zhecheng Xu
  * Changes:
  *  - Updated gacha result panel layout and close button styling.
@@ -73,6 +79,26 @@ body{
     padding:16px 18px; border-bottom:1px solid var(--muted);
 }
 .brand{ font-size:28px; font-weight:800; letter-spacing:.3px; }
+
+.topbar-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.settings-btn{
+    border:1px solid var(--muted);
+    background:#fff;
+    color:var(--text);
+    border-radius:999px;
+    padding:6px 12px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow: 0 3px 8px rgba(47, 58, 52, 0.10);
+}
+
+.settings-btn:hover{ background:#f5f8f6; }
+.settings-btn:active{ transform: translateY(1px); }
 
 .token-chip{
     display:inline-flex;
@@ -231,6 +257,124 @@ body{
     pointer-events: none; z-index: 9999;
 }
 .toast.show{ opacity:1; transform: translateY(0); }
+
+/* =============== Settings / Data Management =============== */
+.settings-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(28, 33, 30, 0.26);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10020;
+    padding: 24px;
+}
+
+.settings-overlay.open{ display:flex; }
+
+.settings-dialog{
+    width: min(920px, 100%);
+    background: #fbfdfb;
+    border: 1px solid #d8e3db;
+    border-radius: 18px;
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.17);
+    overflow: hidden;
+}
+
+.settings-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 16px 18px;
+    border-bottom:1px solid #dfe7e1;
+}
+
+.settings-title{
+    margin:0;
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 0.2px;
+    color:#2f3a34;
+}
+
+.settings-close{
+    border: none;
+    background: transparent;
+    color: #5a655e;
+    font-size: 30px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.settings-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 16px;
+}
+
+.settings-card{
+    border:1px solid #dfe8e1;
+    border-radius: 14px;
+    background:#fff;
+    padding: 16px;
+}
+
+.settings-card h3{
+    margin:0 0 10px;
+    font-size: 26px;
+    line-height: 1.1;
+}
+
+.settings-card ul{
+    margin:0 0 12px 20px;
+    color:#5c6861;
+    font-size: 16px;
+}
+
+.settings-note{
+    margin:4px 0 10px;
+    color:#5f6b63;
+    font-size:16px;
+}
+
+#archiveImportFile{
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.settings-action{
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    background: var(--green);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    padding: 12px 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(75,139,107,.20);
+}
+
+.settings-action:hover{ filter: brightness(0.98); }
+.settings-action:active{ transform: translateY(1px); }
+.settings-action:disabled{ opacity: 0.6; cursor: not-allowed; }
+
+.settings-meta{
+    margin-top: 8px;
+    min-height: 20px;
+    color:#4d7a61;
+    font-size:14px;
+    font-weight:700;
+}
+
+@media (max-width: 840px) {
+    .settings-grid{ grid-template-columns: 1fr; }
+    .settings-title{ font-size: 28px; }
+    .topbar-actions{ gap: 8px; }
+    .settings-btn{ padding: 6px 10px; }
+}
 
 /* 激活中的导航按钮样式 */
 .nav-btn.active{

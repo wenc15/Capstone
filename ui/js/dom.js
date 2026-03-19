@@ -1,3 +1,7 @@
+// 2026/03/19 edited by Zhecheng Xu
+// Changes:
+//  - Collect Settings/Data Management modal DOM nodes.
+
 // 2026/01/28 edited by JS
 // Changes:
 //  - Collect Pet view DOM (level/exp) and Store button for the new store overlay.
@@ -112,6 +116,15 @@ export function collectDom() {
   const tokenValue = document.getElementById('tokenValue');
   const tokenAdd1000Btn = document.getElementById('tokenAdd1000Btn');
 
+  // ===== Settings / Archive =====
+  const settingsOpenBtn = document.getElementById('settingsOpenBtn');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  const archiveExportBtn = document.getElementById('archiveExportBtn');
+  const archiveImportFile = document.getElementById('archiveImportFile');
+  const archiveImportBtn = document.getElementById('archiveImportBtn');
+  const archiveImportMeta = document.getElementById('archiveImportMeta');
+
   // ===== Pet view =====
   const feedBtn = document.getElementById('feedBtn');
   const petMedia = document.getElementById('petMedia');
@@ -191,6 +204,15 @@ export function collectDom() {
     //token/credits
     tokenValue,
     tokenAdd1000Btn,
+
+    // Settings / Archive
+    settingsOpenBtn,
+    settingsOverlay,
+    settingsCloseBtn,
+    archiveExportBtn,
+    archiveImportFile,
+    archiveImportBtn,
+    archiveImportMeta,
 
     // Minigame
     mgRoot,
