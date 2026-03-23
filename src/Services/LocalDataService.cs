@@ -1,3 +1,21 @@
+// 2026/03/16 edited by Zikai Lu
+// 新增内容：
+//   - 增加 SessionHistory 可读时间明细与按日期汇总查询方法。
+//   - 增加本地档案导出/导入方法（user_profile/session_history/whitelist_presets）。
+// 新增的作用：
+//   - 让前端可直接使用可读时间和每日统计数据。
+//   - 支持用户导出和导入本地配置与档案。
+// =============================================================
+
+// 2026/03/09 edited by Zikai Lu
+// 新增内容：
+//   - 增加 Collection 相关接口：GetCollection() / TryAcquireCollectionItem()。
+//   - 引入预设收藏品目录，返回完整收藏列表及 0/1 拥有状态。
+// 新增的作用：
+//   - 为皮肤等收藏品提供固定目录查询能力。
+//   - 支持“获取指定收藏品”：未拥有时置为 1，已拥有时返回已拥有状态。
+// =============================================================
+
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 增加 Inventory 相关接口：GetInventory() / AddInventoryItem() / TryConsumeInventoryItem()。
@@ -14,18 +32,7 @@
 //   - 保证成长值不低于 0，并兼容未来使用 -1 表示未拥有的场景。
 // =============================================================
 
-// 2026/03/14 edited by JS
-// Changes:
-//   - Add pet ownership/active state helpers.
-//   - Pet purchase/equip gated by current pet max (Lv 20).
-//   - Clamp pet growth at Lv 20 cap.
-
-// 2026/03/14 edited by JS
-// Changes:
-//   - Track FeedingPetId and gate new pet purchase by FeedingPetId max.
-//   - Allow switching ActivePetId freely; only purchase is gated.
-
-// 2026/01/16 edited by Zikai
+// 2026/01/16 edited by Zikai Lu
 // 新增内容：
 //   - 在 RecordSession(...) 中根据本次会话时长按 Ceil(秒 / 60) 累积点数（Credits）。
 //   - 新增 GetCredits() / AddCredits() / TryConsumeCredits() 三个点数接口供 Controller 使用。
@@ -156,78 +163,6 @@ public class LocalDataService
         return value < 0 ? 0 : value;
     }
 
-    private const int PetMaxGrowthThreshold = 1900; // Lv 20 cap: (20-1)*100
-
-    private static bool IsValidPetId(int petId)
-    {
-        return petId == 1 || petId == 2 || petId == 3;
-    }
-
-    private static int ClampPetGrowth(int value)
-    {
-        var normalized = NormalizePetGrowthValue(value);
-        return normalized > PetMaxGrowthThreshold ? PetMaxGrowthThreshold : normalized;
-    }
-
-    private static int GetPetGrowthFromProfile(UserProfile profile, int petId, out bool changed)
-    {
-        changed = EnsurePetGrowthList(profile, petId);
-
-        var raw = petId >= 0 && profile.PetGrowth.Count > petId ? profile.PetGrowth[petId] : 0;
-        var clamped = ClampPetGrowth(raw);
-        if (raw != clamped)
-        {
-            profile.PetGrowth[petId] = clamped;
-            changed = true;
-        }
-
-        return clamped;
-    }
-
-    private static bool EnsurePetState(UserProfile profile)
-    {
-        var changed = false;
-
-        if (profile.UnlockedPetIds == null || profile.UnlockedPetIds.Count == 0)
-        {
-            profile.UnlockedPetIds = new List<int> { 3 };
-            changed = true;
-        }
-
-        // 清理非法 id / 去重
-        var set = new HashSet<int>();
-        var normalized = new List<int>();
-        foreach (var id in profile.UnlockedPetIds)
-        {
-            if (!IsValidPetId(id)) continue;
-            if (set.Add(id)) normalized.Add(id);
-        }
-        if (normalized.Count == 0)
-        {
-            normalized.Add(3);
-        }
-        if (profile.UnlockedPetIds.Count != normalized.Count)
-        {
-            profile.UnlockedPetIds = normalized;
-            changed = true;
-        }
-
-        if (!IsValidPetId(profile.ActivePetId) || !profile.UnlockedPetIds.Contains(profile.ActivePetId))
-        {
-            profile.ActivePetId = profile.UnlockedPetIds[0];
-            changed = true;
-        }
-
-        // Current on-stage pet is the one being fed/leveled.
-        if (profile.FeedingPetId != profile.ActivePetId)
-        {
-            profile.FeedingPetId = profile.ActivePetId;
-            changed = true;
-        }
-
-        return changed;
-    }
-
     // 作用：根据一次专注会话结果更新用户 profile 里的统计信息。
     //       现在会额外统计 Aborted -> CanceledSessions，同时按照 ceil(专注分钟数) 奖励点数（Credits）。
     // =============================================================
@@ -346,146 +281,6 @@ public class LocalDataService
     }
 
     /// <summary>
-    /// 设置点数余额为指定值（用于测试/调试）。
-    /// </summary>
-    public int SetCredits(int credits)
-    {
-        var safe = credits < 0 ? 0 : credits;
-
-        lock (_fileLock)
-        {
-            var profile = GetUserProfile();
-            profile.Credits = safe;
-            SaveUserProfile(profile);
-            return profile.Credits;
-        }
-    }
-
-    /// <summary>
-    /// 获取宠物拥有/激活状态。
-    /// </summary>
-    public PetStateResponse GetPetState()
-    {
-        lock (_fileLock)
-        {
-            var profile = GetUserProfile();
-            var changed = EnsurePetState(profile);
-            if (changed) SaveUserProfile(profile);
-
-            return new PetStateResponse
-            {
-                ActivePetId = profile.ActivePetId,
-                FeedingPetId = profile.FeedingPetId,
-                UnlockedPetIds = new List<int>(profile.UnlockedPetIds)
-            };
-        }
-    }
-
-    /// <summary>
-    /// 设置当前激活宠物（必须已解锁）。
-    /// </summary>
-    public bool TrySetActivePet(int petId, out PetStateResponse state, out string error)
-    {
-        error = string.Empty;
-        state = new PetStateResponse();
-
-        if (!IsValidPetId(petId))
-        {
-            error = "invalid petId.";
-            return false;
-        }
-
-        lock (_fileLock)
-        {
-            var profile = GetUserProfile();
-            EnsurePetState(profile);
-
-            if (!profile.UnlockedPetIds.Contains(petId))
-            {
-                error = "pet is not unlocked.";
-                state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-                return false;
-            }
-
-            profile.ActivePetId = petId;
-            profile.FeedingPetId = petId;
-            SaveUserProfile(profile);
-
-            state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-            return true;
-        }
-    }
-
-    /// <summary>
-    /// 解锁指定宠物（要求当前 FeedingPetId 满级：阶段 3 阈值）。
-    /// </summary>
-    public bool TryUnlockPet(int petId, out PetStateResponse state, out string error)
-    {
-        error = string.Empty;
-        state = new PetStateResponse();
-
-        if (!IsValidPetId(petId))
-        {
-            error = "invalid petId.";
-            return false;
-        }
-
-        lock (_fileLock)
-        {
-            var profile = GetUserProfile();
-            EnsurePetState(profile);
-
-            // Must max the current on-stage (active) pet before buying a new one.
-            var anyGrowthChanged = false;
-            var activeGrowth = GetPetGrowthFromProfile(profile, profile.ActivePetId, out var activeGrowthChanged);
-            anyGrowthChanged = anyGrowthChanged || activeGrowthChanged;
-            if (activeGrowth < PetMaxGrowthThreshold)
-            {
-                if (anyGrowthChanged) SaveUserProfile(profile);
-                error = "current active pet must be max level first.";
-                state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-                return false;
-            }
-
-            // Only allow buying one new pet at a time.
-            // If player already owns any other pet that is not max level (in backpack), block purchase.
-            foreach (var ownedId in profile.UnlockedPetIds)
-            {
-                if (ownedId == profile.ActivePetId) continue;
-                var g = GetPetGrowthFromProfile(profile, ownedId, out var ownedGrowthChanged);
-                anyGrowthChanged = anyGrowthChanged || ownedGrowthChanged;
-                if (g < PetMaxGrowthThreshold)
-                {
-                    if (anyGrowthChanged) SaveUserProfile(profile);
-                    error = "you already have a non-max pet in backpack.";
-                    state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-                    return false;
-                }
-            }
-
-            if (anyGrowthChanged) SaveUserProfile(profile);
-
-            if (profile.UnlockedPetIds.Contains(petId))
-            {
-                // Allow re-buying an owned pet to restart its growth loop.
-                // This will reset that pet's growth to 0 (egg) while keeping ownership.
-                EnsurePetGrowthList(profile, petId);
-                profile.PetGrowth[petId] = 0;
-                SaveUserProfile(profile);
-
-                state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-                return true;
-            }
-
-            profile.UnlockedPetIds.Add(petId);
-            SaveUserProfile(profile);
-
-            state = new PetStateResponse { ActivePetId = profile.ActivePetId, FeedingPetId = profile.FeedingPetId, UnlockedPetIds = new List<int>(profile.UnlockedPetIds) };
-            return true;
-        }
-    }
-
-    /// <summary>
     /// 获取背包内所有物品及其数量。
     /// </summary>
     public Dictionary<string, int> GetInventory()
@@ -576,6 +371,229 @@ public class LocalDataService
     }
 
     /// <summary>
+    /// 查询 Collection 完整列表（预设目录 + 拥有状态 0/1）。
+    /// </summary>
+    public List<CollectionItemStatus> GetCollection()
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            if (profile.Collection == null)
+            {
+                profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var result = new List<CollectionItemStatus>();
+            foreach (var def in CollectionCatalog.PresetItems)
+            {
+                profile.Collection.TryGetValue(def.ItemId, out var state);
+                result.Add(new CollectionItemStatus
+                {
+                    ItemId = def.ItemId,
+                    DisplayName = def.DisplayName,
+                    State = state > 0 ? 1 : 0,
+                });
+            }
+
+            // 清理无效状态值（非 0/1）并持久化，防止脏数据扩散。
+            var changed = false;
+            foreach (var key in profile.Collection.Keys.ToList())
+            {
+                var normalized = profile.Collection[key] > 0 ? 1 : 0;
+                if (profile.Collection[key] != normalized)
+                {
+                    profile.Collection[key] = normalized;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                SaveUserProfile(profile);
+            }
+
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// 获取指定收藏品：
+    /// - 若状态为 0，更新为 1；
+    /// - 若状态为 1，返回已拥有；
+    /// - 若 itemId 不在预设目录中，返回 false。
+    /// </summary>
+    public bool TryAcquireCollectionItem(string itemId, out bool alreadyOwned, out int state)
+{
+    lock (_fileLock)
+    {
+        alreadyOwned = false;
+        state = 0;
+
+        if (string.IsNullOrWhiteSpace(itemId))
+        {
+            return false;
+        }
+
+        // 说明：
+        // - 不再依赖硬编码的 CollectionCatalog.PresetItems 校验
+        // - SkinGachaService 从 skins.json 抽取，保证 itemId 合法
+        // - CollectionController 的 acquire 入口也可继续使用（前端传入 id）
+
+        var profile = GetUserProfile();
+        if (profile.Collection == null)
+        {
+            profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        profile.Collection.TryGetValue(itemId, out var current);
+        current = current > 0 ? 1 : 0;
+
+        if (current == 1)
+        {
+            alreadyOwned = true;
+            state = 1;
+            return true;
+        }
+
+        profile.Collection[itemId] = 1;
+        SaveUserProfile(profile);
+
+        alreadyOwned = false;
+        state = 1;
+        return true;
+    }
+}
+
+    private static bool EnsurePetState(UserProfile profile)
+    {
+        var changed = false;
+
+        if (profile.UnlockedPetIds == null || profile.UnlockedPetIds.Count == 0)
+        {
+            profile.UnlockedPetIds = new List<int> { 3 };
+            changed = true;
+        }
+
+        profile.UnlockedPetIds = profile.UnlockedPetIds
+            .Where(id => id >= 1 && id <= 3)
+            .Distinct()
+            .OrderByDescending(id => id)
+            .ToList();
+
+        if (profile.UnlockedPetIds.Count == 0)
+        {
+            profile.UnlockedPetIds.Add(3);
+            changed = true;
+        }
+
+        if (!profile.UnlockedPetIds.Contains(profile.ActivePetId))
+        {
+            profile.ActivePetId = profile.UnlockedPetIds[0];
+            changed = true;
+        }
+
+        if (!profile.UnlockedPetIds.Contains(profile.FeedingPetId))
+        {
+            profile.FeedingPetId = profile.ActivePetId;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    public PetStateResponse GetPetState()
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            var changed = EnsurePetState(profile);
+
+            if (changed)
+            {
+                SaveUserProfile(profile);
+            }
+
+            return new PetStateResponse
+            {
+                ActivePetId = profile.ActivePetId,
+                FeedingPetId = profile.FeedingPetId,
+                UnlockedPetIds = new List<int>(profile.UnlockedPetIds)
+            };
+        }
+    }
+
+    public bool TrySetActivePet(int petId, out PetStateResponse state, out string error)
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            EnsurePetState(profile);
+
+            if (petId < 1 || petId > 3)
+            {
+                state = BuildPetState(profile);
+                error = "invalid pet id.";
+                return false;
+            }
+
+            if (!profile.UnlockedPetIds.Contains(petId))
+            {
+                state = BuildPetState(profile);
+                error = "pet is not unlocked.";
+                return false;
+            }
+
+            profile.ActivePetId = petId;
+            profile.FeedingPetId = petId;
+            SaveUserProfile(profile);
+
+            state = BuildPetState(profile);
+            error = string.Empty;
+            return true;
+        }
+    }
+
+    public bool TryUnlockPet(int petId, out PetStateResponse state, out string error)
+    {
+        lock (_fileLock)
+        {
+            var profile = GetUserProfile();
+            EnsurePetState(profile);
+
+            if (petId < 1 || petId > 3)
+            {
+                state = BuildPetState(profile);
+                error = "invalid pet id.";
+                return false;
+            }
+
+            if (!profile.UnlockedPetIds.Contains(petId))
+            {
+                profile.UnlockedPetIds.Add(petId);
+                profile.UnlockedPetIds = profile.UnlockedPetIds
+                    .Distinct()
+                    .OrderByDescending(id => id)
+                    .ToList();
+            }
+
+            SaveUserProfile(profile);
+            state = BuildPetState(profile);
+            error = string.Empty;
+            return true;
+        }
+    }
+
+    private static PetStateResponse BuildPetState(UserProfile profile)
+    {
+        return new PetStateResponse
+        {
+            ActivePetId = profile.ActivePetId,
+            FeedingPetId = profile.FeedingPetId,
+            UnlockedPetIds = new List<int>(profile.UnlockedPetIds)
+        };
+    }
+
+    /// <summary>
     /// 获取指定宠物的成长值。
     /// petId 从 0 开始，若不存在则自动扩容为 0。
     /// </summary>
@@ -589,8 +607,14 @@ public class LocalDataService
         lock (_fileLock)
         {
             var profile = GetUserProfile();
-            var growth = GetPetGrowthFromProfile(profile, petId, out var changed);
-            if (changed) SaveUserProfile(profile);
+            var changed = EnsurePetGrowthList(profile, petId);
+            var growth = profile.PetGrowth[petId];
+
+            if (changed)
+            {
+                SaveUserProfile(profile);
+            }
+
             return growth;
         }
     }
@@ -611,9 +635,11 @@ public class LocalDataService
             var profile = GetUserProfile();
             EnsurePetGrowthList(profile, petId);
 
-            var current = ClampPetGrowth(profile.PetGrowth[petId]);
-            checked { current += amount; }
-            current = current > PetMaxGrowthThreshold ? PetMaxGrowthThreshold : current;
+            var current = NormalizePetGrowthValue(profile.PetGrowth[petId]);
+            checked
+            {
+                current += amount;
+            }
 
             profile.PetGrowth[petId] = current;
             SaveUserProfile(profile);
@@ -637,7 +663,7 @@ public class LocalDataService
             var profile = GetUserProfile();
             EnsurePetGrowthList(profile, petId);
 
-            var current = ClampPetGrowth(profile.PetGrowth[petId]);
+            var current = NormalizePetGrowthValue(profile.PetGrowth[petId]);
             var newValue = current - amount;
             if (newValue < 0)
             {
@@ -680,6 +706,59 @@ public class LocalDataService
     }
 
     /// <summary>
+    /// 返回会话历史明细（包含可读时间和日期字段，不包含汇总）。
+    /// </summary>
+    public List<SessionHistoryRecordView> GetSessionHistoryRecords()
+    {
+        lock (_fileLock)
+        {
+            var list = GetSessionHistory();
+
+            return list
+                .OrderByDescending(x => x.Ts)
+                .Select(x =>
+                {
+                    var localTime = DateTimeOffset.FromUnixTimeMilliseconds(x.Ts).ToLocalTime();
+                    return new SessionHistoryRecordView
+                    {
+                        Ts = x.Ts,
+                        Time = localTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        Date = localTime.ToString("yyyy-MM-dd"),
+                        Minutes = x.Minutes,
+                        Note = x.Note,
+                        Outcome = x.Outcome ?? "success"
+                    };
+                })
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// 按日期汇总会话历史（本地时区）。
+    /// </summary>
+    public List<SessionHistoryDailySummaryItem> GetSessionHistoryDailySummary()
+    {
+        lock (_fileLock)
+        {
+            var records = GetSessionHistoryRecords();
+
+            return records
+                .GroupBy(x => x.Date, StringComparer.Ordinal)
+                .Select(g => new SessionHistoryDailySummaryItem
+                {
+                    Date = g.Key,
+                    Sessions = g.Count(),
+                    TotalMinutes = g.Sum(x => Math.Max(0, x.Minutes)),
+                    Success = g.Count(x => string.Equals(x.Outcome, "success", StringComparison.OrdinalIgnoreCase)),
+                    Failed = g.Count(x => string.Equals(x.Outcome, "failed", StringComparison.OrdinalIgnoreCase)),
+                    Aborted = g.Count(x => string.Equals(x.Outcome, "aborted", StringComparison.OrdinalIgnoreCase))
+                })
+                .OrderByDescending(x => x.Date)
+                .ToList();
+        }
+    }
+
+    /// <summary>
     /// 追加一条专注会话历史记录到 session_history.json。
     /// </summary>
     public void AddSessionHistory(SessionHistoryItem entry)
@@ -688,10 +767,88 @@ public class LocalDataService
         {
             var list = GetSessionHistory();
             list.Add(entry);
+            SaveSessionHistoryList(list);
+        }
+    }
 
-            var path = LocalStoragePaths.SessionHistoryFilePath;
-            var json = JsonSerializer.Serialize(list, JsonOptions);
-            File.WriteAllText(path, json);
+    public LocalArchiveExportData ExportArchive()
+    {
+        lock (_fileLock)
+        {
+            return new LocalArchiveExportData
+            {
+                SchemaVersion = 1,
+                ExportedAt = DateTimeOffset.UtcNow,
+                UserProfile = GetUserProfile(),
+                SessionHistory = GetSessionHistory(),
+                WhitelistPresets = GetWhitelistPresets()
+            };
+        }
+    }
+
+    public LocalArchiveImportResult ImportArchive(LocalArchiveExportData archive)
+    {
+        if (archive is null)
+        {
+            throw new ArgumentNullException(nameof(archive));
+        }
+
+        if (archive.UserProfile is null)
+        {
+            throw new ArgumentException("userProfile is required.");
+        }
+
+        archive.SessionHistory ??= new List<SessionHistoryItem>();
+        archive.WhitelistPresets ??= new List<WhitelistPreset>();
+
+        lock (_fileLock)
+        {
+            BackupArchiveFiles();
+
+            SaveUserProfile(archive.UserProfile);
+            SaveSessionHistoryList(archive.SessionHistory);
+            SaveWhitelistPresetList(archive.WhitelistPresets);
+
+            return new LocalArchiveImportResult
+            {
+                SchemaVersion = archive.SchemaVersion,
+                SessionHistoryCount = archive.SessionHistory.Count,
+                WhitelistPresetCount = archive.WhitelistPresets.Count,
+                ImportedAt = DateTimeOffset.UtcNow
+            };
+        }
+    }
+
+    private void SaveSessionHistoryList(List<SessionHistoryItem> list)
+    {
+        var path = LocalStoragePaths.SessionHistoryFilePath;
+        var json = JsonSerializer.Serialize(list, JsonOptions);
+        File.WriteAllText(path, json);
+    }
+
+    private void SaveWhitelistPresetList(List<WhitelistPreset> presets)
+    {
+        var path = LocalStoragePaths.WhitelistPresetsFilePath;
+        var json = JsonSerializer.Serialize(presets, JsonOptions);
+        File.WriteAllText(path, json);
+    }
+
+    private void BackupArchiveFiles()
+    {
+        var backupDir = Path.Combine(LocalStoragePaths.BaseDirectory, "backups");
+        Directory.CreateDirectory(backupDir);
+
+        var suffix = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+        BackupIfExists(LocalStoragePaths.UserProfileFilePath, Path.Combine(backupDir, $"user_profile.{suffix}.bak.json"));
+        BackupIfExists(LocalStoragePaths.SessionHistoryFilePath, Path.Combine(backupDir, $"session_history.{suffix}.bak.json"));
+        BackupIfExists(LocalStoragePaths.WhitelistPresetsFilePath, Path.Combine(backupDir, $"whitelist_presets.{suffix}.bak.json"));
+    }
+
+    private static void BackupIfExists(string sourcePath, string targetPath)
+    {
+        if (File.Exists(sourcePath))
+        {
+            File.Copy(sourcePath, targetPath, overwrite: true);
         }
     }
 

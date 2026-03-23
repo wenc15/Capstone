@@ -17,13 +17,13 @@ const ROWS = 20;
 const EMPTY = 0;
 
 const TETROMINOES = {
-  I: { shape: [[1,1,1,1]], color: '#00f5ff' },
-  O: { shape: [[1,1],[1,1]], color: '#ffeb3b' },
-  T: { shape: [[0,1,0],[1,1,1]], color: '#9c27b0' },
-  S: { shape: [[0,1,1],[1,1,0]], color: '#4caf50' },
-  Z: { shape: [[1,1,0],[0,1,1]], color: '#f44336' },
-  J: { shape: [[1,0,0],[1,1,1]], color: '#2196f3' },
-  L: { shape: [[0,0,1],[1,1,1]], color: '#ff9800' },
+  I: { shape: [[1,1,1,1]], color: '#6de6ff', accent: '#dffbff' },
+  O: { shape: [[1,1],[1,1]], color: '#ffd76a', accent: '#fff4c2' },
+  T: { shape: [[0,1,0],[1,1,1]], color: '#bd8cff', accent: '#f2e3ff' },
+  S: { shape: [[0,1,1],[1,1,0]], color: '#7ef0b5', accent: '#e0fff1' },
+  Z: { shape: [[1,1,0],[0,1,1]], color: '#ff7d9d', accent: '#ffe0e8' },
+  J: { shape: [[1,0,0],[1,1,1]], color: '#7db8ff', accent: '#dfefff' },
+  L: { shape: [[0,0,1],[1,1,1]], color: '#ffb36b', accent: '#fff0df' },
 };
 
 const LEVEL_SPEED = [800, 711, 633, 564, 502, 447, 398, 354, 315, 281, 250, 222, 198, 175, 155, 138, 122, 108, 96, 85];
@@ -143,7 +143,7 @@ function lockPiece(board, piece, x, y) {
       if (piece.shape[row][col]) {
         const newY = y + row;
         const newX = x + col;
-        if (newY >= 0) board[newY][newX] = piece.color;
+        if (newY >= 0) board[newY][newX] = piece.type;
         else overflow = true;
       }
     }
@@ -313,7 +313,7 @@ function renderBoard(els, st) {
           const y = st.currentY + row;
           const x = st.currentX + col;
           if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
-            tempBoard[y][x] = st.currentPiece.color;
+            tempBoard[y][x] = st.currentPiece.type;
           }
         }
       }
@@ -325,8 +325,11 @@ function renderBoard(els, st) {
       const cell = document.createElement('div');
       cell.className = 'tet-cell';
       if (tempBoard[y][x] !== EMPTY) {
+        const skin = getPieceSkin(tempBoard[y][x]);
         cell.classList.add('tet-filled');
-        cell.style.backgroundColor = tempBoard[y][x];
+        if (skin.type) cell.dataset.piece = skin.type;
+        cell.style.setProperty('--tet-fill', skin.color);
+        cell.style.setProperty('--tet-accent', skin.accent);
       }
       display.appendChild(cell);
     }
@@ -352,11 +355,29 @@ function renderNext(els, st) {
       cell.className = 'tet-cell tet-next-cell';
       if (piece.shape[y][x]) {
         cell.classList.add('tet-filled');
-        cell.style.backgroundColor = piece.color;
+        cell.dataset.piece = piece.type;
+        cell.style.setProperty('--tet-fill', piece.color);
+        cell.style.setProperty('--tet-accent', piece.accent);
       }
       display.appendChild(cell);
     }
   }
+}
+
+function getPieceSkin(value) {
+  if (typeof value === 'string' && TETROMINOES[value]) {
+    return {
+      type: value,
+      color: TETROMINOES[value].color,
+      accent: TETROMINOES[value].accent,
+    };
+  }
+
+  return {
+    type: '',
+    color: typeof value === 'string' ? value : '#8aa4ff',
+    accent: '#ecf2ff',
+  };
 }
 
 function showTetrisView(els) {

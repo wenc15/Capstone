@@ -1,3 +1,9 @@
+// 2026/03/09 edited by Zikai Lu
+// 新增内容：
+//   - 在用户 Profile 中增加 Collection 字典（收藏品拥有状态，0/1）。
+// 新增的作用：
+//   - 为收藏系统提供本地持久化数据源，记录皮肤等收藏品的拥有状态。
+// =============================================================
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 在用户 Profile 中增加 Inventory 字典，用于存储物品及其数量。
@@ -37,15 +43,6 @@
 //   - Credits:           当前点数余额（按专注分钟数累计）
 // 开发者（Profile 部分）：Zikai Lu
 // =============================================================
-// 2026/03/14 edited by JS
-// Changes:
-//   - Add pet ownership state (ActivePetId / UnlockedPetIds).
-//   - Default active/unlocked pet to 3.
-
-// 2026/03/14 edited by JS
-// Changes:
-//   - Track the current "feeding" pet separately (FeedingPetId).
-//   - Buying a new pet is gated by FeedingPetId reaching max level.
 
 using System;
 using System.Collections.Generic;
@@ -83,28 +80,32 @@ public class UserProfile
     public List<int> PetGrowth { get; set; } = new();
 
     /// <summary>
-    /// 当前激活的宠物编号。
-    /// 约定：本版本仅有 1/2/3 三只宠物；默认使用宠物 3。
-    /// </summary>
-    public int ActivePetId { get; set; } = 3;
-
-    /// <summary>
-    /// 当前正在喂养/推进进度的宠物编号。
-    /// 规则：必须让这只宠物满级（Lv20）才能购买下一只新宠物。
-    /// </summary>
-    public int FeedingPetId { get; set; } = 3;
-
-    /// <summary>
-    /// 已解锁/拥有的宠物编号列表。
-    /// 默认解锁宠物 3。
-    /// </summary>
-    public List<int> UnlockedPetIds { get; set; } = new() { 3 };
-
-    /// <summary>
     /// 背包物品字典，key 为物品 id，value 为数量。
     /// 未包含的物品视为数量 0。
     /// </summary>
     public Dictionary<string, int> Inventory { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Collection 收藏品状态字典，key 为收藏品 id，value 为 0 或 1。
+    /// - 0: 未拥有
+    /// - 1: 已拥有
+    /// </summary>
+    public Dictionary<string, int> Collection { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 当前激活宠物 id。
+    /// </summary>
+    public int ActivePetId { get; set; } = 3;
+
+    /// <summary>
+    /// 当前喂养中的宠物 id。
+    /// </summary>
+    public int FeedingPetId { get; set; } = 3;
+
+    /// <summary>
+    /// 已解锁宠物 id 列表。
+    /// </summary>
+    public List<int> UnlockedPetIds { get; set; } = new() { 3 };
 
     /// <summary>
 /// Achievement counters (event-style), e.g.:

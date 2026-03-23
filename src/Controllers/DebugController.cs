@@ -1,9 +1,6 @@
 #if DEBUG
 // 2026/01/22 created by <your name>
 // =============================================================
-// 2026/03/14 edited by JS
-// Changes:
-//   - Add a debug endpoint to set credits for testing.
 // 文件：DebugController.cs
 // 作用：提供开发/测试用的调试接口，不会在 Release 构建中启用。
 // 功能：
@@ -60,18 +57,6 @@ public class DebugController : ControllerBase
             totalSuccessfulSessions = profile.SuccessfulSessions,
             totalFocusSeconds = profile.TotalFocusSeconds
         });
-    }
-
-    /// <summary>
-    /// Set credits (tokens) to an exact value for testing.
-    /// Example:
-    ///   POST /api/debug/set-credits?amount=1000
-    /// </summary>
-    [HttpPost("set-credits")]
-    public IActionResult SetCredits([FromQuery] int amount = 0)
-    {
-        var credits = _localData.SetCredits(amount);
-        return Ok(new { credits });
     }
 }
 #endif

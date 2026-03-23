@@ -223,6 +223,8 @@ function renderBoard(els, st) {
         cell.classList.add('snake-head');
       } else if (val === SNAKE) {
         cell.classList.add('snake-body');
+        const depth = Math.min(st.snake.findIndex((segment) => segment.x === x && segment.y === y), 9);
+        cell.style.setProperty('--snake-depth', String(depth < 0 ? 0 : depth));
       }
       display.appendChild(cell);
     }

@@ -1,0 +1,4 @@
+[
+  { "itemId": "skin_tetris_starlit", "displayName": "Starlit Tetris Skin", "rarity": "Epic", "category": "minigame", "game": "tetris" },
+  { "itemId": "skin_snake_nebula", "displayName": "Nebula Snake Skin", "rarity": "Epic", "category": "minigame", "game": "snake" }
+]

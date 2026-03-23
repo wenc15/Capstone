@@ -42,7 +42,6 @@ using CapstoneBackend.Services;
 using CapstoneBackend.Data;
 using CapstoneBackend.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Text.Json;
 
@@ -82,7 +81,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 //   - 成就状态依赖 LocalDataService（同为 Singleton），保持一致的本地数据读写与线程安全
 builder.Services.AddSingleton<AchievementService>();
 
+// 注册皮肤目录服务（从 skins.json 读取并缓存）
+builder.Services.AddSingleton<SkinCatalogService>();
 
+// 注册 Skin Pool 抽卡服务
+builder.Services.AddScoped<ISkinGachaService, SkinGachaService>();
 
 
 // 配置 CORS：开发阶段允许本地前端自由访问
@@ -101,60 +104,12 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-static void EnsureSqliteTablesForNewFeatures(AppDbContext db)
-{
-    // NOTE:
-    // This project uses EnsureCreated() (no migrations).
-    // EnsureCreated() does not add new tables once an existing DB already has tables.
-    // For local/dev DB files created before Food/Card systems existed, we create missing tables additively.
-
-    db.Database.ExecuteSqlRaw(@"
-CREATE TABLE IF NOT EXISTS FoodDefinitions (
-  Id INTEGER PRIMARY KEY AUTOINCREMENT,
-  FoodId TEXT NOT NULL,
-  Name TEXT NOT NULL,
-  Rarity TEXT NULL,
-  ExpValue INTEGER NOT NULL,
-  ImageKey TEXT NULL,
-  IsEnabled INTEGER NOT NULL
-);");
-
-    db.Database.ExecuteSqlRaw(@"
-CREATE TABLE IF NOT EXISTS UserFoods (
-  Id INTEGER PRIMARY KEY AUTOINCREMENT,
-  UserId TEXT NOT NULL,
-  FoodId TEXT NOT NULL,
-  ObtainedAt TEXT NOT NULL,
-  Count INTEGER NOT NULL
-);");
-
-    db.Database.ExecuteSqlRaw(@"
-CREATE TABLE IF NOT EXISTS CardDefinitions (
-  Id INTEGER PRIMARY KEY,
-  Name TEXT NOT NULL,
-  Rarity TEXT NULL,
-  ImageKey TEXT NULL,
-  IsEnabled INTEGER NOT NULL
-);");
-
-    db.Database.ExecuteSqlRaw(@"
-CREATE TABLE IF NOT EXISTS UserCards (
-  Id INTEGER PRIMARY KEY AUTOINCREMENT,
-  UserId TEXT NOT NULL,
-  CardDefinitionId INTEGER NOT NULL,
-  ObtainedAt TEXT NOT NULL,
-  Count INTEGER NOT NULL
-);");
-}
-
 // 应用启动时自动创建数据库（如果不存在）
 // 方便开发阶段使用，无需手动跑迁移。
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
-
-    EnsureSqliteTablesForNewFeatures(db);
 
     // -------------------------------------------------------------
     // Seed/Sync FoodDefinitions from Data/foods.json (dev-friendly, no hardcode)
@@ -180,18 +135,8 @@ using (var scope = app.Services.CreateScope())
             .ToList();
 
         // Upsert by FoodId
-        Dictionary<string, FoodDefinition> existing;
-        try
-        {
-            existing = await db.FoodDefinitions
-                .ToDictionaryAsync(f => f.FoodId, StringComparer.OrdinalIgnoreCase);
-        }
-        catch (SqliteException ex) when (ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase))
-        {
-            EnsureSqliteTablesForNewFeatures(db);
-            existing = await db.FoodDefinitions
-                .ToDictionaryAsync(f => f.FoodId, StringComparer.OrdinalIgnoreCase);
-        }
+        var existing = await db.FoodDefinitions
+            .ToDictionaryAsync(f => f.FoodId, StringComparer.OrdinalIgnoreCase);
 
         foreach (var f in normalized)
         {
