@@ -6,6 +6,12 @@
     - Add a small +1000 token test button in topbar.
     - Add a Pet view Backpack button.
 -->
+<!--
+  2026/03/19 edited by Zhecheng Xu
+  Changes:
+    - Add Settings entry button in topbar.
+    - Add Data Management modal for archive export/import.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -19,10 +25,13 @@
     <header class="topbar">
       <div class="brand">Growin</div>
       <div class="weather-chip">☁️ <span>16°C</span></div>
-      <div class="token-chip">
-        <span aria-hidden="true">🪙</span>
-        <span id="tokenValue">0</span>
-        <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button>
+      <div class="topbar-actions">
+        <button class="settings-btn" id="settingsOpenBtn" type="button" aria-label="Open settings">⚙️ Settings</button>
+        <div class="token-chip">
+          <span aria-hidden="true">🪙</span>
+          <span id="tokenValue">0</span>
+          <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button>
+        </div>
       </div>
     </header>
 
@@ -438,6 +447,35 @@
         <button class="relax-btn" id="relaxLaterBtn" type="button">Not Now</button>
       </div>
     </div>
+  </div>
+
+  <div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
+    <section class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings data management">
+      <div class="settings-head">
+        <h2 class="settings-title">Data Management</h2>
+        <button class="settings-close" id="settingsCloseBtn" type="button" aria-label="Close settings">×</button>
+      </div>
+
+      <div class="settings-grid">
+        <article class="settings-card">
+          <h3>Export Your Data</h3>
+          <ul>
+            <li>Focus history</li>
+            <li>Profile statistics</li>
+            <li>Whitelist presets</li>
+          </ul>
+          <button class="settings-action" id="archiveExportBtn" type="button">Export Data</button>
+        </article>
+
+        <article class="settings-card">
+          <h3>Import Existing Data</h3>
+          <p class="settings-note">This will overwrite your current data.</p>
+          <input id="archiveImportFile" type="file" accept=".json,application/json" />
+          <button class="settings-action" id="archiveImportBtn" type="button" disabled>Import Data</button>
+          <div class="settings-meta" id="archiveImportMeta"></div>
+        </article>
+      </div>
+    </section>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

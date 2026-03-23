@@ -1,3 +1,7 @@
+// 2026/03/19 edited by Zhecheng Xu
+// Changes:
+//  - Mount Settings module for archive export/import UI.
+
 // 2026/01/28 edited by JS
 // Changes:
 //  - Mount Store UI module alongside existing views.
@@ -20,6 +24,7 @@ import { mountMusic } from './js/music.js';
 import { mountDiceBuild } from './js/minigame_dicebuild.js';
 import { mountRelaxPrompt } from './js/relax_prompt.js';
 import { mountMinigameDevtools } from './js/minigame_devtools.js';
+import { mountSettings } from './js/settings.js';
 const els = collectDom();      // ← 现在 DOM 都来自这里
 
 mountWidget();
@@ -34,6 +39,7 @@ mountMusic();
 mountDiceBuild(els);
 mountRelaxPrompt(els);
 mountMinigameDevtools(els);
+mountSettings(els);
 // 2026/1/22 edited by JS:
 // 修改内容：
 //   - 引入 Credits 前端状态管理。
