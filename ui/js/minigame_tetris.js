@@ -1,9 +1,12 @@
-// minigame_tetris.js
-// A Tetris minigame prototype.
-// Notes:
-//  - Local-only singleplayer; state stored in localStorage.
-//  - Access is gated by relax_prompt eligibility.
-//  - MVP supports classic Tetris gameplay with scoring and levels.
+// 2026/03/23 edited by Zikai Lu
+// Changes:
+//  - Add and keep the starlit Tetris skin (starfield visible only through filled blocks).
+//  - Restore classic Tetris visuals as the default skin for normal gameplay.
+//  - Keep skin state structure in save data for future skin switching integration.
+// =============================================================
+// File: minigame_tetris.js
+// Purpose: local Tetris gameplay loop, rendering, and persisted state.
+// =============================================================
 
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
@@ -11,6 +14,7 @@ import { showToast } from './utils.js';
 
 const SAVE_KEY = 'tetris.save.v1';
 const HIST_KEY = 'tetris.history.v1';
+const DEFAULT_SKIN_ID = 'default';
 
 const COLS = 10;
 const ROWS = 20;
@@ -27,6 +31,15 @@ const TETROMINOES = {
 };
 
 const LEVEL_SPEED = [800, 711, 633, 564, 502, 447, 398, 354, 315, 281, 250, 222, 198, 175, 155, 138, 122, 108, 96, 85];
+
+const TETRIS_SKINS = {
+  default: {
+    boardClass: '',
+  },
+  skin_tetris_starlit: {
+    boardClass: 'tetris-skin-starlit',
+  },
+};
 
 function endGame(st, els) {
   st.gameOver = true;
@@ -58,7 +71,14 @@ function defaultState() {
     currentY: 0,
     dropInterval: null,
     lastDrop: 0,
+    skinId: DEFAULT_SKIN_ID,
   };
+}
+
+function normalizeLoadedState(raw) {
+  if (!raw || raw.version !== 1) return null;
+  const skinId = DEFAULT_SKIN_ID;
+  return { ...raw, skinId };
 }
 
 function readJson(key, fallback) {
@@ -85,7 +105,7 @@ function save(st) {
 
 function load() {
   const st = readJson(SAVE_KEY, null);
-  return st && st.version === 1 ? st : null;
+  return normalizeLoadedState(st);
 }
 
 function pushHistory(entry) {
@@ -278,6 +298,15 @@ function getSpeed(level) {
 
 function render(els, st) {
   if (!els || !st) return;
+
+  if (els.tetRoot) {
+    const skin = TETRIS_SKINS[st.skinId] || TETRIS_SKINS[DEFAULT_SKIN_ID];
+    for (const entry of Object.values(TETRIS_SKINS)) {
+      if (entry.boardClass) els.tetRoot.classList.remove(entry.boardClass);
+    }
+    els.tetRoot.dataset.tetrisSkin = st.skinId;
+    if (skin.boardClass) els.tetRoot.classList.add(skin.boardClass);
+  }
 
   if (els.tetScore) els.tetScore.textContent = st.score;
   if (els.tetLevel) els.tetLevel.textContent = st.level;
