@@ -244,6 +244,50 @@ body{
     background:#fafbfa; color:var(--sub); font-size:15px; cursor:pointer; width: fit-content;
 }
 
+.collection-short-meta{
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--sub);
+    font-weight: 700;
+}
+
+.collection-short-list{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.collection-short-chip{
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    border: 1px solid rgba(196, 208, 201, 0.95);
+    background: rgba(248, 251, 249, 0.95);
+    position: relative;
+    overflow: hidden;
+}
+
+.collection-short-chip.is-unowned{
+    filter: grayscale(1);
+}
+
+.collection-short-chip.is-unowned::after{
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(130, 138, 146, 0.42);
+}
+
+.collection-short-empty{
+    color: var(--sub);
+    font-size: 13px;
+}
+
 /* Floating widget placeholder */
 .floating-widget {
     position: absolute; left: 40px; top: 425px;
@@ -1283,6 +1327,32 @@ body{
   text-align: center;
   color: rgba(47, 58, 52, 0.70);
   font-weight: 800;
+}
+
+.collection-row .bag-ico{
+  position: relative;
+  overflow: hidden;
+}
+
+.collection-row.is-unowned .bag-ico{
+  filter: grayscale(1);
+}
+
+.collection-row.is-unowned .bag-ico::after{
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(130, 138, 146, 0.42);
+}
+
+.collection-state.is-owned{
+  background: rgba(215, 242, 224, 0.95);
+  color: rgba(26, 94, 56, 0.92);
+}
+
+.collection-state.is-unowned{
+  background: rgba(234, 237, 240, 0.96);
+  color: rgba(80, 92, 104, 0.9);
 }
 
 @media (max-width: 860px){

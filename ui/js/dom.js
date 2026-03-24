@@ -36,6 +36,9 @@ export function collectDom() {
 
   // Whitelist checkbox group container (replaces old <select id="whitelistSelect">)
   const whitelistGroup = document.getElementById('whitelistGroup');
+  const openCollectionBtn = document.getElementById('openCollectionBtn');
+  const collectionPreviewShort = document.getElementById('collectionPreviewShort');
+  const collectionOwnedMeta = document.getElementById('collectionOwnedMeta');
 
   // ===== View switching =====
   const viewTimer = document.getElementById('view-timer');
@@ -160,6 +163,9 @@ export function collectDom() {
     focusLast,
     toastEl,
     whitelistGroup,
+    openCollectionBtn,
+    collectionPreviewShort,
+    collectionOwnedMeta,
 
     // Views & Nav
     viewTimer,
