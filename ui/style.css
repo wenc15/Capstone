@@ -1,3 +1,10 @@
+/* 2026/03/23 edited by Zikai Lu
+ * Changes:
+ *  - Add "starlit" Tetris skin styles with a continuous colorful starfield.
+ *  - Implement mask-like behavior: only filled blocks reveal the starfield; empty cells stay black.
+ *  - Keep classic Tetris styling unchanged so it remains the default visual theme.
+ */
+
 /* 2026/03/19 edited by Zhecheng Xu
  * Changes:
  *  - Add Settings entry/data-management modal visuals.
@@ -2835,6 +2842,83 @@ body{
     linear-gradient(135deg, var(--tet-accent, #eef5ff) 0%, var(--tet-fill, #7db8ff) 45%, color-mix(in srgb, var(--tet-fill, #7db8ff) 72%, #091121 28%) 100%);
   border: 1px solid color-mix(in srgb, var(--tet-accent, #eef5ff) 38%, rgba(255,255,255,0.2) 62%);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 12px color-mix(in srgb, var(--tet-fill, #7db8ff) 46%, transparent 54%);
+}
+
+.tetris-root.tetris-skin-starlit .tetris-board-wrap {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.tetris-root.tetris-skin-starlit .tetris-board {
+  gap: 0;
+  padding: 0;
+  background-color: #050b33;
+  background-image:
+    conic-gradient(from 210deg at 16% 22%, rgba(63,132,255,0.68) 0deg, rgba(21,58,188,0.12) 70deg, rgba(100,196,255,0.62) 135deg, rgba(22,43,153,0.14) 230deg, rgba(63,132,255,0.68) 360deg),
+    conic-gradient(from 42deg at 74% 24%, rgba(88,205,255,0.56) 0deg, rgba(21,74,210,0.1) 88deg, rgba(137,228,255,0.48) 170deg, rgba(8,29,123,0.1) 260deg, rgba(88,205,255,0.56) 360deg),
+    conic-gradient(from 190deg at 30% 82%, rgba(92,169,255,0.5) 0deg, rgba(18,57,176,0.1) 76deg, rgba(129,220,255,0.45) 160deg, rgba(13,36,129,0.1) 240deg, rgba(92,169,255,0.5) 360deg),
+    radial-gradient(circle at 51% 47%, rgba(255,222,79,0.88) 0 5%, rgba(255,245,181,0.65) 5.2% 8%, transparent 8.2%),
+    radial-gradient(circle at 17% 19%, rgba(188,236,255,0.9) 0 4.2%, rgba(133,204,255,0.55) 4.3% 6.8%, transparent 7%),
+    radial-gradient(circle at 75% 24%, rgba(183,239,255,0.86) 0 3.7%, rgba(120,202,255,0.5) 3.8% 6.2%, transparent 6.4%),
+    radial-gradient(circle at 32% 81%, rgba(171,228,255,0.82) 0 3.4%, rgba(108,185,255,0.45) 3.5% 6%, transparent 6.2%),
+    radial-gradient(circle at 61% 71%, rgba(255,236,116,0.72) 0 2.9%, rgba(255,246,194,0.45) 3% 4.9%, transparent 5.1%),
+    radial-gradient(circle at 8% 12%, rgba(255,255,255,0.9) 0 1.2px, transparent 1.4px),
+    radial-gradient(circle at 23% 37%, rgba(240,248,255,0.82) 0 1.1px, transparent 1.3px),
+    radial-gradient(circle at 36% 15%, rgba(255,255,255,0.88) 0 1.2px, transparent 1.4px),
+    radial-gradient(circle at 53% 61%, rgba(220,235,255,0.8) 0 1.15px, transparent 1.35px),
+    radial-gradient(circle at 69% 39%, rgba(255,247,224,0.86) 0 1.2px, transparent 1.4px),
+    radial-gradient(circle at 88% 16%, rgba(255,255,255,0.9) 0 1.2px, transparent 1.4px),
+    radial-gradient(circle at 13% 73%, rgba(206,228,255,0.8) 0 1.15px, transparent 1.35px),
+    radial-gradient(circle at 47% 89%, rgba(255,255,255,0.86) 0 1.2px, transparent 1.4px),
+    radial-gradient(circle at 82% 82%, rgba(215,236,255,0.8) 0 1.15px, transparent 1.35px),
+    linear-gradient(180deg, #123fbe 0%, #0f2f9d 24%, #0a1f77 48%, #07134e 72%, #040a2a 100%);
+  background-blend-mode: screen, screen, screen, screen, screen, screen, screen, screen, normal, normal, normal, normal, normal, normal, normal, normal, normal, normal;
+  overflow: hidden;
+}
+
+.tetris-root.tetris-skin-starlit .tet-cell {
+  background: #000;
+  border: 1px solid rgba(32, 46, 72, 0.7);
+}
+
+.tetris-root.tetris-skin-starlit .tet-cell.tet-filled {
+  background: transparent;
+  border: 1px solid rgba(232, 242, 255, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+}
+
+.tetris-root.tetris-skin-starlit .tetris-next-piece {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #050b18 0%, #02060f 100%);
+}
+
+.tetris-root.tetris-skin-starlit .tetris-next-piece::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 8px;
+  background:
+    conic-gradient(from 210deg at 26% 30%, rgba(70,150,255,0.55) 0deg, rgba(26,70,196,0.08) 120deg, rgba(119,214,255,0.45) 220deg, rgba(70,150,255,0.55) 360deg),
+    radial-gradient(circle at 64% 62%, rgba(255,227,102,0.7) 0 14%, rgba(255,246,196,0.4) 15% 21%, transparent 22%),
+    radial-gradient(circle at 18% 24%, rgba(255,255,255,0.9) 0 1px, transparent 1.2px),
+    radial-gradient(circle at 72% 62%, rgba(185,215,255,0.85) 0 1px, transparent 1.2px),
+    linear-gradient(180deg, #133ea8 0%, #0a246f 52%, #040c2a 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.tetris-root.tetris-skin-starlit .tet-next-cell {
+  position: relative;
+  z-index: 1;
+  background: rgba(4, 8, 18, 0.98);
+  border: 1px solid rgba(58, 83, 128, 0.52);
+}
+
+.tetris-root.tetris-skin-starlit .tet-next-cell.tet-filled {
+  background: transparent;
+  border: 1px solid rgba(232, 242, 255, 0.95);
 }
 
 .tet-cell.tet-ghost {
