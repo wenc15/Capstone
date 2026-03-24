@@ -19,6 +19,11 @@
 // Collects all DOM elements needed across the UI.
 
 export function collectDom() {
+  // ===== Topbar =====
+  const weatherChip = document.getElementById('weatherChip');
+  const weatherIcon = document.getElementById('weatherIcon');
+  const weatherTemp = document.getElementById('weatherTemp');
+
   // ===== Timer area =====
   const display   = document.getElementById('timerDisplay');
   const startBtn  = document.getElementById('startBtn');
@@ -141,6 +146,10 @@ export function collectDom() {
   const sidebarPetPreview = document.getElementById('sidebarPetPreview');
 
   return {
+    weatherChip,
+    weatherIcon,
+    weatherTemp,
+
     // Timer
     display,
     startBtn,

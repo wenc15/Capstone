@@ -25,9 +25,11 @@ import { mountDiceBuild } from './js/minigame_dicebuild.js';
 import { mountRelaxPrompt } from './js/relax_prompt.js';
 import { mountMinigameDevtools } from './js/minigame_devtools.js';
 import { mountSettings } from './js/settings.js';
+import { mountWeather } from './js/weather.js';
 const els = collectDom();      // ← 现在 DOM 都来自这里
 
 mountWidget();
+mountWeather(els);
 mountTimer(els);
 mountNav(els);
 mountPet(els);  

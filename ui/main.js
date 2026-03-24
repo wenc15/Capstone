@@ -14,7 +14,7 @@
 //   - Widget 支持从托盘随时显示/隐藏，避免 close 后无法恢复的问题。
 // =============================================================
 
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, session } = require('electron');
 
 const { placeBallAtOldWidgetSpot } = require('./js/ballPositioner');
 
@@ -267,6 +267,20 @@ function createTray() {
 
 
 app.whenReady().then(() => {
+  // Allow geolocation for renderer (used by weather module).
+  // Electron does not show Chromium permission prompts by default,
+  // so we handle the permission request here.
+  const ses = session?.defaultSession;
+  if (ses) {
+    ses.setPermissionRequestHandler((webContents, permission, callback) => {
+      if (permission === 'geolocation') {
+        callback(true);
+        return;
+      }
+      callback(false);
+    });
+  }
+
   loadAppSettings();
   createMain();
   createBall();

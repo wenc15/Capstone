@@ -31,7 +31,10 @@
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand">Growin</div>
-      <div class="weather-chip">☁️ <span>16°C</span></div>
+      <div class="weather-chip" id="weatherChip" title="Loading weather...">
+        <span id="weatherIcon" aria-hidden="true">☁️</span>
+        <span id="weatherTemp">--°C</span>
+      </div>
       <div class="topbar-actions">
         <button class="settings-btn" id="settingsOpenBtn" type="button" aria-label="Open settings">⚙️ Settings</button>
         <div class="token-chip">

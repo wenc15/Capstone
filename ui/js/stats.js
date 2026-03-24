@@ -14,6 +14,8 @@ function normalizeSessionsFromBackend(raw) {
 
   const arr = Array.isArray(raw)
     ? raw
+    : Array.isArray(raw.items)
+    ? raw.items
     : Array.isArray(raw.sessions)
     ? raw.sessions
     : [];
@@ -30,15 +32,19 @@ function normalizeSessionsFromBackend(raw) {
     // 2. 处理时长 (转换为分钟)
     const minutesRaw =
       s.minutes ??
+      s.Minutes ??
       s.durationMinutes ??
-      (typeof s.durationSeconds === 'number'
-        ? s.durationSeconds / 60
+      s.totalMinutes ??
+      ((Number(s.durationSeconds) || 0) > 0
+        ? Number(s.durationSeconds) / 60
         : 0);
 
     const minutes = Number(minutesRaw) || 0;
 
     // 3. 处理 Note
     const note = s.note ?? s.appName ?? s.label ?? '';
+
+    const outcome = String(s.outcome ?? s.Outcome ?? s.status ?? '').toLowerCase();
 
     // === ★★★ 核心修复：判断这条记录是否有效 ★★★ ===
     let isValid = true;
@@ -53,7 +59,11 @@ function normalizeSessionsFromBackend(raw) {
     // 如果后端有 isFailed 字段
     if (s.isFailed === true) isValid = false;
     
-    // 如果后端有 status 字段，且状态不是 Completed
+    // 如果后端有 status/outcome 字段，过滤失败/中断
+    if (outcome === 'failed' || outcome === 'aborted' || outcome === 'stopped') {
+      isValid = false;
+    }
+
     if (s.status && s.status !== 'Completed' && s.status !== 'Success') {
         // 假如后端把 'Stopped' 也记录下来了，这里可以过滤掉
         if (s.status === 'Stopped' || s.status === 'Failed' || s.status === 'Aborted') {
