@@ -120,6 +120,9 @@ export function collectDom() {
   const settingsOpenBtn = document.getElementById('settingsOpenBtn');
   const settingsOverlay = document.getElementById('settingsOverlay');
   const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  const settingWidgetStartupVisible = document.getElementById('settingWidgetStartupVisible');
+  const settingCloseBehavior = document.getElementById('settingCloseBehavior');
+  const settingsBehaviorMeta = document.getElementById('settingsBehaviorMeta');
   const archiveExportBtn = document.getElementById('archiveExportBtn');
   const archiveImportFile = document.getElementById('archiveImportFile');
   const archiveImportBtn = document.getElementById('archiveImportBtn');
@@ -209,6 +212,9 @@ export function collectDom() {
     settingsOpenBtn,
     settingsOverlay,
     settingsCloseBtn,
+    settingWidgetStartupVisible,
+    settingCloseBehavior,
+    settingsBehaviorMeta,
     archiveExportBtn,
     archiveImportFile,
     archiveImportBtn,

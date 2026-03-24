@@ -11,6 +11,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   setIgnoreMouse: (ignore) => ipcRenderer.invoke('ball:setIgnore', ignore),
 
+  // app behavior settings
+  getAppSettings: () => ipcRenderer.invoke('appSettings:get'),
+  updateAppSettings: (patch) => ipcRenderer.invoke('appSettings:update', patch),
+
   // status: already have
   emitFocusStatus: (st) => ipcRenderer.send('focus:status', st),
   onFocusStatus: (cb) => ipcRenderer.on('focus:status', (_e, st) => cb(st)),

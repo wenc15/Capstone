@@ -12,6 +12,13 @@
     - Add Settings entry button in topbar.
     - Add Data Management modal for archive export/import.
 -->
+<!--
+  2026/03/22 edited by Zhecheng Xu
+  Changes:
+    - Refine minimal Gacha layout with edge arrows and info button.
+    - Restore food pool headline to "Feed Your Goals".
+    - Add 10x draw subtext: rare food guaranteed.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -155,85 +162,30 @@
         </div>
 
         <div id="view-gacha" style="display:none;">
-          <div class="gacha-stage">
-            <section class="gacha-shell">
-              <div class="gacha-side-panel">
-                <div class="gacha-side-copy">
-                  <div class="gacha-eyebrow" id="gachaEyebrow">Tetris Skin Pool</div>
-                  <h2 class="gacha-heading" id="gachaHeading">Pull food rewards and chase the Tetris epic skin.</h2>
-                  <p class="gacha-description" id="gachaDescription">This pool uses common and rare pet-food rewards for the lower tiers, with the Tetris skin locked to the highest rarity.</p>
-                </div>
+          <div class="gacha-min-stage">
+            <div class="gacha-min-bg-wrap" aria-hidden="true">
+              <div class="gacha-min-bg gacha-bg-food" data-bg-slot="active"></div>
+              <div class="gacha-min-bg" data-bg-slot="incoming"></div>
+            </div>
 
-                <div class="gacha-pool-switch" id="gachaPoolSwitch" aria-label="Choose skin pool">
-                  <button class="gacha-pool-switch-btn is-active" type="button" data-gacha-pool="tetris">Tetris Pool</button>
-                  <button class="gacha-pool-switch-btn" type="button" data-gacha-pool="snake">Snake Pool</button>
-                </div>
+            <button id="gachaPoolPrevBtn" class="gacha-min-nav gacha-min-nav-edge gacha-min-nav-left" type="button" aria-label="Previous pool">&lt;</button>
+            <button id="gachaPoolNextBtn" class="gacha-min-nav gacha-min-nav-edge gacha-min-nav-right" type="button" aria-label="Next pool">&gt;</button>
+            <button id="gachaPoolInfoBtn" class="gacha-min-info" type="button" aria-label="Pool info">i</button>
 
-                <div class="gacha-stats" aria-label="Gacha info">
-                  <div class="gacha-stat-card">
-                    <div class="gacha-stat-label">Current Credits</div>
-                    <div class="gacha-stat-value" id="gachaCreditValue">0</div>
-                  </div>
-                  <div class="gacha-stat-card">
-                    <div class="gacha-stat-label">Single Cost</div>
-                    <div class="gacha-stat-value" id="gachaSingleCost">1</div>
-                  </div>
-                  <div class="gacha-stat-card">
-                    <div class="gacha-stat-label">10x Cost</div>
-                    <div class="gacha-stat-value" id="gachaTenCost">10</div>
-                  </div>
-                </div>
+            <div class="gacha-min-title" id="gachaTitleMain">Feed Your Goals</div>
+            <div class="gacha-min-sub" id="gachaTitleSub">Use food drops to support your pet journey.</div>
+            <div class="gacha-min-current" id="gachaPoolCurrentLabel" style="display:none;">Food Pool</div>
 
-                <div class="gacha-featured-card" id="gachaFeaturedCard">
-                  <div class="gacha-featured-top">
-                    <div>
-                      <div class="gacha-featured-kicker">Featured Pull Preview</div>
-                      <div class="gacha-featured-name" id="gachaFeaturedName">Starlit Tetris Skin</div>
-                    </div>
-                    <div class="gacha-featured-icon" id="gachaFeaturedIcon" aria-hidden="true">🧩</div>
-                  </div>
-                  <div class="gacha-featured-meta" id="gachaFeaturedMeta">Epic skin, Tetris skin</div>
-                </div>
+            <div class="gacha-min-actions">
+              <button class="gacha-btn" id="gachaSingleBtn" type="button">Single Draw</button>
+              <button class="gacha-btn gacha-ten" id="gachaTenBtn" type="button">
+                <span class="gacha-min-ten-main">10x Draw</span>
+                <span class="gacha-min-ten-sub" id="gachaTenSubText">adv. food guaranteed</span>
+              </button>
+            </div>
 
-                <div class="gacha-actions">
-                  <button class="gacha-btn primary gacha-btn-wide" id="gachaSingleBtn" type="button">
-                    <div class="gacha-btn-title">Single Draw</div>
-                    <div class="gacha-btn-sub">Backend single draw</div>
-                  </button>
-
-                  <button class="gacha-btn primary gacha-ten" id="gachaTenBtn" type="button">
-                    <div class="gacha-ten-title">10x Draw</div>
-                    <div class="gacha-ten-sub">Backend ten draw</div>
-                  </button>
-                </div>
-
-                <div class="gacha-footnote" id="gachaFootnote">Tier rates match the backend rules: Common 70%, Rare 25%, Epic 5%, with the two minigame skins reserved for the Epic tier and at least one Epic skin guaranteed on a successful 10x draw when the Epic pool exists.</div>
-              </div>
-
-              <div class="gacha-main-panel">
-                <div class="gacha-title">
-                  <div class="gacha-title-main" id="gachaTitleMain">Starlit Stack</div>
-                  <div class="gacha-title-sub" id="gachaTitleSub">Current backend tetris pool with food rewards in the lower tiers</div>
-                </div>
-
-                <div class="gacha-hero-art">
-                  <div class="gacha-pool-header">
-                    <div>
-                      <div class="gacha-pool-kicker">Pool Preview</div>
-                      <div class="gacha-pool-title">Current Skin Pool</div>
-                    </div>
-                    <div class="gacha-pool-note" id="gachaPoolNote">Tetris Pool uses common and rare pet food below, with Starlit Tetris Skin as the only Epic reward.</div>
-                  </div>
-
-                  <div class="gacha-pool-grid" id="gachaPoolGrid"></div>
-
-                  <div class="gacha-last-draw" id="gachaLastDraw">
-                    <div class="gacha-last-draw-label">Latest Result</div>
-                    <div class="gacha-last-draw-value">No draws yet.</div>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <div id="gachaLastDraw" style="display:none;"><span class="gacha-last-draw-value">No draws yet.</span></div>
+            <div id="gachaCreditValue" style="display:none;">0</div>
           </div>
         </div>
 
@@ -450,13 +402,33 @@
   </div>
 
   <div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
-    <section class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings data management">
+    <section class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings">
       <div class="settings-head">
-        <h2 class="settings-title">Data Management</h2>
+        <h2 class="settings-title">Settings</h2>
         <button class="settings-close" id="settingsCloseBtn" type="button" aria-label="Close settings">×</button>
       </div>
 
       <div class="settings-grid">
+        <article class="settings-card">
+          <h3>App Behavior</h3>
+          <p class="settings-note">Choose startup widget visibility and window close behavior.</p>
+
+          <label class="settings-field-row" for="settingWidgetStartupVisible">
+            <span>Show Widget On Startup</span>
+            <input id="settingWidgetStartupVisible" type="checkbox" checked />
+          </label>
+
+          <label class="settings-field-col" for="settingCloseBehavior">
+            <span>When Clicking Window Close (X)</span>
+            <select id="settingCloseBehavior" class="settings-select">
+              <option value="minimize">Minimize To Tray</option>
+              <option value="exit">Exit App</option>
+            </select>
+          </label>
+
+          <div class="settings-meta" id="settingsBehaviorMeta"></div>
+        </article>
+
         <article class="settings-card">
           <h3>Export Your Data</h3>
           <ul>

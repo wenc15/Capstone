@@ -143,7 +143,7 @@ const PET_SPEECH = {
 };
 
 const FOOD_PRIORITY = [
-  { id: 'adv_food', exp: 30 },
+  { id: 'adv_food', exp: 45 },
   { id: 'meat_snack', exp: 15 },
   { id: 'basic_food', exp: 5 },
 ];
@@ -294,7 +294,7 @@ function speak(petSpeechBubble, text, ms = 1200) {
 }
 
 export function mountPet(els) {
-  const { feedBtn, petMedia, petImage, petSpeechBubble, storeBtn } = els;
+  const { feedBtn, petMedia, petSpeechBubble, storeBtn } = els;
 
   let currentPetId = 3;
   let currentGrowth = 0;
