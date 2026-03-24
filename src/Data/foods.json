@@ -1,11 +1,5 @@
 [
-  { "foodId": "food_common_001", "name": "Apple",  "rarity": "普通", "expValue": 5,  "imageKey": "apple",  "isEnabled": true },
-  { "foodId": "food_common_002", "name": "Bread",  "rarity": "普通", "expValue": 6,  "imageKey": "bread",  "isEnabled": true },
-  { "foodId": "food_common_003", "name": "Milk",   "rarity": "普通", "expValue": 6,  "imageKey": "milk",   "isEnabled": true },
-
-  { "foodId": "food_rare_001",   "name": "Sushi",  "rarity": "稀有", "expValue": 12, "imageKey": "sushi",  "isEnabled": true },
-  { "foodId": "food_rare_002",   "name": "Steak",  "rarity": "稀有", "expValue": 15, "imageKey": "steak",  "isEnabled": true },
-
-  { "foodId": "food_epic_001",   "name": "Cake",   "rarity": "史诗", "expValue": 25, "imageKey": "cake",   "isEnabled": true },
-  { "foodId": "food_epic_002",   "name": "Hotpot", "rarity": "史诗", "expValue": 30, "imageKey": "hotpot", "isEnabled": true }
+  { "foodId": "basic_food", "name": "Basic Food", "rarity": "Common", "expValue": 5, "imageKey": "basic_food", "isEnabled": true },
+  { "foodId": "meat_snack", "name": "Meat Snack", "rarity": "Rare", "expValue": 15, "imageKey": "meat_snack", "isEnabled": true },
+  { "foodId": "adv_food", "name": "Adv. Food", "rarity": "Epic", "expValue": 45, "imageKey": "adv_food", "isEnabled": true }
 ]

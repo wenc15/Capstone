@@ -18,6 +18,7 @@ const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } = require
 
 const { placeBallAtOldWidgetSpot } = require('./js/ballPositioner');
 
+const fs = require('fs');
 const path = require('path');
 const PRELOAD_PATH = path.join(__dirname, 'js', 'preload.js');
 const iconPath = path.join(__dirname, 'assets', 'tray.png');
@@ -26,6 +27,48 @@ let tray = null;
 let isQuitting = false;
 
 let mainWin, ballWin;
+const APP_SETTINGS_FILE = 'growin-ui-settings.json';
+const DEFAULT_APP_SETTINGS = Object.freeze({
+  widgetVisibleOnStartup: true,
+  closeBehavior: 'minimize', // 'minimize' | 'exit'
+});
+let appSettings = { ...DEFAULT_APP_SETTINGS };
+
+function normalizeAppSettings(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  return {
+    widgetVisibleOnStartup: src.widgetVisibleOnStartup !== false,
+    closeBehavior: src.closeBehavior === 'exit' ? 'exit' : 'minimize',
+  };
+}
+
+function getSettingsPath() {
+  return path.join(app.getPath('userData'), APP_SETTINGS_FILE);
+}
+
+function loadAppSettings() {
+  try {
+    const p = getSettingsPath();
+    if (!fs.existsSync(p)) {
+      appSettings = { ...DEFAULT_APP_SETTINGS };
+      return;
+    }
+    const raw = fs.readFileSync(p, 'utf8');
+    appSettings = normalizeAppSettings(JSON.parse(raw));
+  } catch (err) {
+    console.warn('[Settings] Failed to load app settings:', err);
+    appSettings = { ...DEFAULT_APP_SETTINGS };
+  }
+}
+
+function saveAppSettings() {
+  try {
+    const p = getSettingsPath();
+    fs.writeFileSync(p, JSON.stringify(appSettings, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[Settings] Failed to save app settings:', err);
+  }
+}
 
 function createMain() {
   mainWin = new BrowserWindow({
@@ -42,6 +85,13 @@ function createMain() {
     // ✅ 关键：拦截关闭按钮 -> 不退出，改为隐藏到托盘
   mainWin.on('close', (e) => {
     if (isQuitting) return; // 真退出时放行
+
+    if (appSettings.closeBehavior === 'exit') {
+      e.preventDefault();
+      isQuitting = true;
+      app.quit();
+      return;
+    }
 
     e.preventDefault();
     mainWin.hide();
@@ -82,9 +132,11 @@ function createBall() {
   ballWin.loadFile('widget.html');
 
   ballWin.once('ready-to-show', () => {
-    // ✅ 先摆位置再 show
+    // ✅ 先摆位置再按设置决定是否显示
     try { placeBallAtOldWidgetSpot(mainWin, ballWin); } catch {}
-    ballWin.show();
+    if (appSettings.widgetVisibleOnStartup) {
+      ballWin.show();
+    }
   });
   ballWin.on('show', refreshTrayMenu);
   ballWin.on('hide', refreshTrayMenu);
@@ -215,14 +267,19 @@ function createTray() {
 
 
 app.whenReady().then(() => {
+  loadAppSettings();
   createMain();
   createBall();
   createTray(); // ✅ 加这一行
 
   mainWin.webContents.once('did-finish-load', () => {
-  placeBallAtOldWidgetSpot(mainWin, ballWin);
-  ballWin.show();
-});
+    placeBallAtOldWidgetSpot(mainWin, ballWin);
+    if (appSettings.widgetVisibleOnStartup) {
+      ballWin.show();
+    } else {
+      ballWin.hide();
+    }
+  });
 
 
   app.on('activate', () => {
@@ -240,6 +297,23 @@ app.on('window-all-closed', () => {
 // （可选）穿透点击
 ipcMain.handle('ball:setIgnore', (_evt, ignore) => {
   if (ballWin) ballWin.setIgnoreMouseEvents(!!ignore, { forward: true });
+});
+
+ipcMain.handle('appSettings:get', () => ({ ...appSettings }));
+
+ipcMain.handle('appSettings:update', (_evt, patch) => {
+  appSettings = normalizeAppSettings({ ...appSettings, ...(patch || {}) });
+  saveAppSettings();
+
+  if (typeof patch?.widgetVisibleOnStartup === 'boolean' && ballWin) {
+    if (appSettings.widgetVisibleOnStartup) {
+      ballWin.show();
+    } else {
+      ballWin.hide();
+    }
+  }
+
+  return { ...appSettings };
 });
 
 // （可选）IPC 同步状态：作为 BroadcastChannel 的兜底

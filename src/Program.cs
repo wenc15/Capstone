@@ -164,6 +164,18 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
+        var normalizedIds = normalized
+            .Select(f => f.FoodId.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in existing.Values)
+        {
+            if (!normalizedIds.Contains(row.FoodId))
+            {
+                row.IsEnabled = false;
+            }
+        }
+
         await db.SaveChangesAsync();
     }
     else

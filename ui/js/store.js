@@ -24,7 +24,7 @@ const API_BASE = 'http://localhost:5024';
 const PRODUCTS = [
   { id: 'basic_food', name: 'Basic Food', exp: 5, cost: 1, icon: '🥣' },
   { id: 'meat_snack', name: 'Meat Snack', exp: 15, cost: 5, icon: '🍖' },
-  { id: 'adv_food', name: 'Adv. Food', exp: 30, cost: 10, icon: '🐟' },
+  { id: 'adv_food', name: 'Adv. Food', exp: 45, cost: 15, icon: '🐟' },
 ];
 
 const FOOD_MAX_BUY_QTY = 99;
