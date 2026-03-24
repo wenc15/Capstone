@@ -14,6 +14,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // app behavior settings
   getAppSettings: () => ipcRenderer.invoke('appSettings:get'),
   updateAppSettings: (patch) => ipcRenderer.invoke('appSettings:update', patch),
+  setWidgetVisible: (visible) => ipcRenderer.invoke('widget:setVisible', !!visible),
+  onAppSettingsChanged: (cb) => ipcRenderer.on('appSettings:changed', (_e, settings) => cb(settings)),
+  maximizeMainWindowForMinigame: async () => {
+    try {
+      return await ipcRenderer.invoke('main:maximizeForDicebuild');
+    } catch {
+      return false;
+    }
+  },
 
   // status: already have
   emitFocusStatus: (st) => ipcRenderer.send('focus:status', st),

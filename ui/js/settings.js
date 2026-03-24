@@ -11,7 +11,7 @@ import { showToast } from './utils.js';
 const API_BASE = 'http://localhost:5024';
 const APP_SETTINGS_LOCAL_KEY = 'growin:appBehaviorSettings';
 const DEFAULT_APP_SETTINGS = {
-  widgetVisibleOnStartup: true,
+  showWidget: true,
   closeBehavior: 'minimize',
 };
 
@@ -36,19 +36,19 @@ function openSettings(els) {
 }
 
 function resolveAppSettingsFromRenderer(els) {
-  const widgetVisible = els?.settingWidgetStartupVisible?.checked !== false;
+  const showWidget = els?.settingShowWidget?.checked !== false;
   const closeBehavior = els?.settingCloseBehavior?.value === 'exit' ? 'exit' : 'minimize';
-  return { widgetVisibleOnStartup: widgetVisible, closeBehavior };
+  return { showWidget, closeBehavior };
 }
 
 function applyAppSettingsToRenderer(els, settings) {
   const safe = {
-    widgetVisibleOnStartup: settings?.widgetVisibleOnStartup !== false,
+    showWidget: settings?.showWidget ?? (settings?.widgetVisibleOnStartup !== false),
     closeBehavior: settings?.closeBehavior === 'exit' ? 'exit' : 'minimize',
   };
 
-  if (els?.settingWidgetStartupVisible) {
-    els.settingWidgetStartupVisible.checked = safe.widgetVisibleOnStartup;
+  if (els?.settingShowWidget) {
+    els.settingShowWidget.checked = safe.showWidget !== false;
   }
   if (els?.settingCloseBehavior) {
     els.settingCloseBehavior.value = safe.closeBehavior;
@@ -93,6 +93,16 @@ async function loadAppBehaviorSettings(els) {
   }
 }
 
+function bindAppSettingSyncEvents(els) {
+  const api = window.electronAPI;
+  if (!api?.onAppSettingsChanged) return;
+
+  api.onAppSettingsChanged((settings) => {
+    const safe = applyAppSettingsToRenderer(els, settings);
+    saveLocalAppSettings(safe);
+  });
+}
+
 async function saveAppBehaviorSettings(els) {
   const meta = els?.settingsBehaviorMeta;
   const api = window.electronAPI;
@@ -113,6 +123,45 @@ async function saveAppBehaviorSettings(els) {
   } catch (err) {
     console.warn('[Settings] Failed to save app settings:', err);
     if (meta) meta.textContent = 'Saved locally. Restart app to apply desktop behavior.';
+  }
+}
+
+async function saveCloseBehaviorOnly(els) {
+  const meta = els?.settingsBehaviorMeta;
+  const api = window.electronAPI;
+  const closeBehavior = els?.settingCloseBehavior?.value === 'exit' ? 'exit' : 'minimize';
+
+  const localBase = loadLocalAppSettings() || DEFAULT_APP_SETTINGS;
+  const localNext = { ...localBase, closeBehavior };
+  saveLocalAppSettings(localNext);
+
+  if (!api?.updateAppSettings) {
+    if (meta) meta.textContent = 'Saved locally. Restart app to apply desktop behavior.';
+    return;
+  }
+
+  if (meta) meta.textContent = 'Saving...';
+  try {
+    const saved = await api.updateAppSettings({ closeBehavior });
+    const safe = applyAppSettingsToRenderer(els, saved);
+    saveLocalAppSettings(safe);
+    if (meta) meta.textContent = 'Saved.';
+  } catch (err) {
+    console.warn('[Settings] Failed to save close behavior:', err);
+    if (meta) meta.textContent = 'Saved locally. Restart app to apply desktop behavior.';
+  }
+}
+
+async function setWidgetVisibilityDirect(els, visible) {
+  const api = window.electronAPI;
+  if (!api?.setWidgetVisible) return;
+
+  try {
+    const saved = await api.setWidgetVisible(!!visible);
+    const safe = applyAppSettingsToRenderer(els, saved);
+    saveLocalAppSettings(safe);
+  } catch (err) {
+    console.warn('[Settings] Failed to set widget visibility directly:', err);
   }
 }
 
@@ -216,7 +265,7 @@ export function mountSettings(els) {
     settingsOpenBtn,
     settingsOverlay,
     settingsCloseBtn,
-    settingWidgetStartupVisible,
+    settingShowWidget,
     settingCloseBehavior,
     settingsBehaviorMeta,
     archiveExportBtn,
@@ -224,11 +273,12 @@ export function mountSettings(els) {
     archiveImportBtn,
   } = els || {};
 
-  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !settingWidgetStartupVisible || !settingCloseBehavior || !settingsBehaviorMeta) {
+  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !settingShowWidget || !settingCloseBehavior || !settingsBehaviorMeta) {
     return;
   }
 
   loadAppBehaviorSettings(els);
+  bindAppSettingSyncEvents(els);
 
   settingsOpenBtn.addEventListener('click', () => openSettings(els));
   settingsCloseBtn.addEventListener('click', () => closeSettings(els));
@@ -250,6 +300,9 @@ export function mountSettings(els) {
 
   archiveExportBtn.addEventListener('click', () => exportArchive(els));
   archiveImportBtn.addEventListener('click', () => importArchive(els));
-  settingWidgetStartupVisible.addEventListener('change', () => saveAppBehaviorSettings(els));
-  settingCloseBehavior.addEventListener('change', () => saveAppBehaviorSettings(els));
+  settingShowWidget.addEventListener('change', async () => {
+    await setWidgetVisibilityDirect(els, settingShowWidget.checked);
+    if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = 'Saved.';
+  });
+  settingCloseBehavior.addEventListener('change', () => saveCloseBehaviorOnly(els));
 }

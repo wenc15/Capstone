@@ -27,19 +27,58 @@ let tray = null;
 let isQuitting = false;
 
 let mainWin, ballWin;
+let hasAppliedInitialWidgetVisibility = false;
+let isBallReadyToShow = false;
+let pendingWidgetVisibility = null;
 const APP_SETTINGS_FILE = 'growin-ui-settings.json';
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  widgetVisibleOnStartup: true,
+  showWidget: true,
   closeBehavior: 'minimize', // 'minimize' | 'exit'
 });
 let appSettings = { ...DEFAULT_APP_SETTINGS };
 
 function normalizeAppSettings(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
+  const showWidgetRaw =
+    typeof src.showWidget === 'boolean'
+      ? src.showWidget
+      : src.widgetVisibleOnStartup;
+
   return {
-    widgetVisibleOnStartup: src.widgetVisibleOnStartup !== false,
+    showWidget: showWidgetRaw !== false,
     closeBehavior: src.closeBehavior === 'exit' ? 'exit' : 'minimize',
   };
+}
+
+function currentSettingsPayload() {
+  return { ...appSettings };
+}
+
+function broadcastAppSettingsChanged() {
+  if (mainWin && !mainWin.isDestroyed()) {
+    mainWin.webContents.send('appSettings:changed', currentSettingsPayload());
+  }
+}
+
+function setWidgetVisible(visible, { focus = false, save = false, notify = false } = {}) {
+  const v = !!visible;
+
+  appSettings.showWidget = v;
+
+  if (ballWin && !ballWin.isDestroyed()) {
+    if (!isBallReadyToShow) {
+      pendingWidgetVisibility = v;
+    } else if (v) {
+      if (!ballWin.isVisible()) ballWin.show();
+      if (focus) ballWin.focus();
+    } else if (ballWin.isVisible()) {
+      ballWin.hide();
+    }
+  }
+
+  if (save) saveAppSettings();
+  if (notify) broadcastAppSettingsChanged();
+  refreshTrayMenu();
 }
 
 function getSettingsPath() {
@@ -102,6 +141,10 @@ function createMain() {
 }
 
 function createBall() {
+  hasAppliedInitialWidgetVisibility = false;
+  isBallReadyToShow = false;
+  pendingWidgetVisibility = null;
+
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const winSize = 160;
 
@@ -132,18 +175,37 @@ function createBall() {
   ballWin.loadFile('widget.html');
 
   ballWin.once('ready-to-show', () => {
-    // ✅ 先摆位置再按设置决定是否显示
+    // ✅ 先摆位置；初始可见性统一在 main did-finish-load 时应用，避免闪现
     try { placeBallAtOldWidgetSpot(mainWin, ballWin); } catch {}
-    if (appSettings.widgetVisibleOnStartup) {
-      ballWin.show();
+    isBallReadyToShow = true;
+
+    if (pendingWidgetVisibility !== null) {
+      setWidgetVisible(pendingWidgetVisibility, { save: false, notify: false });
+      pendingWidgetVisibility = null;
     }
+
+    refreshTrayMenu();
   });
-  ballWin.on('show', refreshTrayMenu);
-  ballWin.on('hide', refreshTrayMenu);
+  ballWin.on('show', () => {
+    if (appSettings.showWidget !== true) {
+      appSettings.showWidget = true;
+      saveAppSettings();
+      broadcastAppSettingsChanged();
+    }
+    refreshTrayMenu();
+  });
+  ballWin.on('hide', () => {
+    if (appSettings.showWidget !== false) {
+      appSettings.showWidget = false;
+      saveAppSettings();
+      broadcastAppSettingsChanged();
+    }
+    refreshTrayMenu();
+  });
   ballWin.on('close', (e) => {
     if (isQuitting) return;
     e.preventDefault();
-    ballWin.hide();
+    setWidgetVisible(false, { save: true, notify: true });
   });
 }
 
@@ -179,8 +241,7 @@ function buildTrayMenu() {
     items.push({
       label: 'Show Widget',
       click: () => {
-        ballWin.show();
-        ballWin.focus();
+        setWidgetVisible(true, { focus: true, save: true, notify: true });
       }
     });
   }
@@ -189,7 +250,7 @@ function buildTrayMenu() {
     items.push({
       label: 'Hide Widget',
       click: () => {
-        ballWin.hide();
+        setWidgetVisible(false, { save: true, notify: true });
       }
     });
   }
@@ -287,11 +348,10 @@ app.whenReady().then(() => {
   createTray(); // ✅ 加这一行
 
   mainWin.webContents.once('did-finish-load', () => {
-    placeBallAtOldWidgetSpot(mainWin, ballWin);
-    if (appSettings.widgetVisibleOnStartup) {
-      ballWin.show();
-    } else {
-      ballWin.hide();
+    try { placeBallAtOldWidgetSpot(mainWin, ballWin); } catch {}
+    if (!hasAppliedInitialWidgetVisibility) {
+      hasAppliedInitialWidgetVisibility = true;
+      setWidgetVisible(appSettings.showWidget, { save: false, notify: false });
     }
   });
 
@@ -313,21 +373,40 @@ ipcMain.handle('ball:setIgnore', (_evt, ignore) => {
   if (ballWin) ballWin.setIgnoreMouseEvents(!!ignore, { forward: true });
 });
 
-ipcMain.handle('appSettings:get', () => ({ ...appSettings }));
+ipcMain.handle('appSettings:get', () => currentSettingsPayload());
+
+ipcMain.handle('widget:setVisible', (_evt, visible) => {
+  setWidgetVisible(!!visible, { save: true, notify: true });
+  return currentSettingsPayload();
+});
+
+ipcMain.handle('main:maximizeForDicebuild', () => {
+  if (!mainWin || mainWin.isDestroyed()) return false;
+  if (!mainWin.isVisible()) mainWin.show();
+  mainWin.focus();
+  if (!mainWin.isMaximized()) {
+    mainWin.maximize();
+  }
+  return true;
+});
 
 ipcMain.handle('appSettings:update', (_evt, patch) => {
-  appSettings = normalizeAppSettings({ ...appSettings, ...(patch || {}) });
-  saveAppSettings();
-
-  if (typeof patch?.widgetVisibleOnStartup === 'boolean' && ballWin) {
-    if (appSettings.widgetVisibleOnStartup) {
-      ballWin.show();
-    } else {
-      ballWin.hide();
-    }
+  const nextPatch = { ...(patch || {}) };
+  if (typeof nextPatch.showWidget !== 'boolean' && typeof nextPatch.widgetVisibleOnStartup === 'boolean') {
+    nextPatch.showWidget = nextPatch.widgetVisibleOnStartup;
   }
 
-  return { ...appSettings };
+  const prevShowWidget = appSettings.showWidget;
+  appSettings = normalizeAppSettings({ ...appSettings, ...nextPatch });
+
+  if (appSettings.showWidget !== prevShowWidget) {
+    setWidgetVisible(appSettings.showWidget, { save: false, notify: false });
+  }
+
+  saveAppSettings();
+  broadcastAppSettingsChanged();
+
+  return currentSettingsPayload();
 });
 
 // （可选）IPC 同步状态：作为 BroadcastChannel 的兜底

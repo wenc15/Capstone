@@ -228,7 +228,7 @@
             <header class="mg-topbar" aria-label="Status bar">
               <button class="mg-menu" id="mgMenuBtn" type="button" aria-label="Menu">☰</button>
               <div class="mg-topbar-mid">
-                <div class="mg-cash"><span class="mg-cash-ico">💰</span><span id="mgCash">0</span></div>
+                <div class="mg-cash"><span class="mg-cash-ico">💵</span><span id="mgCash">0</span></div>
                 <div class="mg-stage" id="mgStage">Stage 1/6</div>
                 <div class="mg-goal">
                   <div class="mg-goal-row"><span id="mgGoal">0/15</span></div>
@@ -253,17 +253,19 @@
               </aside>
             </main>
 
-            <button class="mg-buyblock" id="mgBuyBlockBtn" type="button">🏕 Buy <span id="mgBuyBlockCost">(10)</span></button>
+            <div class="mg-actionbar" aria-label="Dice actions">
+              <button class="mg-buyblock" id="mgBuyBlockBtn" type="button">🔑 Unlock <span id="mgBuyBlockCost">(10)</span></button>
+              <div class="mg-actionbar-right">
+                <div class="mg-last" id="mgLastRoll">—</div>
+                <button class="mg-roll" id="mgRollBtn" type="button">🎲 Roll!!</button>
+              </div>
+            </div>
 
-            <button class="mg-roll" id="mgRollBtn" type="button">🎲 Roll!!</button>
-            <div class="mg-last" id="mgLastRoll">—</div>
-
-            <footer class="mg-storebar" aria-label="Store">
+            <footer class="mg-storebar" id="mgStorebar" aria-label="Store">
               <div class="mg-storebar-head">
                 <div class="mg-storebar-title">Store</div>
                 <div class="mg-storebar-actions">
                   <button class="mg-refresh" id="mgRefreshBtn" type="button">Refresh <span id="mgRefreshCost">(5)</span></button>
-                  <button class="mg-sell" id="mgSellBtn" type="button" disabled>Sell</button>
                 </div>
               </div>
               <div class="mg-store-grid" id="mgStore"></div>
@@ -414,11 +416,14 @@
       <div class="settings-grid">
         <article class="settings-card">
           <h3>App Behavior</h3>
-          <p class="settings-note">Choose startup widget visibility and window close behavior.</p>
+          <p class="settings-note">Choose widget visibility and window close behavior.</p>
 
-          <label class="settings-field-row" for="settingWidgetStartupVisible">
-            <span>Show Widget On Startup</span>
-            <input id="settingWidgetStartupVisible" type="checkbox" checked />
+          <label class="settings-field-row settings-switch-row" for="settingShowWidget">
+            <span>Show Widget</span>
+            <span class="settings-switch">
+              <input id="settingShowWidget" type="checkbox" checked />
+              <span class="settings-switch-bar"></span>
+            </span>
           </label>
 
           <label class="settings-field-col" for="settingCloseBehavior">

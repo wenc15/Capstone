@@ -77,6 +77,7 @@ export function collectDom() {
   const mgHint = document.getElementById('mgHint');
   const mgRefreshBtn = document.getElementById('mgRefreshBtn');
   const mgRefreshCost = document.getElementById('mgRefreshCost');
+  const mgStorebar = document.getElementById('mgStorebar');
   const mgStore = document.getElementById('mgStore');
   const mgRollBtn = document.getElementById('mgRollBtn');
   const mgLastRoll = document.getElementById('mgLastRoll');
@@ -125,7 +126,7 @@ export function collectDom() {
   const settingsOpenBtn = document.getElementById('settingsOpenBtn');
   const settingsOverlay = document.getElementById('settingsOverlay');
   const settingsCloseBtn = document.getElementById('settingsCloseBtn');
-  const settingWidgetStartupVisible = document.getElementById('settingWidgetStartupVisible');
+  const settingShowWidget = document.getElementById('settingShowWidget');
   const settingCloseBehavior = document.getElementById('settingCloseBehavior');
   const settingsBehaviorMeta = document.getElementById('settingsBehaviorMeta');
   const archiveExportBtn = document.getElementById('archiveExportBtn');
@@ -221,7 +222,7 @@ export function collectDom() {
     settingsOpenBtn,
     settingsOverlay,
     settingsCloseBtn,
-    settingWidgetStartupVisible,
+    settingShowWidget,
     settingCloseBehavior,
     settingsBehaviorMeta,
     archiveExportBtn,
@@ -247,6 +248,7 @@ export function collectDom() {
     mgHint,
     mgRefreshBtn,
     mgRefreshCost,
+    mgStorebar,
     mgStore,
     mgRollBtn,
     mgLastRoll,

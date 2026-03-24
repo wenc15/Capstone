@@ -142,16 +142,11 @@ async function refreshWeather(els) {
     let fromBrowserGeo = false;
 
     try {
-      // Prefer device geolocation first (more accurate than IP city mapping).
+      // Prefer device geolocation first (more accurate and avoids IP provider blocking).
       geo = await fetchGeoByBrowser();
       fromBrowserGeo = !!geo;
     } catch (_) {
       geo = null;
-    }
-
-    if (!geo) {
-      geo = await fetchGeo();
-      fromBrowserGeo = false;
     }
 
     if (!geo) {
