@@ -1,14 +1,14 @@
-/* 2026/03/22 edited by Zhecheng Xu
- * Changes:
- *  - Update minimal Gacha styles for edge arrows and info button.
- *  - Add 10x draw subtext style in minimal Gacha layout.
- */
-
 /* 2026/03/23 edited by Zikai Lu
  * Changes:
  *  - Add "starlit" Tetris skin styles with a continuous colorful starfield.
  *  - Implement mask-like behavior: only filled blocks reveal the starfield; empty cells stay black.
  *  - Keep classic Tetris styling unchanged so it remains the default visual theme.
+ */
+ 
+/* 2026/03/22 edited by Zhecheng Xu
+ * Changes:
+ *  - Update minimal Gacha styles for edge arrows and info button.
+ *  - Add 10x draw subtext style in minimal Gacha layout.
  */
 
 /* 2026/03/19 edited by Zhecheng Xu
