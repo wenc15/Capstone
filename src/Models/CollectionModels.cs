@@ -25,12 +25,8 @@ public static class CollectionCatalog
     // 预设收藏品目录：可按业务继续扩展。
     public static readonly IReadOnlyList<CollectionItemDefinition> PresetItems = new List<CollectionItemDefinition>
     {
-        new() { ItemId = "skin_cat_default", DisplayName = "Cat Default Skin" },
-        new() { ItemId = "skin_cat_sakura", DisplayName = "Cat Sakura Skin" },
-        new() { ItemId = "skin_dog_default", DisplayName = "Dog Default Skin" },
-        new() { ItemId = "skin_dog_space", DisplayName = "Dog Space Skin" },
-        new() { ItemId = "skin_bird_sky", DisplayName = "Bird Sky Skin" },
-        new() { ItemId = "skin_fox_autumn", DisplayName = "Fox Autumn Skin" },
+        new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin" },
+        new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin" },
     };
 }
 
