@@ -13,6 +13,11 @@
 //  - Cap pet level at Lv 20 for UI.
 //  - Rename pets: 1=Sprig, 2=Nomo, 3=Lyra.
 
+// 2026/03/23 edited by Zhecheng Xu
+// Changes:
+//  - Refine pet speech bubble behavior on interaction.
+//  - Use smooth fade-out timing and prevent flicker on rapid clicks.
+
 // js/pet.js
 
 import { getPetsState, onPetsChanged } from './petsApi.js';
@@ -281,16 +286,41 @@ function speak(petSpeechBubble, text, ms = 1200) {
   if (!petSpeechBubble) return;
 
   const prev = speechTimers.get(petSpeechBubble);
-  if (prev) clearTimeout(prev);
+  if (prev?.hideTimer) clearTimeout(prev.hideTimer);
+  if (prev?.cleanupTimer) clearTimeout(prev.cleanupTimer);
+
+  const fadeMs = 260;
+  const wasVisible = petSpeechBubble.classList.contains('is-visible');
 
   petSpeechBubble.textContent = text;
   petSpeechBubble.style.display = 'block';
-  const timer = setTimeout(() => {
-    petSpeechBubble.style.display = 'none';
-    speechTimers.delete(petSpeechBubble);
-  }, ms);
 
-  speechTimers.set(petSpeechBubble, timer);
+  petSpeechBubble.classList.remove('is-pop');
+  void petSpeechBubble.offsetWidth;
+  petSpeechBubble.classList.add('is-pop');
+
+  if (!wasVisible) {
+    requestAnimationFrame(() => {
+      petSpeechBubble.classList.add('is-visible');
+    });
+  } else {
+    petSpeechBubble.classList.add('is-visible');
+  }
+
+  const state = {
+    hideTimer: setTimeout(() => {
+      petSpeechBubble.classList.remove('is-visible');
+      petSpeechBubble.classList.remove('is-pop');
+
+      state.cleanupTimer = setTimeout(() => {
+        petSpeechBubble.style.display = 'none';
+        speechTimers.delete(petSpeechBubble);
+      }, fadeMs);
+    }, ms),
+    cleanupTimer: null,
+  };
+
+  speechTimers.set(petSpeechBubble, state);
 }
 
 export function mountPet(els) {
