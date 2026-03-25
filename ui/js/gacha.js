@@ -248,11 +248,17 @@ export function mountGacha(els) {
 
       panel.metaEl.textContent = count === 1 ? 'Single draw ready to reveal.' : `${items.length} results ready to reveal.`;
       await revealCardsSequentially(panel.gridEl, panel.metaEl, items);
+
+      const convertedDuplicateSkinCount = await handleDuplicateSkinCompensation(items);
       await refreshCredits();
 
       const rewardText = formatRewardSummary(items);
       panel.metaEl.textContent = `Draw complete. ${rewardText}${guaranteeApplied ? ' Guarantee triggered.' : ''}`;
       showToast(toastEl, rewardText);
+      if (convertedDuplicateSkinCount > 0) {
+        const bonus = convertedDuplicateSkinCount * 5;
+        showToast(toastEl, `Duplicate skin converted: +${bonus} Adv. Food`);
+      }
       scheduleAutoFade(panel.root);
     } catch (error) {
       console.warn('[Gacha] draw failed:', error);
@@ -406,6 +412,7 @@ function normalizeFoodItem(item) {
   const rarity = formatRarity(item.rarity || item.Rarity || 'Common');
   const itemId = item.foodId || item.FoodId || item.itemId || item.ItemId || '';
   return {
+    itemId,
     name: item.name || item.Name || itemId || 'Food',
     rarity,
     kind: 'Food',
@@ -420,12 +427,40 @@ function normalizeSkinItem(item) {
   const rarity = formatRarity(item.rarity || item.Rarity || 'Common');
   const itemId = item.itemId || item.ItemId || '';
   return {
+    itemId,
     name: item.name || item.Name || itemId || 'Drop',
     rarity,
     kind: dropType === 'food' ? 'Food' : 'Skin',
     icon: dropType === 'food' ? (FOOD_ICON_BY_ID[itemId] || fallbackIcon(rarity)) : skinIcon(itemId),
     rarityKey: getRarityKey(rarity),
+    isNew: Boolean(item.isNew ?? item.IsNew ?? false),
   };
+}
+
+async function handleDuplicateSkinCompensation(items) {
+  const skins = (items || []).filter((item) => item?.kind === 'Skin' && item?.itemId);
+  if (!skins.length) return 0;
+
+  let converted = 0;
+  for (const skin of skins) {
+    try {
+      const acquire = await requestJson('/api/collection/acquire', {
+        method: 'POST',
+        body: JSON.stringify({ itemId: skin.itemId }),
+      });
+      const message = String(acquire?.message || acquire?.Message || '').trim().toLowerCase();
+      if (message === 'already owned' && skin.isNew === false) {
+        await requestJson('/api/inventory/add', {
+          method: 'POST',
+          body: JSON.stringify({ itemId: 'adv_food', amount: 5 }),
+        });
+        converted += 1;
+      }
+    } catch (error) {
+      console.warn('[Gacha] duplicate skin compensation failed:', error);
+    }
+  }
+  return converted;
 }
 
 function skinIcon(itemId) {
