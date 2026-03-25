@@ -67,4 +67,36 @@ public class CollectionController : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>
+    /// 设置皮肤启用状态：
+    /// - enable=true: 启用该皮肤，并自动关闭同 game 的其他皮肤
+    /// - enable=false: 关闭该皮肤；若该 game 没有启用皮肤则回退默认皮肤
+    /// 路径：POST /api/collection/skin/enable
+    /// 请求体：{ "itemId": "skin_tetris_starlit", "enable": true }
+    /// </summary>
+    [HttpPost("skin/enable")]
+    public ActionResult<CollectionSkinEnableResponse> SetSkinEnabled([FromBody] CollectionSkinEnableRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.ItemId))
+        {
+            return BadRequest(new { message = "itemId must be non-empty." });
+        }
+
+        var ok = _dataService.TrySetCollectionSkinEnabled(request.ItemId, request.Enable, out var game, out var enabled, out var message);
+        if (!ok)
+        {
+            return BadRequest(new { message, itemId = request.ItemId, enable = request.Enable });
+        }
+
+        var response = new CollectionSkinEnableResponse
+        {
+            ItemId = request.ItemId,
+            Game = game,
+            Enabled = enabled,
+            Message = message,
+        };
+
+        return Ok(response);
+    }
 }

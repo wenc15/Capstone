@@ -378,33 +378,29 @@ public class LocalDataService
         lock (_fileLock)
         {
             var profile = GetUserProfile();
-            if (profile.Collection == null)
-            {
-                profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            }
+            var changed = NormalizeCollectionSkinState(profile, out _);
 
             var result = new List<CollectionItemStatus>();
             foreach (var def in CollectionCatalog.PresetItems)
             {
                 profile.Collection.TryGetValue(def.ItemId, out var state);
+                var owned = state > 0 ? 1 : 0;
+                var game = NormalizeGameKey(def.Game);
+                var enabled = owned == 1
+                    && !string.IsNullOrWhiteSpace(game)
+                    && profile.ActiveSkinsByGame.TryGetValue(game, out var activeItemId)
+                    && string.Equals(activeItemId, def.ItemId, StringComparison.OrdinalIgnoreCase);
+
                 result.Add(new CollectionItemStatus
                 {
                     ItemId = def.ItemId,
                     DisplayName = def.DisplayName,
-                    State = state > 0 ? 1 : 0,
+                    Category = def.Category,
+                    Rarity = def.Rarity,
+                    Game = def.Game,
+                    State = owned,
+                    IsEnabled = enabled,
                 });
-            }
-
-            // 清理无效状态值（非 0/1）并持久化，防止脏数据扩散。
-            var changed = false;
-            foreach (var key in profile.Collection.Keys.ToList())
-            {
-                var normalized = profile.Collection[key] > 0 ? 1 : 0;
-                if (profile.Collection[key] != normalized)
-                {
-                    profile.Collection[key] = normalized;
-                    changed = true;
-                }
             }
 
             if (changed)
@@ -463,6 +459,151 @@ public class LocalDataService
         return true;
     }
 }
+
+    public bool TrySetCollectionSkinEnabled(string itemId, bool enable, out string game, out bool enabled, out string message)
+    {
+        lock (_fileLock)
+        {
+            game = string.Empty;
+            enabled = false;
+            message = "invalid request";
+
+            if (string.IsNullOrWhiteSpace(itemId))
+            {
+                message = "itemId must be non-empty.";
+                return false;
+            }
+
+            var profile = GetUserProfile();
+            _ = NormalizeCollectionSkinState(profile, out var defMap);
+
+            var normalizedItemId = itemId.Trim();
+            if (!defMap.TryGetValue(normalizedItemId, out var def))
+            {
+                message = "collection item not found in preset catalog.";
+                return false;
+            }
+
+            var gameKey = NormalizeGameKey(def.Game);
+            if (string.IsNullOrWhiteSpace(gameKey))
+            {
+                message = "item is not bound to a minigame.";
+                return false;
+            }
+
+            game = gameKey;
+            profile.Collection.TryGetValue(def.ItemId, out var state);
+            var owned = state > 0 ? 1 : 0;
+
+            if (enable)
+            {
+                if (owned == 0)
+                {
+                    message = "item not owned.";
+                    return false;
+                }
+
+                profile.ActiveSkinsByGame[gameKey] = def.ItemId;
+                SaveUserProfile(profile);
+
+                enabled = true;
+                message = "enabled";
+                return true;
+            }
+
+            if (profile.ActiveSkinsByGame.TryGetValue(gameKey, out var activeItemId)
+                && string.Equals(activeItemId, def.ItemId, StringComparison.OrdinalIgnoreCase))
+            {
+                profile.ActiveSkinsByGame.Remove(gameKey);
+                SaveUserProfile(profile);
+            }
+
+            enabled = false;
+            message = "disabled";
+            return true;
+        }
+    }
+
+    private static string NormalizeGameKey(string? game)
+        => string.IsNullOrWhiteSpace(game) ? string.Empty : game.Trim().ToLowerInvariant();
+
+    private static bool NormalizeCollectionSkinState(UserProfile profile, out Dictionary<string, CollectionItemDefinition> defMap)
+    {
+        var changed = false;
+
+        if (profile.Collection == null)
+        {
+            profile.Collection = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            changed = true;
+        }
+
+        if (profile.ActiveSkinsByGame == null)
+        {
+            profile.ActiveSkinsByGame = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            changed = true;
+        }
+
+        defMap = CollectionCatalog.PresetItems
+            .Where(x => !string.IsNullOrWhiteSpace(x.ItemId))
+            .GroupBy(x => x.ItemId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToDictionary(x => x.ItemId.Trim(), x => x, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in profile.Collection.Keys.ToList())
+        {
+            var normalized = profile.Collection[key] > 0 ? 1 : 0;
+            if (profile.Collection[key] != normalized)
+            {
+                profile.Collection[key] = normalized;
+                changed = true;
+            }
+        }
+
+        foreach (var kv in profile.ActiveSkinsByGame.ToList())
+        {
+            var gameKey = NormalizeGameKey(kv.Key);
+            var itemId = kv.Value?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(gameKey) || string.IsNullOrWhiteSpace(itemId))
+            {
+                profile.ActiveSkinsByGame.Remove(kv.Key);
+                changed = true;
+                continue;
+            }
+
+            if (!defMap.TryGetValue(itemId, out var def))
+            {
+                profile.ActiveSkinsByGame.Remove(kv.Key);
+                changed = true;
+                continue;
+            }
+
+            var defGame = NormalizeGameKey(def.Game);
+            if (string.IsNullOrWhiteSpace(defGame) || !string.Equals(defGame, gameKey, StringComparison.OrdinalIgnoreCase))
+            {
+                profile.ActiveSkinsByGame.Remove(kv.Key);
+                changed = true;
+                continue;
+            }
+
+            profile.Collection.TryGetValue(itemId, out var ownedState);
+            if (ownedState <= 0)
+            {
+                profile.ActiveSkinsByGame.Remove(kv.Key);
+                changed = true;
+                continue;
+            }
+
+            if (!string.Equals(kv.Key, gameKey, StringComparison.Ordinal))
+            {
+                profile.ActiveSkinsByGame.Remove(kv.Key);
+                profile.ActiveSkinsByGame[gameKey] = itemId;
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
 
     private static bool EnsurePetState(UserProfile profile)
     {

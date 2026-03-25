@@ -93,6 +93,12 @@ public class UserProfile
     public Dictionary<string, int> Collection { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// 各游戏当前启用的皮肤，key 为 game（如 tetris/snake），value 为 itemId。
+    /// 若某游戏无记录，则表示使用默认皮肤。
+    /// </summary>
+    public Dictionary<string, string> ActiveSkinsByGame { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// 当前激活宠物 id。
     /// </summary>
     public int ActivePetId { get; set; } = 3;

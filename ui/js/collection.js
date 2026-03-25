@@ -2,11 +2,10 @@
 // Changes:
 //  - Replace Timer card placeholder with real Collection preview.
 //  - Add Collection overlay page connected to backend /api/collection.
-//  - Display ownership state (Owned/Locked) instead of quantity.
+//  - Display ownership state (Enabled/Owned/Locked) and support skin enable/disable toggling.
 
 import { showToast } from './utils.js';
-
-const API_BASE = 'http://localhost:5024';
+import { getCollectionItems, setCollectionSkinEnabled } from './collection_api.js';
 
 const COLLECTION_ICONS = {
   skin_tetris_starlit: '🧱',
@@ -20,44 +19,6 @@ function iconForItem(itemId) {
   if (itemId.startsWith('skin_snake_')) return '🐍';
   if (itemId.startsWith('skin_')) return '🎨';
   return '🧩';
-}
-
-async function fetchJson(path, init) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
-
-  let body = null;
-  try {
-    body = await res.json();
-  } catch {
-    // ignore
-  }
-
-  if (!res.ok) {
-    const msg = body?.message || `${res.status} ${res.statusText}`;
-    const err = new Error(msg);
-    err.status = res.status;
-    err.body = body;
-    throw err;
-  }
-
-  return body;
-}
-
-async function getCollectionItems() {
-  const data = await fetchJson('/api/collection');
-  const list = Array.isArray(data?.items) ? data.items : [];
-
-  return list
-    .map((item) => ({
-      itemId: String(item?.itemId || item?.ItemId || '').trim(),
-      displayName: String(item?.displayName || item?.DisplayName || item?.itemId || item?.ItemId || 'Unknown Item'),
-      state: Number(item?.state ?? item?.State ?? 0) > 0 ? 1 : 0,
-    }))
-    .filter((item) => item.itemId)
-    .sort((a, b) => a.itemId.localeCompare(b.itemId));
 }
 
 function buildOverlay() {
@@ -88,17 +49,22 @@ function buildOverlay() {
 
 function formatCollectionRow(item) {
   const owned = item.state > 0;
-  const stateText = owned ? 'Owned' : 'Locked';
-  const stateClass = owned ? 'is-owned' : 'is-unowned';
+  const enabled = owned && item.isEnabled;
+  const stateText = enabled ? 'Enabled' : (owned ? 'Owned' : 'Locked');
+  const stateClass = enabled ? 'is-enabled' : (owned ? 'is-owned' : 'is-unowned');
+  const actionBtn = owned
+    ? `<button class="bag-btn collection-toggle-btn" type="button" data-collection-action="toggle-enable" data-item-id="${item.itemId}" data-enable="${enabled ? '0' : '1'}">${enabled ? 'Disable' : 'Enable'}</button>`
+    : '<button class="bag-btn collection-toggle-btn" type="button" disabled>Enable</button>';
 
   return `
     <div class="bag-row collection-row ${stateClass}" data-item-id="${item.itemId}">
       <div class="bag-ico" aria-hidden="true">${iconForItem(item.itemId)}</div>
       <div class="bag-mid">
         <div class="bag-name">${item.displayName}</div>
-        <div class="bag-id">${item.itemId}</div>
+        <div class="bag-id">${item.itemId}${item.game ? ` • ${item.game}` : ''}</div>
       </div>
       <div class="bag-count collection-state ${stateClass}">${stateText}</div>
+      ${actionBtn}
     </div>
   `.trim();
 }
@@ -117,8 +83,8 @@ function renderCollectionPreview(items, previewEl, metaEl) {
 
   const preview = items.slice(0, 8)
     .map((item) => {
-      const ownedClass = item.state > 0 ? 'is-owned' : 'is-unowned';
-      return `<div class="collection-short-chip ${ownedClass}" title="${item.displayName}">${iconForItem(item.itemId)}</div>`;
+      const stateClass = item.state <= 0 ? 'is-unowned' : (item.isEnabled ? 'is-enabled' : 'is-owned');
+      return `<div class="collection-short-chip ${stateClass}" title="${item.displayName}">${iconForItem(item.itemId)}</div>`;
     })
     .join('');
 
@@ -188,6 +154,30 @@ export function mountCollection(els) {
   refreshBtn?.addEventListener('click', refresh);
 
   overlay.addEventListener('click', (e) => {
+    const actionBtn = e.target?.closest?.('[data-collection-action="toggle-enable"]');
+    if (actionBtn) {
+      const itemId = String(actionBtn.getAttribute('data-item-id') || '').trim();
+      const enable = String(actionBtn.getAttribute('data-enable') || '') === '1';
+      if (!itemId) return;
+
+      const prevText = actionBtn.textContent;
+      actionBtn.disabled = true;
+      actionBtn.textContent = enable ? 'Enabling...' : 'Disabling...';
+
+      setCollectionSkinEnabled(itemId, enable)
+        .then(async () => {
+          showToast(els.toastEl, enable ? 'Skin enabled.' : 'Skin disabled.');
+          window.dispatchEvent(new CustomEvent('collection:skin-changed', { detail: { itemId, enable } }));
+          await refresh();
+        })
+        .catch((err) => {
+          showToast(els.toastEl, err?.body?.message || err?.message || 'Failed to update skin state.');
+          actionBtn.disabled = false;
+          actionBtn.textContent = prevText;
+        });
+      return;
+    }
+
     if (e.target === overlay) close();
   });
 

@@ -10,6 +10,7 @@
 
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
+import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
 
 const SAVE_KEY = 'tetris.save.v1';
@@ -77,8 +78,22 @@ function defaultState() {
 
 function normalizeLoadedState(raw) {
   if (!raw || raw.version !== 1) return null;
-  const skinId = DEFAULT_SKIN_ID;
+  const skinId = typeof raw.skinId === 'string' && raw.skinId in TETRIS_SKINS
+    ? raw.skinId
+    : DEFAULT_SKIN_ID;
   return { ...raw, skinId };
+}
+
+async function syncSkinFromCollection(st) {
+  if (!st) return;
+  try {
+    const skin = await getEnabledSkinForGame('tetris');
+    const nextSkinId = skin?.itemId && skin.itemId in TETRIS_SKINS ? skin.itemId : DEFAULT_SKIN_ID;
+    st.skinId = nextSkinId;
+    save(st);
+  } catch {
+    st.skinId = DEFAULT_SKIN_ID;
+  }
 }
 
 function readJson(key, fallback) {
@@ -509,7 +524,14 @@ export function mountTetris(els) {
   const st = load() || defaultState();
   stRef.current = st;
   save(st);
+  syncSkinFromCollection(st).then(() => render(els, st));
   render(els, st);
+
+  window.addEventListener('collection:skin-changed', () => {
+    const cur = stRef.current;
+    if (!cur) return;
+    syncSkinFromCollection(cur).then(() => render(els, cur));
+  });
 
   if (typeof window !== 'undefined') {
     window.tetrisOpen = () => openTetris(els, { reason: 'dev' });
@@ -537,9 +559,11 @@ export function openTetris(els, meta) {
   if (!stRef?.current) {
     stRef.current = defaultState();
   }
-  startGame(stRef.current);
-  startGameLoop(stRef.current, els);
-  render(els, stRef.current);
+  syncSkinFromCollection(stRef.current).finally(() => {
+    startGame(stRef.current);
+    startGameLoop(stRef.current, els);
+    render(els, stRef.current);
+  });
 }
 
 export function closeTetris(els) {

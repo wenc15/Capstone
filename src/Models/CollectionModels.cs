@@ -25,8 +25,8 @@ public static class CollectionCatalog
     // 预设收藏品目录：可按业务继续扩展。
     public static readonly IReadOnlyList<CollectionItemDefinition> PresetItems = new List<CollectionItemDefinition>
     {
-        new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin" },
-        new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin" },
+        new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
+        new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin", Rarity = "Epic", Category = "minigame", Game = "snake" },
     };
 }
 
@@ -34,7 +34,11 @@ public class CollectionItemStatus
 {
     public string ItemId { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public string? Game { get; set; }
+    public string? Category { get; set; }
+    public string? Rarity { get; set; }
     public int State { get; set; }
+    public bool IsEnabled { get; set; }
 }
 
 public class CollectionQueryResponse
@@ -52,5 +56,19 @@ public class CollectionAcquireResponse
     public string ItemId { get; set; } = string.Empty;
     public int State { get; set; }
     public bool AlreadyOwned { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class CollectionSkinEnableRequest
+{
+    public string ItemId { get; set; } = string.Empty;
+    public bool Enable { get; set; }
+}
+
+public class CollectionSkinEnableResponse
+{
+    public string ItemId { get; set; } = string.Empty;
+    public string Game { get; set; } = string.Empty;
+    public bool Enabled { get; set; }
     public string Message { get; set; } = string.Empty;
 }

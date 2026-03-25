@@ -250,3 +250,14 @@ Content-Type: application/json
 }
 
 ###
+
+### 设置皮肤启用状态（同游戏仅可启用一个；全部关闭则走默认皮肤）
+POST http://localhost:5024/api/collection/skin/enable
+Content-Type: application/json
+
+{
+  "itemId": "skin_tetris_starlit",
+  "enable": true
+}
+
+###

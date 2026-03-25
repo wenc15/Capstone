@@ -7,16 +7,27 @@
 
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
+import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
 
 const SAVE_KEY = 'snake.save.v1';
 const HIST_KEY = 'snake.history.v1';
+const DEFAULT_SKIN_ID = 'default';
 
 const COLS = 20;
 const ROWS = 20;
 const EMPTY = 0;
 const SNAKE = 1;
 const FOOD = 2;
+
+const SNAKE_SKINS = {
+  default: {
+    boardClass: '',
+  },
+  skin_snake_nebula: {
+    boardClass: 'snake-skin-nebula',
+  },
+};
 
 function defaultState() {
   return {
@@ -33,7 +44,28 @@ function defaultState() {
     gameLoop: null,
     lastMove: 0,
     speed: 150,
+    skinId: DEFAULT_SKIN_ID,
   };
+}
+
+function normalizeLoadedState(raw) {
+  if (!raw || raw.version !== 1) return null;
+  const skinId = typeof raw.skinId === 'string' && raw.skinId in SNAKE_SKINS
+    ? raw.skinId
+    : DEFAULT_SKIN_ID;
+  return { ...raw, skinId };
+}
+
+async function syncSkinFromCollection(st) {
+  if (!st) return;
+  try {
+    const skin = await getEnabledSkinForGame('snake');
+    const nextSkinId = skin?.itemId && skin.itemId in SNAKE_SKINS ? skin.itemId : DEFAULT_SKIN_ID;
+    st.skinId = nextSkinId;
+    save(st);
+  } catch {
+    st.skinId = DEFAULT_SKIN_ID;
+  }
 }
 
 function readJson(key, fallback) {
@@ -60,7 +92,7 @@ function save(st) {
 
 function load() {
   const st = readJson(SAVE_KEY, null);
-  return st && st.version === 1 ? st : null;
+  return normalizeLoadedState(st);
 }
 
 function pushHistory(entry) {
@@ -175,6 +207,15 @@ function endGame(st, els, result = 'lose') {
 
 function render(els, st) {
   if (!els || !st) return;
+
+  if (els.snakeRoot) {
+    const skin = SNAKE_SKINS[st.skinId] || SNAKE_SKINS[DEFAULT_SKIN_ID];
+    for (const entry of Object.values(SNAKE_SKINS)) {
+      if (entry.boardClass) els.snakeRoot.classList.remove(entry.boardClass);
+    }
+    els.snakeRoot.dataset.snakeSkin = st.skinId;
+    if (skin.boardClass) els.snakeRoot.classList.add(skin.boardClass);
+  }
 
   if (els.snakeScore) els.snakeScore.textContent = st.score;
   if (els.snakeHighScore) els.snakeHighScore.textContent = st.highScore;
@@ -326,7 +367,14 @@ export function mountSnake(els) {
   const st = load() || defaultState();
   stRef.current = st;
   save(st);
+  syncSkinFromCollection(st).then(() => render(els, st));
   render(els, st);
+
+  window.addEventListener('collection:skin-changed', () => {
+    const cur = stRef.current;
+    if (!cur) return;
+    syncSkinFromCollection(cur).then(() => render(els, cur));
+  });
 
   if (typeof window !== 'undefined') {
     window.snakeOpen = () => openSnake(els, { reason: 'dev' });
@@ -354,9 +402,11 @@ export function openSnake(els, meta) {
   if (!stRef?.current) {
     stRef.current = defaultState();
   }
-  startGame(stRef.current);
-  startGameLoop(stRef.current, els);
-  render(els, stRef.current);
+  syncSkinFromCollection(stRef.current).finally(() => {
+    startGame(stRef.current);
+    startGameLoop(stRef.current, els);
+    render(els, stRef.current);
+  });
 }
 
 export function closeSnake(els) {
