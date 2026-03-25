@@ -10,9 +10,15 @@
  *  - Tune theme-consistent colors for focus completion and player controls.
  */
 
+/* 2026/03/25 edited by JS
+ * Changes:
+ *  - Rename Dice & Build minigame UI label to Growin Town.
+ *  - Prevent gacha pool title from wrapping for longer names.
+ */
+
 /* 2026/03/24 edited by Zhecheng Xu
  * Changes:
- *  - Dice & Build UI polish for hover cards, roll warnings, and card visuals.
+ *  - Growin Town UI polish for hover cards, roll warnings, and card visuals.
  *  - Store transition stability improvements and minor animation tuning.
  */
 
@@ -3080,8 +3086,12 @@ body{
 }
 
 .gacha-min-title{
-  max-width: 420px;
-  font-size: 44px;
+  /* Keep pool titles readable even when names get longer */
+  max-width: min(560px, 88vw);
+  font-size: clamp(32px, 5.2vw, 44px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 900;
   color: #f2fbf4;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.42), 0 8px 24px rgba(0, 0, 0, 0.26);
@@ -4082,7 +4092,7 @@ body{
 }
 
 /* =============================================================
- * Minigame: Dice & Build (MVP)
+ * Minigame: Growin Town (MVP)
  * ============================================================= */
 
 .mg-hidden{ display:none !important; }

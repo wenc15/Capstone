@@ -1,3 +1,7 @@
+// 2026/03/25 edited by JS
+// Changes:
+//  - Rename Dice & Build UI strings to Growin Town.
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Sync Dice & Build pool background usage with dedicated gacha dicebuild asset.
@@ -66,19 +70,19 @@ const POOLS = [
   },
   {
     key: 'dicebuild',
-    title: 'Dice & Build Skins',
-    poolName: 'Dice & Build Skin Pool',
-    subtitle: 'Draw cosmetic skins for Dice & Build minigame.',
-    featured: 'Dice & Build skin',
-    tenSubText: 'dice & build skin guaranteed',
+    title: 'Growin Town Skins',
+    poolName: 'Growin Town Skin Pool',
+    subtitle: 'Draw cosmetic skins for Growin Town minigame.',
+    featured: 'Growin Town skin',
+    tenSubText: 'growin town skin guaranteed',
     apiType: 'skin',
     backendPool: 'dicebuild',
     rates: [
       { label: 'Common', value: '70%' },
       { label: 'Rare', value: '25%' },
-      { label: 'Dice & Build skin (Epic)', value: '5%' },
+      { label: 'Growin Town skin (Epic)', value: '5%' },
     ],
-    tenDrawNote: '10x: guaranteed epic Dice & Build skin in this pool.',
+    tenDrawNote: '10x: guaranteed epic Growin Town skin in this pool.',
   },
 ];
 

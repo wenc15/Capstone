@@ -6,6 +6,11 @@
     - Align visual behavior and theme synchronization across main UI and widget window.
 -->
 <!--
+  2026/03/25 edited by JS
+  Changes:
+    - Rename Dice & Build minigame UI label to Growin Town.
+-->
+<!--
   2026/03/14 edited by JS
   Changes:
     - Default Pet view placeholder to pet3 phase-1 asset.
@@ -46,7 +51,7 @@
         <div class="token-chip" id="tokenChip">
           <span aria-hidden="true">🪙</span>
           <span id="tokenValue">0</span>
-          <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button>
+          <!-- <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button> -->
         </div>
       </div>
     </header>
@@ -206,14 +211,14 @@
               <div>
                 <div class="mg-hub-kicker">Break Time</div>
                 <h2 class="mg-hub-title">Choose a minigame</h2>
-                <p class="mg-hub-copy">Take a short break with Dice & Build, Tetris, or Snake.</p>
+                <p class="mg-hub-copy">Take a short break with Growin Town, Tetris, or Snake.</p>
               </div>
             </div>
 
             <div class="mg-hub-grid">
               <button class="mg-hub-card" id="mgOpenDicebuildBtn" type="button">
                 <div class="mg-hub-icon">🎲</div>
-                <div class="mg-hub-name">Dice & Build</div>
+                <div class="mg-hub-name">Growin Town</div>
                 <div class="mg-hub-desc">Roll dice, earn coins, and grow your board.</div>
               </button>
 
@@ -231,7 +236,7 @@
             </div>
           </div>
 
-          <div class="mg-shell" id="mgRoot" aria-label="Dice & Build minigame" style="display:none;">
+          <div class="mg-shell" id="mgRoot" aria-label="Growin Town minigame" style="display:none;">
             <header class="mg-topbar" aria-label="Status bar">
               <button class="mg-menu" id="mgMenuBtn" type="button" aria-label="Menu">☰</button>
               <div class="mg-topbar-mid">
@@ -246,7 +251,7 @@
               <button class="mg-exit" id="mgExitBtn" type="button" aria-label="Return to minigame hub">↩</button>
             </header>
 
-            <div class="mg-settings-panel mg-hidden" id="mgSettingsPanel" aria-label="Dice and Build settings">
+            <div class="mg-settings-panel mg-hidden" id="mgSettingsPanel" aria-label="Growin Town settings">
               <div class="mg-settings-title">Settings</div>
               <label class="mg-settings-row" for="mgSpeedModeToggle">
                 <input id="mgSpeedModeToggle" type="checkbox">

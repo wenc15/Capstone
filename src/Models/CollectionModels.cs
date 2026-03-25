@@ -7,6 +7,10 @@
 //   - 统一前后端对 Collection 接口的字段约定。
 // =============================================================
 
+// 2026/03/25 edited by JS
+// Changes:
+//   - Rename Dice & Build skin display name to Growin Town.
+
 using System.Collections.Generic;
 
 namespace CapstoneBackend.Models;
@@ -27,7 +31,7 @@ public static class CollectionCatalog
     {
         new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
         new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin", Rarity = "Epic", Category = "minigame", Game = "snake" },
-        new() { ItemId = "skin_dicebuild_petstand", DisplayName = "Pet Standee Dice & Build Skin", Rarity = "Epic", Category = "minigame", Game = "dicebuild" },
+        new() { ItemId = "skin_dicebuild_petstand", DisplayName = "Pet Standee Growin Town Skin", Rarity = "Epic", Category = "minigame", Game = "dicebuild" },
     };
 }
 

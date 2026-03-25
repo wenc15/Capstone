@@ -1,3 +1,7 @@
+// 2026/03/25 edited by JS
+// Changes:
+//  - Rename Dice & Build UI strings to Growin Town.
+
 import { grantDiceBuildEligibility } from './relax_prompt.js';
 import { openMinigameHub } from './minigame_hub.js';
 import { openDiceBuild } from './minigame_dicebuild.js';
@@ -56,7 +60,7 @@ export function mountMinigameDevtools(els) {
 
   grid.appendChild(makeButton('Grant Access', () => grant()));
   grid.appendChild(makeButton('Open Hub', () => openMinigameHub(els, { reason: 'dev' })));
-  grid.appendChild(makeButton('Dice & Build', () => {
+  grid.appendChild(makeButton('Growin Town', () => {
     grant();
     openDiceBuild(els, { reason: 'dev', bypassGate: true });
   }));
