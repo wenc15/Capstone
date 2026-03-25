@@ -103,6 +103,7 @@ public class FocusSessionService
     private string? _failReason;
 
     private int _remainingSeconds; //11/18/25 不确定是否应该让变量初始化为0
+    private int _preferredDurationSeconds = 25 * 60;
     private int _violationSeconds;
     private string? _currentProcess;
     private bool _isRunning;
@@ -146,6 +147,7 @@ public class FocusSessionService
 
             _startAt = DateTimeOffset.Now;
             _plannedDurationSeconds = req.DurationSeconds;
+            _preferredDurationSeconds = req.DurationSeconds;
             _endAt = _startAt.AddSeconds(req.DurationSeconds);
             _grace = TimeSpan.FromSeconds(req.GraceSeconds <= 0 ? 10 : req.GraceSeconds);
 
@@ -480,6 +482,24 @@ public class FocusSessionService
             // 返回当前专注模式是否处于“活跃”
             // 加锁确保不会读到 timer 还没写完的值
             return _isRunning;
+        }
+    }
+
+    public int GetPreferredDurationSeconds()
+    {
+        lock (_lock)
+        {
+            return Math.Max(60, _preferredDurationSeconds);
+        }
+    }
+
+    public int SetPreferredDurationSeconds(int durationSeconds)
+    {
+        lock (_lock)
+        {
+            var clamped = Math.Max(60, Math.Min(8 * 60 * 60, durationSeconds));
+            _preferredDurationSeconds = clamped;
+            return _preferredDurationSeconds;
         }
     }
 

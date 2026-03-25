@@ -1,6 +1,11 @@
 // Capstone/ui/main.js
 // 2025/11/28 edited by Jingyao: 新增 ballwin 使悬浮球为独立窗口
 
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Add music track listing IPC and music command forwarding.
+//  - Extend app settings payload to include uiTone and broadcast to widget.
+
 //12.20 edited by Jingyao: 用变量统一管理文件路径
 // 2026/01/29 edited by Zhecheng Xu
 // 新增内容：
@@ -14,12 +19,19 @@
 //   - Widget 支持从托盘随时显示/隐藏，避免 close 后无法恢复的问题。
 // =============================================================
 
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, session } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, session, shell } = require('electron');
 
 const { placeBallAtOldWidgetSpot } = require('./js/ballPositioner');
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
+let parseAudioMetadata = null;
+try {
+  ({ parseFile: parseAudioMetadata } = require('music-metadata'));
+} catch {
+  parseAudioMetadata = null;
+}
 const PRELOAD_PATH = path.join(__dirname, 'js', 'preload.js');
 const iconPath = path.join(__dirname, 'assets', 'tray.png');
 // ✅ 新增：tray 相关变量
@@ -34,8 +46,77 @@ const APP_SETTINGS_FILE = 'growin-ui-settings.json';
 const DEFAULT_APP_SETTINGS = Object.freeze({
   showWidget: true,
   closeBehavior: 'minimize', // 'minimize' | 'exit'
+  uiTone: 'default', // 'default' | 'sky'
 });
 let appSettings = { ...DEFAULT_APP_SETTINGS };
+
+const MUSIC_EXTS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac']);
+
+function getMusicFolder() {
+  return path.join(__dirname, 'music');
+}
+
+function walkMusicFiles(dir, out = []) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+
+  for (const entry of entries) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkMusicFiles(abs, out);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!MUSIC_EXTS.has(ext)) continue;
+    out.push(abs);
+  }
+  return out;
+}
+
+async function readTrackTag(absPath) {
+  if (!parseAudioMetadata) return null;
+  try {
+    const m = await parseAudioMetadata(absPath, { duration: false, skipCovers: true });
+    const c = m?.common || {};
+    const title = typeof c.title === 'string' ? c.title.trim() : '';
+    const album = typeof c.album === 'string' ? c.album.trim() : '';
+    const artist = typeof c.artist === 'string' ? c.artist.trim() : '';
+    return {
+      title: title || null,
+      album: album || null,
+      artist: artist || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function listMusicTracksPayload() {
+  const folder = getMusicFolder();
+  if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+
+  const files = walkMusicFiles(folder).sort((a, b) => a.localeCompare(b));
+  const tracks = await Promise.all(files.map(async (abs) => {
+    const tag = await readTrackTag(abs);
+    const file = path.basename(abs);
+    const fallbackAlbum = path.basename(path.dirname(abs)) || 'music';
+    return {
+      src: pathToFileURL(abs).toString(),
+      file,
+      title: tag?.title || file.replace(/\.[a-zA-Z0-9]+$/, ''),
+      album: tag?.album || fallbackAlbum,
+      artist: tag?.artist || '',
+      absolutePath: abs,
+    };
+  }));
+
+  return { folder, tracks };
+}
 
 function normalizeAppSettings(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
@@ -47,6 +128,7 @@ function normalizeAppSettings(raw) {
   return {
     showWidget: showWidgetRaw !== false,
     closeBehavior: src.closeBehavior === 'exit' ? 'exit' : 'minimize',
+    uiTone: String(src.uiTone || '').toLowerCase() === 'sky' ? 'sky' : 'default',
   };
 }
 
@@ -57,6 +139,9 @@ function currentSettingsPayload() {
 function broadcastAppSettingsChanged() {
   if (mainWin && !mainWin.isDestroyed()) {
     mainWin.webContents.send('appSettings:changed', currentSettingsPayload());
+  }
+  if (ballWin && !ballWin.isDestroyed()) {
+    ballWin.webContents.send('appSettings:changed', currentSettingsPayload());
   }
 }
 
@@ -112,7 +197,8 @@ function saveAppSettings() {
 function createMain() {
   mainWin = new BrowserWindow({
     width: 1100,
-    height: 760,
+    height: 960,
+    minHeight: 900,
     icon: iconPath,
     webPreferences: {
       preload: PRELOAD_PATH,
@@ -121,6 +207,16 @@ function createMain() {
     }
   });
   mainWin.loadFile('index.html'); // 你的原主界面（计时逻辑照旧）
+  mainWin.once('ready-to-show', () => {
+    try {
+      const [w, h] = mainWin.getSize();
+      if (h < 900) {
+        mainWin.setSize(Math.max(w, 1100), 960);
+      }
+    } catch {
+      // ignore
+    }
+  });
     // ✅ 关键：拦截关闭按钮 -> 不退出，改为隐藏到托盘
   mainWin.on('close', (e) => {
     if (isQuitting) return; // 真退出时放行
@@ -146,7 +242,7 @@ function createBall() {
   pendingWidgetVisibility = null;
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const winSize = 160;
+  const winSize = 180;
 
   ballWin = new BrowserWindow({
     show: false,
@@ -409,6 +505,28 @@ ipcMain.handle('appSettings:update', (_evt, patch) => {
   return currentSettingsPayload();
 });
 
+ipcMain.handle('music:openFolder', async () => {
+  try {
+    const folder = getMusicFolder();
+    if (!fs.existsSync(folder)) {
+      fs.mkdirSync(folder, { recursive: true });
+    }
+    const err = await shell.openPath(folder);
+    return { ok: !err, folder, error: err || null };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+ipcMain.handle('music:listTracks', async () => {
+  try {
+    const { folder, tracks } = await listMusicTracksPayload();
+    return { ok: true, folder, tracks };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e), tracks: [] };
+  }
+});
+
 // （可选）IPC 同步状态：作为 BroadcastChannel 的兜底
 ipcMain.on('focus:status', (_evt, st) => {
   if (mainWin) mainWin.webContents.send('focus:status', st);
@@ -418,4 +536,9 @@ ipcMain.on('focus:status', (_evt, st) => {
 // 新增：widget 发命令 -> 转给主窗口执行
 ipcMain.on('focus:command', (_evt, cmd) => {
   if (mainWin) mainWin.webContents.send('focus:command', cmd);
+});
+
+// widget music quick controls -> main window player
+ipcMain.on('music:command', (_evt, cmd) => {
+  if (mainWin) mainWin.webContents.send('music:command', cmd);
 });

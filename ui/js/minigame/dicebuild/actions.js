@@ -53,7 +53,7 @@ function renderDicePreview(ui, faces, opts = {}) {
 
     const num = document.createElement('span');
     num.className = 'mg-die-num';
-    num.textContent = String(n);
+    num.textContent = useGif ? '...' : String(n);
 
     wrap.appendChild(die);
     wrap.appendChild(num);
@@ -63,7 +63,7 @@ function renderDicePreview(ui, faces, opts = {}) {
   el.appendChild(row);
 }
 
-async function animateDiceRoll(ui, result) {
+async function animateDiceRoll(ui, result, durationMs = 760) {
   const label = ui?.mgLastRoll;
   if (!label) return;
   const animId = ++activeDiceAnimId;
@@ -74,7 +74,12 @@ async function animateDiceRoll(ui, result) {
   const dice = Array.isArray(result?.dice) ? result.dice : [1];
   const gifToken = `${Date.now()}_${++diceGifTokenSeed}`;
   renderDicePreview(ui, dice, { useGif: true, gifToken });
-  await sleep(760);
+  const BASE_DURATION_MS = 760;
+  const FRAME_MS = 17;
+  const CUT_FRAMES = 6.5;
+  const speedRatio = Math.max(0.1, Number(durationMs || BASE_DURATION_MS) / BASE_DURATION_MS);
+  const cutMs = FRAME_MS * CUT_FRAMES * speedRatio;
+  await sleep(Math.max(1, durationMs - cutMs));
   if (animId !== activeDiceAnimId) return;
   renderDicePreview(ui, dice);
   if (rollBtn && animId === activeDiceAnimId) rollBtn.classList.remove('is-rolling');
@@ -169,6 +174,7 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
     resolvePathTriggers,
     resolveLand,
     finalizeStageIfNeeded,
+    createPlayerMarker,
   } = deps;
 
   const ui = els;
@@ -179,6 +185,26 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
   let pendingDeferredRender = false;
   let shopRefreshAnimating = false;
   let hoverHideTimer = null;
+
+  const speedScale = (st) => (st?.speedMode ? 1 : 2);
+  const speedMs = (st, ms) => Math.max(1, Math.round(ms * speedScale(st)));
+
+  const syncSettingsUi = () => {
+    const st = stRef.current;
+    if (!st) return;
+    if (ui.mgSpeedModeToggle) {
+      ui.mgSpeedModeToggle.checked = !!st.speedMode;
+    }
+  };
+
+  const hideSettingsPanel = () => {
+    ui.mgSettingsPanel?.classList.add('mg-hidden');
+  };
+
+  const toggleSettingsPanel = () => {
+    syncSettingsUi();
+    ui.mgSettingsPanel?.classList.toggle('mg-hidden');
+  };
 
   const cancelHoverHide = () => {
     if (hoverHideTimer) {
@@ -270,9 +296,12 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
     const target = boardEl.querySelector(`.mg-cell[data-idx="${cellIdx}"]`);
     if (!target) return;
 
-    const marker = document.createElement('div');
-    marker.className = 'mg-player is-hop';
-    marker.textContent = '🙂';
+    const marker = createPlayerMarker ? createPlayerMarker(st, true) : (() => {
+      const el = document.createElement('div');
+      el.className = 'mg-player is-hop';
+      el.textContent = '🙂';
+      return el;
+    })();
     target.appendChild(marker);
   };
 
@@ -516,16 +545,32 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
     }, 460 + ((items.length - 1) * 26));
   };
 
-  ui.mgMenuBtn?.addEventListener('click', () => {
+  ui.mgMenuBtn?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    toggleSettingsPanel();
+  });
+
+  ui.mgBackHubBtn?.addEventListener('click', () => {
+    hideSettingsPanel();
     openMinigameHub(ui, { bypassGate: true, reason: 'hub' });
   });
 
+  ui.mgSpeedModeToggle?.addEventListener('change', () => {
+    const st = stRef.current;
+    if (!st) return;
+    st.speedMode = !!ui.mgSpeedModeToggle?.checked;
+    save(st);
+    showToast(ui.toastEl, st.speedMode ? 'Speed mode: 1x' : 'Speed mode: 0.5x');
+  });
+
   ui.mgExitBtn?.addEventListener('click', () => {
-    closeDiceBuild(ui);
+    hideSettingsPanel();
+    openMinigameHub(ui, { bypassGate: true, reason: 'hub' });
   });
 
   ui.mgResultExit?.addEventListener('click', () => {
     hideResult(ui);
+    hideSettingsPanel();
     closeDiceBuild(ui);
   });
 
@@ -1157,7 +1202,7 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
       const roll = dice.reduce((sum, n) => sum + n, 0);
       const rollText = d2 == null ? String(d1) : `${d1}+${d2}=${roll}`;
 
-      await animateDiceRoll(ui, { dice, rollText });
+      await animateDiceRoll(ui, { dice, rollText }, speedMs(st, 760));
 
       st.lastRoll = rollText;
       st.lastDice = [...dice];
@@ -1181,14 +1226,14 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
 
       await triggerOpeningPhasesSequential(st, rollCtx, float, hooks, async () => {
         render(ui, st);
-        await sleep(300);
+        await sleep(speedMs(st, 300));
       });
 
       st.isMoving = true;
       render(ui, st);
       const moveInfo = await stepMove(st, roll, async ({ loopPos }) => {
         movePlayerMarkerToLoopPos(st, loopPos);
-        await sleep(185);
+        await sleep(speedMs(st, 185));
       });
       if (moveInfo?.stoppedAtStart) {
         buildShopItems(st);
@@ -1198,12 +1243,12 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
       pendingDeferredRender = false;
       await resolvePathTriggers(st, moveInfo?.traversed || [], float, hooks, async () => {
         render(ui, st);
-        await sleep(330);
+        await sleep(speedMs(st, 330));
       });
       const landInfo = resolveLand(st, float, hooks);
       if (landInfo?.landTriggered) {
         render(ui, st);
-        await sleep(320);
+        await sleep(speedMs(st, 320));
       }
 
       finalizeStageIfNeeded(st, ui);
@@ -1255,7 +1300,14 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
 
   ui.mgRoot?.addEventListener('click', (ev) => {
     const st = stRef.current;
-    if (!st || !st.selected) return;
+    if (!st) return;
+
+    const keepSettings = ev.target.closest('#mgSettingsPanel, #mgMenuBtn');
+    if (!keepSettings) {
+      hideSettingsPanel();
+    }
+
+    if (!st.selected) return;
 
     const keep = ev.target.closest('.mg-cell, .mg-pack-slot, .mg-detail-card, #mgDetail');
     if (keep) return;

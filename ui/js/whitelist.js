@@ -94,6 +94,7 @@ export const BASE_APP_CATALOG = [
 
 
 const CUSTOM_CATALOG_KEY = 'growin.custom_app_catalog.v1';
+const WHITELIST_SELECTION_KEY = 'growin.whitelist.selection.v1';
 let customCatalog = loadCustomCatalog();
 
 function loadCustomCatalog() {
@@ -185,6 +186,25 @@ function normalizeSelection(ids) {
   const set = new Set((Array.isArray(ids) ? ids : []).filter(Boolean));
   ALWAYS_ALLOWED_APP_IDS.forEach((id) => set.add(id));
   return Array.from(set);
+}
+
+function loadSelection() {
+  try {
+    const raw = localStorage.getItem(WHITELIST_SELECTION_KEY);
+    const list = raw ? JSON.parse(raw) : null;
+    if (!Array.isArray(list)) return normalizeSelection(currentWhitelistApps);
+    return normalizeSelection(list.map(String));
+  } catch {
+    return normalizeSelection(currentWhitelistApps);
+  }
+}
+
+function saveSelection() {
+  try {
+    localStorage.setItem(WHITELIST_SELECTION_KEY, JSON.stringify(normalizeSelection(currentWhitelistApps)));
+  } catch {
+    // ignore
+  }
 }
 
 function findAppById(id) {
@@ -294,6 +314,7 @@ export function initWhitelist(groupEl) {
   }
 
   currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+  currentWhitelistApps = loadSelection();
 
   // 初始渲染：默认选中 electron
   renderSelected(groupEl);
@@ -330,6 +351,7 @@ export function initWhitelist(groupEl) {
     if (!currentWhitelistApps.includes(appId)) {
       currentWhitelistApps.push(appId);
       currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+      saveSelection();
       renderSelected(groupEl);
     }
 
@@ -353,6 +375,7 @@ export function initWhitelist(groupEl) {
     if (!currentWhitelistApps.includes(appId)) {
       currentWhitelistApps.push(appId);
       currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+      saveSelection();
       renderSelected(groupEl);
     }
 
@@ -371,6 +394,7 @@ export function initWhitelist(groupEl) {
 
     currentWhitelistApps = currentWhitelistApps.filter(id => id !== appId);
     currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+    saveSelection();
 
     renderSelected(groupEl);
   });

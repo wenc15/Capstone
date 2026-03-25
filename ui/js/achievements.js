@@ -1,19 +1,38 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Refine achievement popup queue behavior and panel rendering stability.
+
 // ui/js/achievements.js
 // Purpose:
 //  - Render Achievements view (minimal list: icon + title + desc + progress).
 //  - Fetch from backend: GET /api/achievements.
 
-import { showToast } from './utils.js';
-
 const API_BASE = 'http://localhost:5024';
 const SEEN_UNLOCKED_KEY = 'growin:achievements:seenUnlocked';
+const ACHV_POPUP_HOST_ID = 'achvPopupHost';
 
 let mounted = false;
 let inFlight = null;
+let latestEls = null;
+const popupQueue = [];
+const queuedPopupIds = new Set();
+let activePopupId = '';
+let popupActive = false;
+let pollTimer = null;
+let hasUnlockedBaseline = false;
+const lastUnlockedState = new Map();
+let keepOpenAchvId = '';
+let keepOpenUntil = 0;
+let lastListDigest = '';
+
+const POPUP_STAY_MS = 5000;
+const POPUP_EXIT_MS = 650;
+const ACHV_POLL_MS = 1000;
 
 export function mountAchievements(els) {
   if (mounted) return;
   mounted = true;
+  latestEls = els || latestEls;
 
   const { achvRefreshBtn } = els || {};
   if (achvRefreshBtn) {
@@ -21,24 +40,52 @@ export function mountAchievements(els) {
       refreshAchievements(els, { force: true });
     });
   }
+
+  // Keep achievements synced globally so newly unlocked popup can appear
+  // even when user is not currently on the achievements page.
+  refreshAchievements(els, { force: true }).catch(() => {});
+  if (!pollTimer) {
+    pollTimer = setInterval(() => {
+      if (!latestEls) return;
+      refreshAchievements(latestEls, { silent: true }).catch(() => {});
+    }, ACHV_POLL_MS);
+  }
+
+  window.addEventListener('focus', () => {
+    if (!latestEls) return;
+    refreshAchievements(latestEls, { force: true, silent: true }).catch(() => {});
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (!latestEls) return;
+    refreshAchievements(latestEls, { force: true, silent: true }).catch(() => {});
+  });
 }
 
 export function onEnterAchievements(els) {
+  latestEls = els || latestEls;
   mountAchievements(els);
   refreshAchievements(els);
 }
 
-async function refreshAchievements(els, { force = false } = {}) {
+async function refreshAchievements(els, { force = false, silent = false } = {}) {
+  latestEls = els || latestEls;
   const { achvList, achvMeta, achvEmpty, achvError, toastEl, achvRefreshBtn } = els || {};
   if (!achvList || !achvMeta) return;
 
   if (inFlight && !force) return inFlight;
 
-  setVisible(achvError, false);
-  setVisible(achvEmpty, false);
-  achvMeta.textContent = 'Loading...';
-  renderSkeleton(achvList);
-  if (achvRefreshBtn) achvRefreshBtn.disabled = true;
+  if (!silent) {
+    setVisible(achvError, false);
+    setVisible(achvEmpty, false);
+    const hasExistingRows = achvList.childElementCount > 0;
+    achvMeta.textContent = hasExistingRows ? 'Refreshing...' : 'Loading...';
+    if (!hasExistingRows) {
+      renderSkeleton(achvList);
+    }
+    if (achvRefreshBtn) achvRefreshBtn.disabled = true;
+  }
 
   inFlight = (async () => {
     try {
@@ -58,23 +105,32 @@ async function refreshAchievements(els, { force = false } = {}) {
       const list = Array.isArray(data?.achievements) ? data.achievements : [];
       const normalized = list.map(normalizeAchievement);
       const sorted = sortAchievements(normalized);
+      const digest = buildListDigest(sorted);
+      const changed = digest !== lastListDigest;
+      lastListDigest = digest;
 
       const unlockedCount = sorted.filter(a => a.unlocked).length;
-      achvMeta.textContent = `${unlockedCount}/${sorted.length} unlocked`;
+      if (!silent || changed) {
+        achvMeta.textContent = `${unlockedCount}/${sorted.length} unlocked`;
+      }
 
-      renderAchievementList(els, sorted);
-      setVisible(achvEmpty, sorted.length === 0);
+      if (!silent || changed) {
+        renderAchievementList(els, sorted);
+        setVisible(achvEmpty, sorted.length === 0);
+      }
 
       toastNewUnlocks(toastEl, sorted);
     } catch (err) {
-      achvMeta.textContent = 'Offline';
-      achvList.innerHTML = '';
-      if (achvError) {
-        achvError.textContent = `Failed to load achievements: ${err?.message || 'unknown error'}`;
-        setVisible(achvError, true);
+      if (!silent) {
+        achvMeta.textContent = 'Offline';
+        achvList.innerHTML = '';
+        if (achvError) {
+          achvError.textContent = `Failed to load achievements: ${err?.message || 'unknown error'}`;
+          setVisible(achvError, true);
+        }
       }
     } finally {
-      if (achvRefreshBtn) achvRefreshBtn.disabled = false;
+      if (!silent && achvRefreshBtn) achvRefreshBtn.disabled = false;
       inFlight = null;
     }
   })();
@@ -130,6 +186,7 @@ function clamp01(v) {
 function renderAchievementList(els, list) {
   const { achvList } = els;
   achvList.innerHTML = '';
+  const shouldKeepOpen = Date.now() <= keepOpenUntil;
 
   for (const a of list) {
     const row = document.createElement('button');
@@ -176,11 +233,41 @@ function renderAchievementList(els, list) {
     detail.setAttribute('aria-hidden', 'true');
     detail.innerHTML = buildDetailHtml(a);
 
+    if (shouldKeepOpen && keepOpenAchvId && a.id === keepOpenAchvId) {
+      row.classList.add('is-open');
+      row.setAttribute('aria-expanded', 'true');
+      detail.classList.add('is-open');
+      detail.setAttribute('aria-hidden', 'false');
+    }
+
     row.addEventListener('click', () => {
-      const isOpen = row.classList.toggle('is-open');
+      const wasOpen = row.classList.contains('is-open');
+
+      achvList.querySelectorAll('.achv-row.is-open').forEach((r) => {
+        if (r === row) return;
+        r.classList.remove('is-open');
+        r.setAttribute('aria-expanded', 'false');
+      });
+      achvList.querySelectorAll('.achv-detail.is-open').forEach((d) => {
+        const prevRow = d.previousElementSibling;
+        if (prevRow === row) return;
+        d.classList.remove('is-open');
+        d.setAttribute('aria-hidden', 'true');
+      });
+
+      const isOpen = !wasOpen;
+      row.classList.toggle('is-open', isOpen);
       row.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
       detail.classList.toggle('is-open', isOpen);
       detail.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+
+      if (isOpen) {
+        keepOpenAchvId = a.id;
+        keepOpenUntil = Date.now() + 8000;
+      } else if (keepOpenAchvId === a.id) {
+        keepOpenAchvId = '';
+        keepOpenUntil = 0;
+      }
     });
 
     achvList.appendChild(row);
@@ -193,13 +280,21 @@ function buildDetailHtml(a) {
   const barPct = Math.round(pct * 100);
   const status = a.unlocked ? 'Unlocked' : 'In progress';
   const when = a.unlocked && a.unlockedAt ? ` · ${formatWhen(a.unlockedAt)}` : '';
+  const progressPct = !a.unlocked && a.target > 0 ? `${barPct}%` : '';
 
   return `
     <div class="achv-detail-row">
-      <div class="achv-detail-status">${escapeHtml(status)}${escapeHtml(when)}</div>
+      <div class="achv-detail-status">
+        <span>${escapeHtml(status)}${escapeHtml(when)}</span>
+        <span class="achv-detail-pct">${escapeHtml(progressPct)}</span>
+      </div>
       <div class="achv-bar" aria-hidden="true"><div class="achv-bar-fill" style="width:${barPct}%"></div></div>
     </div>
   `.trim();
+}
+
+function buildListDigest(list) {
+  return (list || []).map((a) => [a.id, a.unlocked ? 1 : 0, a.progress, a.target, a.unlockedAt || ''].join(':')).join('|');
 }
 
 function formatWhen(isoOrDateLike) {
@@ -212,21 +307,170 @@ function formatWhen(isoOrDateLike) {
   }
 }
 
-function toastNewUnlocks(toastEl, list) {
+function toastNewUnlocks(_toastEl, list) {
   const unlockedIds = list.filter(a => a.unlocked && a.id).map(a => a.id);
-  if (unlockedIds.length === 0) return;
+  const byId = new Map(list.map((a) => [a.id, a]));
 
-  const seen = readSeenUnlocked();
-  const newly = unlockedIds.filter(id => !seen.has(id));
-  if (newly.length === 0) return;
-
-  const first = list.find(a => a.id === newly[0]);
-  if (first) {
-    showToast(toastEl, `Unlocked: ${first.title || first.id}`);
+  if (!hasUnlockedBaseline) {
+    hasUnlockedBaseline = true;
+    writeSeenUnlocked(new Set(unlockedIds));
+    syncLastUnlockedState(list);
+    return;
   }
 
-  const nextSeen = new Set([...seen, ...newly]);
-  writeSeenUnlocked(nextSeen);
+  const seen = readSeenUnlocked();
+  const directNew = unlockedIds.filter((id) => !seen.has(id));
+  const transitioned = list
+    .filter((a) => a.unlocked && lastUnlockedState.get(a.id) === false)
+    .map((a) => a.id);
+
+  const toShow = [...new Set([...directNew, ...transitioned])]
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+
+  toShow.forEach((a) => enqueueAchievementPopup(a));
+
+  writeSeenUnlocked(new Set(unlockedIds));
+  syncLastUnlockedState(list);
+}
+
+function syncLastUnlockedState(list) {
+  lastUnlockedState.clear();
+  for (const a of list || []) {
+    if (!a?.id) continue;
+    lastUnlockedState.set(a.id, !!a.unlocked);
+  }
+}
+
+function ensurePopupHost() {
+  let host = document.getElementById(ACHV_POPUP_HOST_ID);
+  if (host) return host;
+  host = document.createElement('div');
+  host.id = ACHV_POPUP_HOST_ID;
+  host.className = 'achv-popup-host';
+  document.body.appendChild(host);
+  return host;
+}
+
+function enqueueAchievementPopup(achv) {
+  if (!achv) return;
+  const id = String(achv.id || '');
+  if (!id) return;
+  if (queuedPopupIds.has(id) || activePopupId === id) return;
+  queuedPopupIds.add(id);
+  popupQueue.push(achv);
+  if (popupActive) return;
+  showNextAchievementPopup();
+}
+
+function showNextAchievementPopup() {
+  if (popupActive) return;
+  const next = popupQueue.shift();
+  if (!next) return;
+  queuedPopupIds.delete(String(next.id || ''));
+  activePopupId = String(next.id || '');
+  popupActive = true;
+  showAchievementPopup(next, () => {
+    activePopupId = '';
+    popupActive = false;
+    setTimeout(() => {
+      showNextAchievementPopup();
+    }, 60);
+  });
+}
+
+function showAchievementPopup(achv, onDone) {
+  if (!achv) return;
+  const host = ensurePopupHost();
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = 'achv-popup';
+  item.innerHTML = `
+    <div class="achv-popup-icon">${iconSvgFor(achv.type)}</div>
+    <div class="achv-popup-main">
+      <div class="achv-popup-kicker">Achievement Unlocked</div>
+      <div class="achv-popup-title">${escapeHtml(achv.title || achv.id || 'Achievement')}</div>
+      <div class="achv-popup-desc">${escapeHtml(achv.desc || '')}</div>
+    </div>
+  `.trim();
+  host.appendChild(item);
+
+  let closed = false;
+
+  const closePopup = () => {
+    if (closed) return;
+    closed = true;
+    item.classList.remove('is-on');
+    item.classList.add('is-off');
+    setTimeout(() => {
+      item.remove();
+      try { onDone?.(); } catch {}
+    }, POPUP_EXIT_MS);
+  };
+
+  item.addEventListener('click', () => {
+    if (achv?.id) {
+      openAchievementFromPopup(achv.id);
+    }
+    closePopup();
+  });
+
+  // Force initial off-screen style to be committed before entering,
+  // otherwise some browsers may skip the enter transition and flash.
+  void item.offsetWidth;
+  setTimeout(() => {
+    if (!closed) item.classList.add('is-on');
+  }, 24);
+
+  setTimeout(() => {
+    closePopup();
+  }, POPUP_STAY_MS);
+}
+
+function openAchievementFromPopup(achvId) {
+  const els = latestEls;
+  keepOpenAchvId = String(achvId || '');
+  keepOpenUntil = Date.now() + 10000;
+  const navBtn = els?.navAchievements || document.getElementById('nav-achievements');
+  if (navBtn) navBtn.click();
+  if (els) {
+    refreshAchievements(els, { force: true }).catch(() => {});
+  }
+
+  let retry = 0;
+  const maxRetry = 16;
+  const timer = setInterval(() => {
+    retry += 1;
+    const list = els?.achvList || document.getElementById('achvList');
+    const escapedId = cssEscape(String(achvId));
+    const row = list?.querySelector(`[data-achv-id="${escapedId}"]`);
+    if (row) {
+      clearInterval(timer);
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (!row.classList.contains('is-open')) {
+        row.classList.add('is-open');
+        row.setAttribute('aria-expanded', 'true');
+        const detail = row.nextElementSibling;
+        if (detail?.classList?.contains('achv-detail')) {
+          detail.classList.add('is-open');
+          detail.setAttribute('aria-hidden', 'false');
+        }
+      }
+      row.classList.add('is-highlight');
+      setTimeout(() => row.classList.remove('is-highlight'), 1600);
+      return;
+    }
+    if (retry >= maxRetry) {
+      clearInterval(timer);
+    }
+  }, 120);
+}
+
+function cssEscape(value) {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(value);
+  }
+  return String(value).replace(/"/g, '\\"');
 }
 
 function readSeenUnlocked() {

@@ -1,3 +1,7 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Stabilize token value flash behavior to avoid layout jitter on unchanged updates.
+
 // 2026.1.22 created by JS
 // 新增内容：
 //   - Token 显示层挂载逻辑：订阅 creditsStore 并更新 DOM。
@@ -15,11 +19,42 @@ import { addCredits, refreshCredits, subscribeCredits } from "./creditsStore.js"
 import { showToast } from "./utils.js";
 
 export function mountToken(els) {
+  let lastValue = null;
+
+  function showTokenGainBubble(amount) {
+    const host = els.tokenChip || els.tokenValue?.closest?.('.token-chip');
+    if (!host) return;
+
+    const bubble = document.createElement('span');
+    bubble.className = 'token-gain-bubble';
+    bubble.textContent = `+${Math.max(0, Math.round(Number(amount) || 0))}`;
+    host.appendChild(bubble);
+
+    requestAnimationFrame(() => {
+      bubble.classList.add('is-on');
+    });
+    setTimeout(() => {
+      bubble.classList.remove('is-on');
+      bubble.classList.add('is-off');
+      setTimeout(() => bubble.remove(), 280);
+    }, 980);
+  }
+
   subscribeCredits((value) => {
     if (!els.tokenValue) return;
-    els.tokenValue.textContent = String(value);
-    els.tokenValue.classList.add("flash");
-    setTimeout(() => els.tokenValue.classList.remove("flash"), 250);
+    const next = String(value);
+    const changed = lastValue != null && next !== lastValue;
+    els.tokenValue.textContent = next;
+    if (changed) {
+      els.tokenValue.classList.add("flash");
+      setTimeout(() => els.tokenValue.classList.remove("flash"), 250);
+    }
+    lastValue = next;
+  });
+
+  window.addEventListener('growin:token-gain', (ev) => {
+    const gain = Number(ev?.detail?.amount || 0);
+    if (gain > 0) showTokenGainBubble(gain);
   });
 
   // Test helper: +1000 tokens

@@ -1,3 +1,7 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Sync Dice & Build pool background usage with dedicated gacha dicebuild asset.
+
 // 2026/03/22 edited by Zhecheng Xu
 // Changes:
 //  - Keep minimal gacha layout and restore "Feed Your Goals" food title.
@@ -60,6 +64,22 @@ const POOLS = [
     ],
     tenDrawNote: '10x: guaranteed epic tetris skin in this pool.',
   },
+  {
+    key: 'dicebuild',
+    title: 'Dice & Build Skins',
+    poolName: 'Dice & Build Skin Pool',
+    subtitle: 'Draw cosmetic skins for Dice & Build minigame.',
+    featured: 'Dice & Build skin',
+    tenSubText: 'dice & build skin guaranteed',
+    apiType: 'skin',
+    backendPool: 'dicebuild',
+    rates: [
+      { label: 'Common', value: '70%' },
+      { label: 'Rare', value: '25%' },
+      { label: 'Dice & Build skin (Epic)', value: '5%' },
+    ],
+    tenDrawNote: '10x: guaranteed epic Dice & Build skin in this pool.',
+  },
 ];
 
 const FOOD_ICON_BY_ID = {
@@ -72,7 +92,7 @@ const FOOD_ICON_BY_ID = {
   food_004: '🐟',
 };
 
-const POOL_BG_CLASSES = ['gacha-bg-food', 'gacha-bg-snake', 'gacha-bg-tetris'];
+const POOL_BG_CLASSES = ['gacha-bg-food', 'gacha-bg-snake', 'gacha-bg-tetris', 'gacha-bg-dicebuild'];
 
 let mounted = false;
 let currentPoolIdx = 0;
@@ -224,6 +244,21 @@ export function mountGacha(els) {
     skipRequested = false;
     cancelAutoFade(panel.root);
 
+    const required = count * DRAW_COST;
+
+    // Pre-check credits before opening draw panel, so insufficient token
+    // won't flash the reveal UI for a split second.
+    try {
+      const credits = await refreshCredits();
+      if (credits < required) throw new Error(`Not enough credits. Need ${required}, current ${credits}.`);
+    } catch (error) {
+      console.warn('[Gacha] pre-check failed:', error);
+      showToast(toastEl, error?.message || 'Draw failed.');
+      isAnimating = false;
+      skipRequested = false;
+      return;
+    }
+
     panel.skipBtn.disabled = false;
     panel.skipBtn.style.visibility = 'visible';
     panel.skipBtn.style.pointerEvents = 'auto';
@@ -235,10 +270,6 @@ export function mountGacha(els) {
     panel.root.classList.remove('is-hidden');
 
     try {
-      const credits = await refreshCredits();
-      const required = count * DRAW_COST;
-      if (credits < required) throw new Error(`Not enough credits. Need ${required}, current ${credits}.`);
-
       const pool = getCurrentPool();
       const { items, guaranteeApplied } = await drawFromPool(pool, count);
       if (!items.length) throw new Error('No draw result returned.');
@@ -466,6 +497,7 @@ async function handleDuplicateSkinCompensation(items) {
 function skinIcon(itemId) {
   if (String(itemId).includes('snake')) return '🐍';
   if (String(itemId).includes('tetris')) return '🧩';
+  if (String(itemId).includes('dicebuild')) return '🎲';
   return '🎴';
 }
 

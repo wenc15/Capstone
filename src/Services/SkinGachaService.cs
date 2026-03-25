@@ -154,7 +154,9 @@ public class SkinGachaService : ISkinGachaService
     private static string NormalizePoolKey(string? pool)
     {
         var value = pool?.Trim().ToLowerInvariant();
-        return value == "snake" ? "snake" : "tetris";
+        if (value == "snake") return "snake";
+        if (value == "dicebuild") return "dicebuild";
+        return "tetris";
     }
 
     private static string NormalizeFoodRarity(string? rarity)

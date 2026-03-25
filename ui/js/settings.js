@@ -1,3 +1,8 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Add focus music autoplay preference and broadcast to music module.
+//  - Persist UI tone changes through app settings for widget/main sync.
+
 // 2026/03/19 edited by Zhecheng Xu
 // Changes:
 //  - Add Settings data management modal.
@@ -10,10 +15,90 @@ import { showToast } from './utils.js';
 
 const API_BASE = 'http://localhost:5024';
 const APP_SETTINGS_LOCAL_KEY = 'growin:appBehaviorSettings';
+const MUSIC_VOLUME_LOCAL_KEY = 'growin:music.volume.v1';
+const MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY = 'growin:music.autoplayOnFocus.v1';
 const DEFAULT_APP_SETTINGS = {
   showWidget: true,
   closeBehavior: 'minimize',
+  uiTone: 'default',
 };
+
+function clampMusicVolume01(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0.35;
+  return Math.max(0, Math.min(1, n));
+}
+
+function loadMusicVolume01() {
+  try {
+    const raw = localStorage.getItem(MUSIC_VOLUME_LOCAL_KEY);
+    if (raw == null) return 0.35;
+    return clampMusicVolume01(raw);
+  } catch {
+    return 0.35;
+  }
+}
+
+function saveMusicVolume01(v) {
+  try {
+    localStorage.setItem(MUSIC_VOLUME_LOCAL_KEY, String(clampMusicVolume01(v)));
+  } catch {
+    // ignore local storage failures
+  }
+}
+
+function loadMusicAutoplayOnFocus() {
+  try {
+    const raw = localStorage.getItem(MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY);
+    if (raw == null) return true;
+    return raw !== '0' && raw !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function saveMusicAutoplayOnFocus(enabled) {
+  try {
+    localStorage.setItem(MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY, enabled ? '1' : '0');
+  } catch {
+    // ignore local storage failures
+  }
+}
+
+function updateMusicVolumeLabel(els, volume01) {
+  if (!els?.settingMusicVolumeValue) return;
+  const pct = Math.round(clampMusicVolume01(volume01) * 100);
+  els.settingMusicVolumeValue.textContent = `${pct}%`;
+}
+
+function emitMusicVolume(volume01) {
+  window.dispatchEvent(new CustomEvent('growin:music-volume', {
+    detail: { value: clampMusicVolume01(volume01) },
+  }));
+}
+
+function emitMusicAutoplayOnFocus(enabled) {
+  window.dispatchEvent(new CustomEvent('growin:music-autoplay-on-focus', {
+    detail: { enabled: !!enabled },
+  }));
+}
+
+function normalizeUiTone(v) {
+  return String(v || '').trim().toLowerCase() === 'sky' ? 'sky' : 'default';
+}
+
+function applyUiTone(tone) {
+  const next = normalizeUiTone(tone);
+  document.documentElement.setAttribute('data-ui-tone', next);
+  return next;
+}
+
+function withUiToneFallback(settings, fallbackTone = 'default') {
+  return {
+    ...(settings || {}),
+    uiTone: normalizeUiTone(settings?.uiTone ?? fallbackTone),
+  };
+}
 
 async function parseJsonSafe(res) {
   try {
@@ -38,13 +123,15 @@ function openSettings(els) {
 function resolveAppSettingsFromRenderer(els) {
   const showWidget = els?.settingShowWidget?.checked !== false;
   const closeBehavior = els?.settingCloseBehavior?.value === 'exit' ? 'exit' : 'minimize';
-  return { showWidget, closeBehavior };
+  const uiTone = normalizeUiTone(els?.settingUiTone?.value);
+  return { showWidget, closeBehavior, uiTone };
 }
 
 function applyAppSettingsToRenderer(els, settings) {
   const safe = {
     showWidget: settings?.showWidget ?? (settings?.widgetVisibleOnStartup !== false),
     closeBehavior: settings?.closeBehavior === 'exit' ? 'exit' : 'minimize',
+    uiTone: normalizeUiTone(settings?.uiTone),
   };
 
   if (els?.settingShowWidget) {
@@ -53,6 +140,10 @@ function applyAppSettingsToRenderer(els, settings) {
   if (els?.settingCloseBehavior) {
     els.settingCloseBehavior.value = safe.closeBehavior;
   }
+  if (els?.settingUiTone) {
+    els.settingUiTone.value = safe.uiTone;
+  }
+  applyUiTone(safe.uiTone);
 
   return safe;
 }
@@ -77,7 +168,7 @@ function saveLocalAppSettings(settings) {
 
 async function loadAppBehaviorSettings(els) {
   const local = loadLocalAppSettings();
-  applyAppSettingsToRenderer(els, local || DEFAULT_APP_SETTINGS);
+  const localSafe = applyAppSettingsToRenderer(els, local || DEFAULT_APP_SETTINGS);
 
   const api = window.electronAPI;
   if (!api?.getAppSettings) {
@@ -86,7 +177,8 @@ async function loadAppBehaviorSettings(els) {
 
   try {
     const settings = await api.getAppSettings();
-    const safe = applyAppSettingsToRenderer(els, settings);
+    const mergedSettings = withUiToneFallback(settings, localSafe.uiTone);
+    const safe = applyAppSettingsToRenderer(els, mergedSettings);
     saveLocalAppSettings(safe);
   } catch (err) {
     console.warn('[Settings] Failed to load app settings:', err);
@@ -98,7 +190,9 @@ function bindAppSettingSyncEvents(els) {
   if (!api?.onAppSettingsChanged) return;
 
   api.onAppSettingsChanged((settings) => {
-    const safe = applyAppSettingsToRenderer(els, settings);
+    const local = loadLocalAppSettings() || DEFAULT_APP_SETTINGS;
+    const mergedSettings = withUiToneFallback(settings, local.uiTone);
+    const safe = applyAppSettingsToRenderer(els, mergedSettings);
     saveLocalAppSettings(safe);
   });
 }
@@ -107,7 +201,9 @@ async function saveAppBehaviorSettings(els) {
   const meta = els?.settingsBehaviorMeta;
   const api = window.electronAPI;
   const patch = resolveAppSettingsFromRenderer(els);
-  saveLocalAppSettings(patch);
+  const localNext = { ...(loadLocalAppSettings() || DEFAULT_APP_SETTINGS), ...patch };
+  saveLocalAppSettings(localNext);
+  applyUiTone(localNext.uiTone);
 
   if (!api?.updateAppSettings) {
     if (meta) meta.textContent = 'Saved locally. Restart app to apply desktop behavior.';
@@ -117,8 +213,10 @@ async function saveAppBehaviorSettings(els) {
   if (meta) meta.textContent = 'Saving...';
   try {
     const saved = await api.updateAppSettings(patch);
-    const safe = applyAppSettingsToRenderer(els, saved);
+    const mergedSettings = withUiToneFallback(saved, localNext.uiTone);
+    const safe = applyAppSettingsToRenderer(els, mergedSettings);
     saveLocalAppSettings(safe);
+    applyUiTone(safe.uiTone);
     if (meta) meta.textContent = 'Saved.';
   } catch (err) {
     console.warn('[Settings] Failed to save app settings:', err);
@@ -134,6 +232,7 @@ async function saveCloseBehaviorOnly(els) {
   const localBase = loadLocalAppSettings() || DEFAULT_APP_SETTINGS;
   const localNext = { ...localBase, closeBehavior };
   saveLocalAppSettings(localNext);
+  applyUiTone(localNext.uiTone);
 
   if (!api?.updateAppSettings) {
     if (meta) meta.textContent = 'Saved locally. Restart app to apply desktop behavior.';
@@ -143,8 +242,10 @@ async function saveCloseBehaviorOnly(els) {
   if (meta) meta.textContent = 'Saving...';
   try {
     const saved = await api.updateAppSettings({ closeBehavior });
-    const safe = applyAppSettingsToRenderer(els, saved);
+    const mergedSettings = withUiToneFallback(saved, localNext.uiTone);
+    const safe = applyAppSettingsToRenderer(els, mergedSettings);
     saveLocalAppSettings(safe);
+    applyUiTone(safe.uiTone);
     if (meta) meta.textContent = 'Saved.';
   } catch (err) {
     console.warn('[Settings] Failed to save close behavior:', err);
@@ -158,7 +259,9 @@ async function setWidgetVisibilityDirect(els, visible) {
 
   try {
     const saved = await api.setWidgetVisible(!!visible);
-    const safe = applyAppSettingsToRenderer(els, saved);
+    const local = loadLocalAppSettings() || DEFAULT_APP_SETTINGS;
+    const mergedSettings = withUiToneFallback(saved, local.uiTone);
+    const safe = applyAppSettingsToRenderer(els, mergedSettings);
     saveLocalAppSettings(safe);
   } catch (err) {
     console.warn('[Settings] Failed to set widget visibility directly:', err);
@@ -222,9 +325,6 @@ async function importArchive(els) {
     return;
   }
 
-  const ok = window.confirm('Import will overwrite your current local data. Continue?');
-  if (!ok) return;
-
   const prev = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Importing...';
@@ -260,6 +360,85 @@ async function importArchive(els) {
   }
 }
 
+async function deleteAllLocalData(els) {
+  const btn = els.archiveDeleteBtn;
+  if (!btn) return;
+
+  const first = window.confirm('This will permanently delete all local data. Continue?');
+  if (!first) return;
+  const second = window.confirm('Final confirmation: this action cannot be undone. Delete now?');
+  if (!second) return;
+
+  const prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Deleting...';
+
+  try {
+    window.dispatchEvent(new CustomEvent('growin:force-stop-focus'));
+    try {
+      await fetch(`${API_BASE}/api/focus/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+    } catch {
+      // ignore stop failures; clear still proceeds
+    }
+
+    const res = await fetch(`${API_BASE}/api/archive/clear`, {
+      method: 'POST',
+    });
+    const body = await parseJsonSafe(res);
+    if (!res.ok) {
+      const msg = body?.error || body?.message || `${res.status} ${res.statusText}`;
+      throw new Error(msg);
+    }
+
+    try {
+      [
+        'growin.whitelist.selection.v1',
+        'growin.custom_app_catalog.v1',
+        'growin.timer.selectedMins.v1',
+        'growin.session.summary.v2',
+        MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY,
+      ].forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignore localStorage failures
+    }
+
+    showToast(els.toastEl, 'Local data deleted. Reloading UI...');
+    setTimeout(() => {
+      window.location.reload();
+    }, 450);
+  } catch (e) {
+    console.warn('[Settings] Delete data failed:', e);
+    showToast(els.toastEl, e?.message || 'Delete data failed.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+}
+
+function refreshImportCta(els) {
+  const fileInput = els.archiveImportFile;
+  const btn = els.archiveImportBtn;
+  const meta = els.archiveImportMeta;
+  const reselectBtn = els.archiveReselectBtn;
+  if (!fileInput || !btn || !meta) return;
+
+  const f = fileInput.files?.[0] || null;
+  if (!f) {
+    btn.textContent = 'Import Data';
+    meta.textContent = 'No file selected yet.';
+    if (reselectBtn) reselectBtn.hidden = true;
+    return;
+  }
+
+  btn.textContent = 'Confirm Import';
+  meta.textContent = `Selected: ${f.name}`;
+  if (reselectBtn) reselectBtn.hidden = false;
+}
+
 export function mountSettings(els) {
   const {
     settingsOpenBtn,
@@ -267,15 +446,34 @@ export function mountSettings(els) {
     settingsCloseBtn,
     settingShowWidget,
     settingCloseBehavior,
+    settingUiTone,
+    settingMusicAutoPlay,
+    settingMusicVolume,
+    settingMusicVolumeValue,
+    openMusicFolderBtn,
     settingsBehaviorMeta,
     archiveExportBtn,
     archiveImportFile,
     archiveImportBtn,
+    archiveReselectBtn,
+    archiveDeleteBtn,
   } = els || {};
 
-  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !settingShowWidget || !settingCloseBehavior || !settingsBehaviorMeta) {
+  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !archiveReselectBtn || !archiveDeleteBtn || !settingShowWidget || !settingCloseBehavior || !settingUiTone || !settingsBehaviorMeta || !openMusicFolderBtn) {
     return;
   }
+
+  const bootMusicVol = loadMusicVolume01();
+  const bootAutoPlay = loadMusicAutoplayOnFocus();
+  if (settingMusicVolume) {
+    settingMusicVolume.value = String(Math.round(bootMusicVol * 100));
+  }
+  if (settingMusicAutoPlay) {
+    settingMusicAutoPlay.checked = bootAutoPlay;
+  }
+  updateMusicVolumeLabel(els, bootMusicVol);
+  emitMusicVolume(bootMusicVol);
+  emitMusicAutoplayOnFocus(bootAutoPlay);
 
   loadAppBehaviorSettings(els);
   bindAppSettingSyncEvents(els);
@@ -294,15 +492,90 @@ export function mountSettings(els) {
 
   archiveImportFile.addEventListener('change', () => {
     const f = archiveImportFile.files?.[0];
-    const enabled = !!f && f.name.toLowerCase().endsWith('.json');
-    archiveImportBtn.disabled = !enabled;
+    if (f && !f.name.toLowerCase().endsWith('.json')) {
+      archiveImportFile.value = '';
+      showToast(els.toastEl, 'Only .json file is supported.');
+    }
+    refreshImportCta(els);
   });
 
   archiveExportBtn.addEventListener('click', () => exportArchive(els));
-  archiveImportBtn.addEventListener('click', () => importArchive(els));
+  archiveImportBtn.addEventListener('click', () => {
+    const f = archiveImportFile.files?.[0] || null;
+    if (!f) {
+      archiveImportFile.click();
+      return;
+    }
+    importArchive(els).finally(() => {
+      archiveImportFile.value = '';
+      refreshImportCta(els);
+    });
+  });
+  archiveReselectBtn.addEventListener('click', () => {
+    archiveImportFile.click();
+  });
+  archiveDeleteBtn.addEventListener('click', () => deleteAllLocalData(els));
+  openMusicFolderBtn.addEventListener('click', async () => {
+    const api = window.electronAPI;
+    if (!api?.openMusicFolder) {
+      showToast(els.toastEl, 'Music folder opening is unavailable.');
+      return;
+    }
+    const res = await api.openMusicFolder();
+    if (res?.ok) {
+      if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = `Opened: ${res.folder}`;
+      showToast(els.toastEl, 'Music folder opened.');
+    } else {
+      showToast(els.toastEl, res?.error || 'Failed to open music folder.');
+    }
+  });
   settingShowWidget.addEventListener('change', async () => {
     await setWidgetVisibilityDirect(els, settingShowWidget.checked);
     if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = 'Saved.';
   });
   settingCloseBehavior.addEventListener('change', () => saveCloseBehaviorOnly(els));
+  settingUiTone.addEventListener('change', () => {
+    const next = resolveAppSettingsFromRenderer(els);
+    const localNext = { ...(loadLocalAppSettings() || DEFAULT_APP_SETTINGS), uiTone: next.uiTone };
+    saveLocalAppSettings(localNext);
+    applyUiTone(localNext.uiTone);
+    const api = window.electronAPI;
+    if (api?.updateAppSettings) {
+      api.updateAppSettings({ uiTone: next.uiTone })
+        .then((saved) => {
+          const merged = withUiToneFallback(saved, localNext.uiTone);
+          const safe = applyAppSettingsToRenderer(els, merged);
+          saveLocalAppSettings(safe);
+          if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = 'Saved.';
+        })
+        .catch(() => {
+          if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = 'Saved locally.';
+        });
+      return;
+    }
+    if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = 'Saved locally.';
+  });
+
+  if (settingMusicAutoPlay) {
+    settingMusicAutoPlay.addEventListener('change', () => {
+      const enabled = !!settingMusicAutoPlay.checked;
+      saveMusicAutoplayOnFocus(enabled);
+      emitMusicAutoplayOnFocus(enabled);
+      if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = enabled
+        ? 'Focus auto-play music: On.'
+        : 'Focus auto-play music: Off.';
+    });
+  }
+
+  if (settingMusicVolume) {
+    settingMusicVolume.addEventListener('input', () => {
+      const volume01 = clampMusicVolume01(Number(settingMusicVolume.value) / 100);
+      updateMusicVolumeLabel(els, volume01);
+      saveMusicVolume01(volume01);
+      emitMusicVolume(volume01);
+      if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = `Music volume: ${Math.round(volume01 * 100)}%`;
+    });
+  }
+
+  refreshImportCta(els);
 }

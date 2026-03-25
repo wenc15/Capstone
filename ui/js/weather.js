@@ -55,6 +55,20 @@ function emojiByCode(code) {
   return '☁️';
 }
 
+function labelByCode(code) {
+  const n = Number(code);
+  if (n === 0) return 'Clear';
+  if (n === 1) return 'Mainly Clear';
+  if (n === 2) return 'Partly Cloudy';
+  if (n === 3) return 'Cloudy';
+  if ([45, 48].includes(n)) return 'Foggy';
+  if ([51, 53, 55, 56, 57].includes(n)) return 'Drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(n)) return 'Rain';
+  if ([71, 73, 75, 77, 85, 86].includes(n)) return 'Snow';
+  if ([95, 96, 99].includes(n)) return 'Thunderstorm';
+  return 'Cloudy';
+}
+
 function setWeatherUI(els, { tempText, icon, title }) {
   if (els?.weatherTemp && tempText) els.weatherTemp.textContent = tempText;
   if (els?.weatherIcon && icon) els.weatherIcon.textContent = icon;
@@ -163,18 +177,20 @@ async function refreshWeather(els) {
 
     const rounded = Math.round(current.temp);
     const icon = emojiByCode(current.code);
+    const label = labelByCode(current.code);
     const place = fromBrowserGeo ? 'Current location' : '';
+    const summary = `${label}, ${rounded}°C`;
 
     setWeatherUI(els, {
       tempText: `${rounded}°C`,
       icon,
-      title: place ? `${place} · ${rounded}°C` : `${rounded}°C`,
+      title: place ? `${place} · ${summary}` : summary,
     });
 
     writeJson(WEATHER_CACHE_KEY, {
       tempText: `${rounded}°C`,
       icon,
-      title: place ? `${place} · ${rounded}°C` : `${rounded}°C`,
+      title: place ? `${place} · ${summary}` : summary,
       ts: Date.now(),
     });
   } catch (err) {

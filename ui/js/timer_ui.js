@@ -1,3 +1,15 @@
+/* 2026/03/25 edited by Zhecheng Xu
+ * Changes:
+ *  - Add backend-to-frontend stop sync so external extension stop halts local timer.
+ *  - Improve stop responsiveness and guard stop request re-entry.
+ */
+
+/* 2026/03/25 edited by Zhecheng Xu
+ * Changes:
+ *  - Align timer/focus behavior with music and widget command interactions.
+ *  - Keep focus status broadcast flow consistent for cross-window control.
+ */
+
 /* 11.18 edited by Jingyao:
  // 新增内容：
  //   - 新增后端基础地址常量 API_BASE，用于集中配置 .NET 后端服务 URL。
@@ -36,7 +48,7 @@ import {
 
 import { updateSessionSummary } from './session_summary.js';
 
-import { refreshCredits } from './creditsStore.js';
+import { refreshCredits, getCreditsSnapshot } from './creditsStore.js';
 
 import { offerRelaxAfterFocus } from './relax_prompt.js';
 
@@ -58,6 +70,74 @@ export function mountTimer(els) {
 
   // ===== Backend config =====
   const API_BASE = 'http://localhost:5024';
+  const TIMER_SELECTED_MINS_KEY = 'growin.timer.selectedMins.v1';
+  let prefSyncTimer = null;
+  let prefRetryTimer = null;
+  let pendingPreferredMins = null;
+
+  async function postPreferredDuration(mins) {
+    const safeMins = clampMins(Number(mins || 25));
+    try {
+      const res = await fetch(`${API_BASE}/api/focus/preference`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationSeconds: safeMins * 60 }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function flushPreferredDurationSync() {
+    if (pendingPreferredMins == null) return;
+    const mins = pendingPreferredMins;
+    const ok = await postPreferredDuration(mins);
+    if (ok) {
+      pendingPreferredMins = null;
+      if (prefRetryTimer) {
+        clearTimeout(prefRetryTimer);
+        prefRetryTimer = null;
+      }
+      return;
+    }
+
+    if (prefRetryTimer) clearTimeout(prefRetryTimer);
+    prefRetryTimer = setTimeout(() => {
+      void flushPreferredDurationSync();
+    }, 2200);
+  }
+
+  function queuePreferredDurationSync(mins, { immediate = false } = {}) {
+    const safeMins = clampMins(Number(mins || 25));
+    pendingPreferredMins = safeMins;
+    if (prefSyncTimer) clearTimeout(prefSyncTimer);
+    if (immediate) {
+      void flushPreferredDurationSync();
+      return;
+    }
+    prefSyncTimer = setTimeout(() => {
+      void flushPreferredDurationSync();
+    }, 180);
+  }
+
+  function loadSelectedMinutes() {
+    try {
+      const raw = localStorage.getItem(TIMER_SELECTED_MINS_KEY);
+      if (raw == null) return null;
+      return clampMins(Number(raw));
+    } catch {
+      return null;
+    }
+  }
+
+  function saveSelectedMinutes(mins) {
+    try {
+      localStorage.setItem(TIMER_SELECTED_MINS_KEY, String(clampMins(Number(mins || 25))));
+    } catch {
+      // ignore localStorage failures
+    }
+  }
 
   // Initialize the whitelist checkbox group
   initWhitelist(whitelistGroup);
@@ -65,18 +145,51 @@ export function mountTimer(els) {
   // === 辅助函数：控制白名单锁定状态 ===
   function setWhitelistState(enabled) {
     const searchInput = document.getElementById('wlSearchInput');
+    const browseBtn = document.getElementById('wlBrowseBtn');
+    const searchResults = document.getElementById('wlSearchResults');
     const selectedList = document.getElementById('wlSelectedList');
+
+    whitelistGroup?.classList.toggle('is-locked', !enabled);
 
     if (searchInput) {
       searchInput.disabled = !enabled;
+      searchInput.style.cursor = enabled ? 'text' : 'not-allowed';
       searchInput.placeholder = enabled 
         ? "Search apps (Chrome, VS Code, Word…)" 
         : "Timer running - Whitelist locked";
+    }
+    if (browseBtn) {
+      browseBtn.classList.toggle('is-locked', !enabled);
+      browseBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      if (enabled) browseBtn.removeAttribute('tabindex');
+      else browseBtn.setAttribute('tabindex', '-1');
+    }
+    if (searchResults) {
+      searchResults.style.pointerEvents = enabled ? 'auto' : 'none';
+      searchResults.style.opacity = enabled ? '1' : '0.6';
     }
     if (selectedList) {
       selectedList.style.pointerEvents = enabled ? 'auto' : 'none';
       selectedList.style.opacity = enabled ? '1' : '0.6';
     }
+  }
+
+  async function syncCreditsAndCelebrate() {
+    const before = Number(getCreditsSnapshot() || 0);
+    let after = before;
+    try {
+      after = Number(await refreshCredits());
+      if (!Number.isFinite(after)) after = before;
+    } catch {
+      // keep old value on refresh error
+    }
+    const gained = Math.max(0, Math.round(after - before));
+    if (gained > 0) {
+      window.dispatchEvent(new CustomEvent('growin:token-gain', {
+        detail: { amount: gained },
+      }));
+    }
+    return gained;
   }
 
   /**
@@ -174,6 +287,13 @@ export function mountTimer(els) {
           resumeTimerFromBackendState(data.remainingSeconds);
       }
 
+      // External stop sync: if backend stopped from another controller
+      // (e.g. Chrome extension), stop local timer immediately.
+      if (!data.isRunning && isRunning) {
+        stopCountdown();
+        updateSessionSummary({ minutes: 0, distractedApp: null });
+      }
+
       // 如果后端还在跑，就用后端的剩余秒数修正一下前端
       if (data.isRunning) {
         remainingMs = Math.max(0, (data.remainingSeconds ?? 0) * 1000);
@@ -239,7 +359,9 @@ export function mountTimer(els) {
             if (focusLast) focusLast.textContent = `${completedMins} min`;
             showToast(toastEl, `Session complete (synced): ${completedMins} min ✅`);
             notifySystem('Focus session complete', 'Synced from backend');
-            offerRelaxAfterFocus(els, { minutes: completedMins });
+            void syncCreditsAndCelebrate().then((tokenGain) => {
+              offerRelaxAfterFocus(els, { minutes: completedMins, tokenGain });
+            });
 
             if (viewStats && viewStats.style.display !== 'none') {
                 renderStats({ els: statsEls, chartRef });
@@ -295,16 +417,13 @@ export function mountTimer(els) {
 
 
   function startBackendStatusPolling() {
-    if (statusTimer) clearInterval(statusTimer);
+    if (statusTimer) return;
     statusTimer = setInterval(pollBackendStatusOnce, 1000);
   }
 
   function stopBackendStatusPolling() {
-    if (statusTimer) {
-      clearInterval(statusTimer);
-      statusTimer = null;
-    }
-    // reset flags
+    // Keep polling alive so sessions started/stopped from other clients
+    // (e.g. Chrome extension) can still sync into this app.
     backendFlags = { isFailed: false, isViolating: false, violationSeconds: 0, currentProcess: null, failReason: null };
     broadcastState();
   }
@@ -328,6 +447,7 @@ export function mountTimer(els) {
   let statusTimer = null;
   // Credits: track backend running edge (for success completion)
   let prevBackendRunning = false;
+  let stopRequestInFlight = false;
 
 
 
@@ -379,6 +499,8 @@ export function mountTimer(els) {
     if (!isRunning) {
       remainingMs = ms;
       endTs = null;
+      saveSelectedMinutes(mins);
+      queuePreferredDurationSync(mins);
     }
     broadcastState(ms);
   }
@@ -418,8 +540,9 @@ export function mountTimer(els) {
         if (focusLast) focusLast.textContent = `${lastStartedMins} min`;
         showToast(toastEl, `Session complete: ${lastStartedMins} min ✅`);
         notifySystem('Focus session complete', `${lastStartedMins} minutes`);
-        refreshCredits(); // ✅ Session success -> update Token immediately
-        offerRelaxAfterFocus(els, { minutes: lastStartedMins });
+        void syncCreditsAndCelebrate().then((tokenGain) => {
+          offerRelaxAfterFocus(els, { minutes: lastStartedMins, tokenGain });
+        });
 
         if (viewStats && viewStats.style.display !== 'none') {
           renderStats({ els: statsEls, chartRef });
@@ -448,6 +571,20 @@ export function mountTimer(els) {
     broadcastState();
   }
 
+  function forceStopForReset() {
+    stopBackendStatusPolling();
+    setWhitelistState(true);
+    clearInterval(tick);
+    tick = null;
+    endTs = null;
+    isRunning = false;
+    remainingMs = 0;
+    if (range) range.disabled = false;
+    setButtonsForRunning(false);
+    updatePreview();
+    broadcastState();
+  }
+
   // ===== Event wiring =====
   range?.addEventListener('input', updatePreview);
 
@@ -455,6 +592,7 @@ export function mountTimer(els) {
     if (isRunning) return;
     try {
       const mins = clampMins(Number(range?.value || 25));
+      queuePreferredDurationSync(mins, { immediate: true });
       await createBackendSession(mins);
     } catch (err) {
       console.error('Start session via backend failed:', err);
@@ -466,16 +604,24 @@ export function mountTimer(els) {
   });
 
   stopBtn?.addEventListener('click', async () => {
-    if (!isRunning) return;
+    if (!isRunning || stopRequestInFlight) return;
+
+    // Stop UI immediately so widget/main both reflect pause instantly.
+    stopRequestInFlight = true;
+    stopBackendStatusPolling();
+    updateSessionSummary({ minutes: 0, distractedApp: null });
+    stopCountdown();
+
     try {
       await stopBackendSession();
     } catch (err) {
       console.error('Stop session via backend failed:', err);
-      alert('Failed to stop focus session. Please try again later.');
+      showToast(toastEl, 'Stop request failed on backend, local timer already stopped.');
+      // If backend did not actually stop, immediately re-sync from backend status.
+      await pollBackendStatusOnce();
+    } finally {
+      stopRequestInFlight = false;
     }
-    stopBackendStatusPolling();
-    updateSessionSummary({ minutes: 0, distractedApp: null });
-    stopCountdown();
   });
 
   // ✅ 接收来自 widget 的命令，让主窗口执行真正的 start/stop（走后端 + 同步 + broadcastState）
@@ -490,12 +636,17 @@ export function mountTimer(els) {
     });
   }
 
+  window.addEventListener('growin:force-stop-focus', () => {
+    forceStopForReset();
+  });
+
 
   // ===== Initial setup =====
   if (range) {
     range.min = '1';
     range.max = '60';
-    range.value = String(clampMins(Number(range.value || 25)));
+    const savedMins = loadSelectedMinutes();
+    range.value = String(clampMins(Number(savedMins ?? range.value ?? 25)));
   }
   updatePreview();
   broadcastState();
@@ -503,4 +654,7 @@ export function mountTimer(els) {
 
   // [FIX Bug 2] 页面加载时立即同步后端状态
   pollBackendStatusOnce();
+  // Always-on polling to keep app in sync with external controllers
+  // such as the Chrome extension popup.
+  startBackendStatusPolling();
 }

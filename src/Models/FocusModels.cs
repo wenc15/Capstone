@@ -27,3 +27,13 @@ public class FocusStatusResponse
     public int ViolationSeconds { get; set; }    // 当前这次违规已经持续多少秒
     public string? CurrentProcess { get; set; }  // 当前前台进程名（比如 "chrome"）
 }
+
+public class FocusPreferenceRequest
+{
+    public int DurationSeconds { get; set; }
+}
+
+public class FocusPreferenceResponse
+{
+    public int PreferredDurationSeconds { get; set; }
+}

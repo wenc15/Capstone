@@ -10,6 +10,7 @@ import { getCollectionItems, setCollectionSkinEnabled } from './collection_api.j
 const COLLECTION_ICONS = {
   skin_tetris_starlit: '🧱',
   skin_snake_nebula: '🐍',
+  skin_dicebuild_petstand: '🎲',
 };
 
 function iconForItem(itemId) {
@@ -31,7 +32,6 @@ function buildOverlay() {
       <div class="bag-top">
         <div class="bag-title">Collection</div>
         <div class="bag-right">
-          <button class="bag-refresh" id="collectionRefreshBtn" type="button">Refresh</button>
           <button class="bag-close" id="collectionCloseBtn" type="button" aria-label="Close">Close</button>
         </div>
       </div>
@@ -104,7 +104,6 @@ export function mountCollection(els) {
   const listEl = overlay.querySelector('#collectionList');
   const emptyEl = overlay.querySelector('#collectionEmpty');
   const closeBtn = overlay.querySelector('#collectionCloseBtn');
-  const refreshBtn = overlay.querySelector('#collectionRefreshBtn');
 
   let isOpen = false;
   let inFlight = false;
@@ -125,7 +124,6 @@ export function mountCollection(els) {
   async function refresh() {
     if (inFlight) return;
     inFlight = true;
-    if (refreshBtn) refreshBtn.disabled = true;
 
     try {
       const items = await getCollectionItems();
@@ -144,14 +142,12 @@ export function mountCollection(els) {
       if (emptyEl) emptyEl.style.display = 'none';
       showToast(els.toastEl, e?.body?.message || e?.message || 'Failed to load collection.');
     } finally {
-      if (refreshBtn) refreshBtn.disabled = false;
       inFlight = false;
     }
   }
 
   openBtn.addEventListener('click', open);
   closeBtn?.addEventListener('click', close);
-  refreshBtn?.addEventListener('click', refresh);
 
   overlay.addEventListener('click', (e) => {
     const actionBtn = e.target?.closest?.('[data-collection-action="toggle-enable"]');
@@ -160,9 +156,8 @@ export function mountCollection(els) {
       const enable = String(actionBtn.getAttribute('data-enable') || '') === '1';
       if (!itemId) return;
 
-      const prevText = actionBtn.textContent;
       actionBtn.disabled = true;
-      actionBtn.textContent = enable ? 'Enabling...' : 'Disabling...';
+      actionBtn.classList.add('is-loading');
 
       setCollectionSkinEnabled(itemId, enable)
         .then(async () => {
@@ -173,7 +168,7 @@ export function mountCollection(els) {
         .catch((err) => {
           showToast(els.toastEl, err?.body?.message || err?.message || 'Failed to update skin state.');
           actionBtn.disabled = false;
-          actionBtn.textContent = prevText;
+          actionBtn.classList.remove('is-loading');
         });
       return;
     }

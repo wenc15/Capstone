@@ -1,3 +1,8 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Add widget music prev/next controls and SVG icon controls.
+//  - Sync widget color tone with app settings updates.
+
 // 2025/11/18 edited by Jingyao(重点：与主计时器同步):
 // 新增内容：
 //   - 新增 createBackendSession()使 widget 与主计时器的启动逻辑统一。
@@ -26,18 +31,64 @@
 
 import { subscribeFocusStatus, getFocusStatus } from './focusStatusStore.js';
 
+const APP_SETTINGS_LOCAL_KEY = 'growin:appBehaviorSettings';
+
+function normalizeUiTone(v) {
+  return String(v || '').trim().toLowerCase() === 'sky' ? 'sky' : 'default';
+}
+
+function applyUiTone(tone) {
+  const next = normalizeUiTone(tone);
+  document.documentElement.setAttribute('data-ui-tone', next);
+}
+
+function loadUiToneLocalFallback() {
+  try {
+    const raw = localStorage.getItem(APP_SETTINGS_LOCAL_KEY);
+    if (!raw) return 'default';
+    const parsed = JSON.parse(raw);
+    return normalizeUiTone(parsed?.uiTone);
+  } catch {
+    return 'default';
+  }
+}
+
 // ---- Mount widget UI ----
 export function mountWidget() {
   const root = document.getElementById('widget');
   if (!root) return;
 
+  // Keep widget tone in sync with main app tone.
+  applyUiTone(loadUiToneLocalFallback());
+  const api = window.electronAPI;
+  if (api?.getAppSettings) {
+    api.getAppSettings()
+      .then((st) => applyUiTone(st?.uiTone))
+      .catch(() => {});
+  }
+  if (api?.onAppSettingsChanged) {
+    api.onAppSettingsChanged((st) => applyUiTone(st?.uiTone));
+  }
+
+  const iconPlay = '<svg class="wg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6l10 6-10 6z"></path></svg>';
+  const iconStop = '<svg class="wg-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"></rect></svg>';
+  const iconPrev = '<svg class="wg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h2v12H8z"></path><path d="M17 6l-7 6 7 6z"></path></svg>';
+  const iconNext = '<svg class="wg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6h2v12h-2z"></path><path d="M7 6l7 6-7 6z"></path></svg>';
+
   root.innerHTML = `
     <div class="wg-time" id="wgTime">00:00</div>
-    <button class="wg-btn" id="wgPlay" aria-label="Start/Stop">▶️</button>
+    <div class="wg-controls" aria-label="Widget controls">
+      <button class="wg-btn wg-btn-icon" id="wgPrev" aria-label="Previous track">${iconPrev}</button>
+      <button class="wg-btn wg-btn-main" id="wgPlay" aria-label="Start/Stop">${iconPlay}</button>
+      <button class="wg-btn wg-btn-icon" id="wgNext" aria-label="Next track">${iconNext}</button>
+    </div>
   `;
 
   const elTime = root.querySelector('#wgTime');
   const btnPlay = root.querySelector('#wgPlay');
+  const btnPrev = root.querySelector('#wgPrev');
+  const btnNext = root.querySelector('#wgNext');
+  let lastFocusToggleAt = 0;
 
   function formatSeconds(sec) {
     const total = Math.max(0, sec | 0);
@@ -50,7 +101,8 @@ export function mountWidget() {
     elTime.textContent = formatSeconds(st.remainingSeconds ?? 0);
 
     // ✅ 运行中显示 Stop 图标，不再是 Pause
-    btnPlay.textContent = st.isRunning ? '⏹️' : '▶️';
+    btnPlay.innerHTML = st.isRunning ? iconStop : iconPlay;
+    btnPlay.classList.toggle('is-running', !!st.isRunning);
 
     root.classList.toggle('wg-running', !!st.isRunning);
     root.classList.toggle('wg-failed', !!st.isFailed);
@@ -67,28 +119,59 @@ export function mountWidget() {
   // - 如果当前在运行 → 点一下 = 调用主界面 Stop
   // - 如果当前没在运行 → 点一下 = 调用主界面 Start
   //12.21 updated by Jingyao: 使独立widget可调用主界面start
-  btnPlay.addEventListener('click', () => {
-    const st = getFocusStatus();
+  function triggerFocusToggle(e) {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
 
+    const now = Date.now();
+    if (now - lastFocusToggleAt < 180) return;
+    lastFocusToggleAt = now;
+
+    // Independent widget window can see slightly stale focus status.
+    // Use main-window toggle command to avoid start/stop mis-branching.
+    if (window.electronAPI?.sendFocusCommand) {
+      window.electronAPI.sendFocusCommand('toggle');
+      return;
+    }
+
+    // Embedded fallback (same page): directly click main start/stop button.
+    const st = getFocusStatus();
     if (st.isRunning) {
-      // 1) 内置 widget（同一页面）优先直接点按钮
       const mainStopBtn = document.getElementById('stopBtn');
       if (mainStopBtn) return mainStopBtn.click();
-
-      // 2) 浮动球（独立窗口）走 IPC 命令
-      if (window.electronAPI?.sendFocusCommand) return window.electronAPI.sendFocusCommand('stop');
-
       console.warn('stop: no stopBtn and no IPC bridge');
       return;
     }
 
-    // st.isRunning === false
     const mainStartBtn = document.getElementById('startBtn');
     if (mainStartBtn) return mainStartBtn.click();
-
-    if (window.electronAPI?.sendFocusCommand) return window.electronAPI.sendFocusCommand('start');
-
     console.warn('start: no startBtn and no IPC bridge');
+  }
+
+  // pointerdown is more reliable than click inside draggable widget window.
+  btnPlay.addEventListener('pointerdown', triggerFocusToggle);
+  btnPlay.addEventListener('click', triggerFocusToggle);
+
+  function triggerMusicCommand(cmd) {
+    if (cmd !== 'prev' && cmd !== 'next') return;
+    const localBtn = document.getElementById(cmd === 'prev' ? 'musicPrevBtn' : 'musicNextBtn');
+    if (localBtn) {
+      localBtn.click();
+      return;
+    }
+    if (window.electronAPI?.sendMusicCommand) {
+      window.electronAPI.sendMusicCommand(cmd);
+    }
+  }
+
+  btnPrev?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    triggerMusicCommand('prev');
+  });
+
+  btnNext?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    triggerMusicCommand('next');
   });
 
 }

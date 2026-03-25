@@ -1,5 +1,8 @@
 // dicebuild/state.js
 // Persistence and default state creation for Dice & Build.
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Reset Dice & Build save once per app launch to start fresh each restart.
 
 import { BUILDING_IDS, BOARD_COLS, BOARD_ROWS, HIST_KEY, SAVE_KEY } from './constants.js';
 import { idxOf, makeBoard } from './board.js';
@@ -28,6 +31,8 @@ function writeJson(key, value) {
 }
 
 export function createDiceBuildState({ makeInstance }) {
+  const BOOT_RESET_FLAG = 'dicebuild.boot.reset.v1';
+
   function defaultState() {
     const board = makeBoard();
     return {
@@ -62,6 +67,8 @@ export function createDiceBuildState({ makeInstance }) {
       board,
       unlockedBuildingIds: [...BUILDING_IDS],
       nextRollTwoDice: false,
+      skinId: 'default',
+      speedMode: false,
       isMoving: false,
       fxPulse: {},
       cellFxItems: [],
@@ -74,6 +81,15 @@ export function createDiceBuildState({ makeInstance }) {
   }
 
   function load() {
+    try {
+      if (!sessionStorage.getItem(BOOT_RESET_FLAG)) {
+        sessionStorage.setItem(BOOT_RESET_FLAG, '1');
+        localStorage.removeItem(SAVE_KEY);
+      }
+    } catch {
+      // ignore storage access failures
+    }
+
     const st = readJson(SAVE_KEY, null);
     if (!st || st.version !== 6) return null;
 
@@ -93,8 +109,16 @@ export function createDiceBuildState({ makeInstance }) {
     if (!Array.isArray(st.lastDice)) {
       st.lastDice = null;
     }
-    if (typeof st.isMoving !== 'boolean') {
-      st.isMoving = false;
+    // Transient runtime flags should always reset after reload/open,
+    // otherwise interactions can remain locked (cannot roll/drag).
+    st.isMoving = false;
+    st.isRolling = false;
+    st.dragPreview = null;
+    if (typeof st.skinId !== 'string' || !st.skinId.trim()) {
+      st.skinId = 'default';
+    }
+    if (typeof st.speedMode !== 'boolean') {
+      st.speedMode = false;
     }
     if (!st.fxPulse || typeof st.fxPulse !== 'object') {
       st.fxPulse = {};
@@ -102,20 +126,19 @@ export function createDiceBuildState({ makeInstance }) {
     if (!Array.isArray(st.cellFxItems)) {
       st.cellFxItems = [];
     }
-    if (!st.dragPreview || typeof st.dragPreview !== 'object') {
-      st.dragPreview = null;
-    }
+    st.selectingPlace = null;
     if (!Array.isArray(st.unlockedLockedCells)) {
       const count = Math.max(0, Math.min(LOCKED_UNLOCK_ORDER.length, Math.round(st.unlockedBlocks || 0)));
       st.unlockedLockedCells = LOCKED_UNLOCK_ORDER.slice(0, count);
     }
     st.unlockedBlocks = Math.max(0, Math.min(LOCKED_UNLOCK_ORDER.length, st.unlockedLockedCells.length));
-    if (typeof st.selectingUnlock !== 'boolean') {
-      st.selectingUnlock = false;
-    }
-    if (!Number.isFinite(st.pendingUnlockCost)) {
-      st.pendingUnlockCost = 0;
-    }
+    st.selectingUnlock = false;
+    st.pendingUnlockCost = 0;
+
+    // Rebuild board topology on load so `tiles` remains a Map.
+    // JSON persistence turns Map into plain objects, which breaks render (`tiles.get`).
+    st.board = makeBoard();
+
     return st;
   }
 

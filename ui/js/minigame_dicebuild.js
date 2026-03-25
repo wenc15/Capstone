@@ -7,6 +7,7 @@
 
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
+import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
 import {
   STAGES,
@@ -26,6 +27,26 @@ import { createDiceBuildRender } from './minigame/dicebuild/render.js';
 import { attachDiceBuildHandlers } from './minigame/dicebuild/actions.js';
 import { createDiceBuildLogic } from './minigame/dicebuild/logic.js';
 
+const DEFAULT_PLAYER_SKIN_ID = 'default';
+const DICEBUILD_PLAYER_SKINS = {
+  default: { playerClass: '' },
+  skin_dicebuild_petstand: { playerClass: 'is-skin-petstand' },
+};
+
+async function syncSkinFromCollection(st) {
+  if (!st) return;
+  try {
+    const skin = await getEnabledSkinForGame('dicebuild');
+    const nextSkinId = skin?.itemId && skin.itemId in DICEBUILD_PLAYER_SKINS
+      ? skin.itemId
+      : DEFAULT_PLAYER_SKIN_ID;
+    st.skinId = nextSkinId;
+    save(st);
+  } catch {
+    st.skinId = DEFAULT_PLAYER_SKIN_ID;
+  }
+}
+
 function makeInstance(defId) {
   return {
     uid: `b_${Math.random().toString(16).slice(2)}_${Date.now()}`,
@@ -39,15 +60,33 @@ function makeInstance(defId) {
 const stateApi = createDiceBuildState({ makeInstance });
 
 function defaultState() {
-  return stateApi.defaultState();
+  const st = stateApi.defaultState();
+  if (!st.skinId) st.skinId = DEFAULT_PLAYER_SKIN_ID;
+  return st;
 }
 
 function save(st) {
   stateApi.save(st);
 }
 
+function load() {
+  const st = stateApi.load();
+  if (!st) return null;
+  if (!st.skinId) st.skinId = DEFAULT_PLAYER_SKIN_ID;
+  if (typeof st.speedMode !== 'boolean') st.speedMode = false;
+  return st;
+}
+
 function pushHistory(entry) {
   stateApi.pushHistory(entry);
+}
+
+function resetRunState(prev) {
+  const next = defaultState();
+  next.speedMode = !!prev?.speedMode;
+  next.skinId = prev?.skinId || DEFAULT_PLAYER_SKIN_ID;
+  buildShopItems(next);
+  return next;
 }
 
 const logicApi = createDiceBuildLogic({ makeInstance });
@@ -136,11 +175,13 @@ function finalizeStageIfNeeded(st, ui) {
 
   if (passed && st.stageIdx === STAGE_COUNT - 1) {
     playStageClearCelebration(ui);
+    consumeDiceBuildEligibility();
     showResult(ui, st, true);
     pushHistory({ result: 'win', score: computeScore(st) });
     return;
   }
 
+  consumeDiceBuildEligibility();
   showResult(ui, st, false);
   pushHistory({ result: 'lose', score: computeScore(st) });
 }
@@ -213,6 +254,9 @@ function syncDiceBuildLayout(ui) {
 }
 
 function render(els, st) {
+  if (!st.skinId || !(st.skinId in DICEBUILD_PLAYER_SKINS)) {
+    st.skinId = DEFAULT_PLAYER_SKIN_ID;
+  }
   uiRender.render(els, st, { fmtGoal });
 }
 
@@ -246,6 +290,7 @@ function attachHandlers(els, stRef) {
     resolvePathTriggers,
     resolveLand,
     finalizeStageIfNeeded,
+    createPlayerMarker: uiRender.createPlayerMarker,
   });
 }
 
@@ -266,14 +311,23 @@ export function mountDiceBuild(els) {
     syncDiceBuildLayout(els);
   });
 
-  // Initial render uses a fresh state (kept hidden until opened)
-  const st = defaultState();
+  // Initial render uses persisted state when available.
+  const st = load() || defaultState();
   stRef.current = st;
-  buildShopItems(st);
+  if (!Array.isArray(st.shop) || st.shop.length === 0) {
+    buildShopItems(st);
+  }
   save(st);
+  syncSkinFromCollection(st).then(() => render(els, st));
   render(els, st);
 
   // Keep local full building pool by default.
+
+  window.addEventListener('collection:skin-changed', () => {
+    const cur = stRef.current;
+    if (!cur) return;
+    syncSkinFromCollection(cur).then(() => render(els, cur));
+  });
 
   // Expose dev helper
   if (typeof window !== 'undefined') {
@@ -295,20 +349,28 @@ export function openDiceBuild(els, meta) {
   // Improve visibility for full board layout on smaller windows.
   window.electronAPI?.maximizeMainWindowForMinigame?.();
 
-  // Consume eligibility when opening (unless dev)
-  if (!bypass && meta?.reason !== 'dev') consumeDiceBuildEligibility();
-
   showMinigameSection(els);
   showDiceBuildView(els);
   enableGateHint(els, true);
 
   const stRef = els.__dicebuild;
   if (!stRef?.current) {
-    stRef.current = defaultState();
-    buildShopItems(stRef.current);
+    stRef.current = load() || defaultState();
+    if (!Array.isArray(stRef.current.shop) || stRef.current.shop.length === 0) {
+      buildShopItems(stRef.current);
+    }
     save(stRef.current);
   }
-  render(els, stRef.current);
+
+  if (!canRoll(stRef.current)) {
+    stRef.current = resetRunState(stRef.current);
+    save(stRef.current);
+  }
+
+  hideResult(els);
+  syncSkinFromCollection(stRef.current).finally(() => {
+    render(els, stRef.current);
+  });
 }
 
 export function closeDiceBuild(els) {

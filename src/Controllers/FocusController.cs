@@ -82,4 +82,27 @@ public class FocusController : ControllerBase
         var status = _focusService.GetStatus();
         return Ok(status);
     }
+
+    [HttpGet("preference")]
+    public ActionResult<FocusPreferenceResponse> GetPreference()
+    {
+        var seconds = _focusService.GetPreferredDurationSeconds();
+        return Ok(new FocusPreferenceResponse
+        {
+            PreferredDurationSeconds = seconds
+        });
+    }
+
+    [HttpPost("preference")]
+    public ActionResult<FocusPreferenceResponse> SetPreference([FromBody] FocusPreferenceRequest request)
+    {
+        if (request.DurationSeconds <= 0)
+            return BadRequest(new { error = "DurationSeconds must be > 0" });
+
+        var seconds = _focusService.SetPreferredDurationSeconds(request.DurationSeconds);
+        return Ok(new FocusPreferenceResponse
+        {
+            PreferredDurationSeconds = seconds
+        });
+    }
 }

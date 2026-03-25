@@ -50,6 +50,7 @@ function endGame(st, els) {
     clearInterval(st.dropInterval);
     st.dropInterval = null;
   }
+  consumeDiceBuildEligibility();
   save(st);
   pushHistory({ result: 'lose', score: st.score, level: st.level, lines: st.lines });
   if (els?.toastEl) showToast(els.toastEl, `Tetris over - score ${st.score}`);
@@ -328,11 +329,37 @@ function render(els, st) {
   if (els.tetLines) els.tetLines.textContent = st.lines;
   if (els.tetStatus) {
     if (st.gameOver) els.tetStatus.textContent = 'Game Over';
+    else if (st.paused) els.tetStatus.textContent = 'Paused';
     else if (st.playing) els.tetStatus.textContent = 'Playing';
     else els.tetStatus.textContent = 'Ready';
   }
 
-  if (els.tetStartBtn) els.tetStartBtn.disabled = st.playing && !st.gameOver;
+  if (els.tetStartBtn) {
+    els.tetStartBtn.disabled = false;
+    els.tetStartBtn.textContent = (st.playing && st.paused) ? 'Resume' : (st.gameOver ? 'Restart' : 'Start');
+    els.tetStartBtn.style.display = 'none';
+  }
+
+  if (els.tetPauseBtn) {
+    els.tetPauseBtn.disabled = !st.playing || st.gameOver;
+    els.tetPauseBtn.textContent = st.paused ? 'Resume' : 'Pause';
+    els.tetPauseBtn.style.display = st.playing && !st.gameOver ? 'inline-block' : 'none';
+  }
+
+  if (els.tetScreen && els.tetScreenTitle && els.tetScreenBtn) {
+    const show = !st.playing || st.paused || st.gameOver;
+    els.tetScreen.classList.toggle('mg-hidden', !show);
+    if (st.gameOver) {
+      els.tetScreenTitle.textContent = 'Game Over';
+      els.tetScreenBtn.textContent = 'Restart';
+    } else if (st.playing && st.paused) {
+      els.tetScreenTitle.textContent = 'Paused';
+      els.tetScreenBtn.textContent = 'Resume';
+    } else {
+      els.tetScreenTitle.textContent = '';
+      els.tetScreenBtn.textContent = 'Start';
+    }
+  }
 
   renderBoard(els, st);
   renderNext(els, st);
@@ -432,20 +459,60 @@ function showTetrisView(els) {
 function attachHandlers(els, stRef) {
   const ui = els;
 
-  ui.tetHubBtn?.addEventListener('click', () => {
+  const pauseTetris = (st) => {
+    if (!st || !st.playing || st.gameOver) return;
+    st.paused = true;
+    save(st);
+    render(ui, st);
+  };
+
+  const resumeTetris = (st) => {
+    if (!st || !st.playing || st.gameOver) return;
+    st.paused = false;
+    st.lastDrop = Date.now();
+    save(st);
+    render(ui, st);
+  };
+
+  const startOrResumeTetris = () => {
+    const st = stRef.current;
+    if (!st) return;
+    if (!st.playing || st.gameOver) {
+      startGame(st);
+      startGameLoop(st, ui);
+      render(ui, st);
+      return;
+    }
+    if (st.paused) {
+      resumeTetris(st);
+    }
+  };
+
+  const stopTetrisLoop = () => {
+    const st = stRef.current;
+    if (!st) return;
+    if (st.dropInterval) {
+      clearInterval(st.dropInterval);
+      st.dropInterval = null;
+    }
+    st.playing = false;
+    st.paused = false;
+    save(st);
+  };
+
+  ui.tetExitBtn?.addEventListener('click', () => {
+    stopTetrisLoop();
     openMinigameHub(ui, { bypassGate: true, reason: 'hub' });
   });
 
-  ui.tetExitBtn?.addEventListener('click', () => {
-    closeTetris(ui);
-  });
+  ui.tetStartBtn?.addEventListener('click', startOrResumeTetris);
+  ui.tetScreenBtn?.addEventListener('click', startOrResumeTetris);
 
-  ui.tetStartBtn?.addEventListener('click', () => {
+  ui.tetPauseBtn?.addEventListener('click', () => {
     const st = stRef.current;
-    if (!st) return;
-    startGame(st);
-    startGameLoop(st, ui);
-    render(ui, st);
+    if (!st || !st.playing || st.gameOver) return;
+    if (st.paused) resumeTetris(st);
+    else pauseTetris(st);
   });
 
   window.addEventListener('keydown', (ev) => {
@@ -488,6 +555,16 @@ function startGameLoop(st, ui) {
   st.lastDrop = Date.now();
 
   st.dropInterval = setInterval(() => {
+    const minigameHidden = ui?.viewMinigame?.style.display === 'none' || ui?.tetRoot?.style.display === 'none';
+    if (minigameHidden) {
+      clearInterval(st.dropInterval);
+      st.dropInterval = null;
+      st.playing = false;
+      st.paused = false;
+      save(st);
+      return;
+    }
+
     if (st.paused || st.gameOver || !st.playing) return;
 
     const now = Date.now();
@@ -522,6 +599,9 @@ export function mountTetris(els) {
   attachHandlers(els, stRef);
 
   const st = load() || defaultState();
+  st.playing = false;
+  st.paused = false;
+  st.dropInterval = null;
   stRef.current = st;
   save(st);
   syncSkinFromCollection(st).then(() => render(els, st));
@@ -549,8 +629,6 @@ export function openTetris(els, meta) {
     return;
   }
 
-  if (!bypass && meta?.reason !== 'dev') consumeDiceBuildEligibility();
-
   showMinigameSection(els);
   showTetrisView(els);
   enableGateHint(els, true);
@@ -560,12 +638,21 @@ export function openTetris(els, meta) {
     stRef.current = defaultState();
   }
   syncSkinFromCollection(stRef.current).finally(() => {
-    startGame(stRef.current);
-    startGameLoop(stRef.current, els);
     render(els, stRef.current);
   });
 }
 
 export function closeTetris(els) {
+  const stRef = els?.__tetris;
+  const st = stRef?.current;
+  if (st?.dropInterval) {
+    clearInterval(st.dropInterval);
+    st.dropInterval = null;
+  }
+  if (st) {
+    st.playing = false;
+    st.paused = false;
+    save(st);
+  }
   closeMinigameSection(els);
 }

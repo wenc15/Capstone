@@ -82,4 +82,11 @@ public class ArchiveController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpPost("clear")]
+    public IActionResult ClearAll()
+    {
+        _dataService.ClearArchiveData();
+        return Ok(new { ok = true });
+    }
 }

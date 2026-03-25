@@ -960,6 +960,17 @@ public class LocalDataService
         }
     }
 
+    public void ClearArchiveData()
+    {
+        lock (_fileLock)
+        {
+            BackupArchiveFiles();
+            SaveUserProfile(new UserProfile());
+            SaveSessionHistoryList(new List<SessionHistoryItem>());
+            SaveWhitelistPresetList(new List<WhitelistPreset>());
+        }
+    }
+
     private void SaveSessionHistoryList(List<SessionHistoryItem> list)
     {
         var path = LocalStoragePaths.SessionHistoryFilePath;

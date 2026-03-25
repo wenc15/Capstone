@@ -1,3 +1,7 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Keep relax prompt style and gating behavior aligned with focus-complete flow updates.
+
 // relax_prompt.js
 // Purpose:
 //  - Gate minigame access: only after a successful focus session.
@@ -64,13 +68,49 @@ export function offerRelaxAfterFocus(els, meta) {
   const settings = getSettings();
   grantDiceBuildEligibility(meta);
   if (!settings.autoPrompt) return;
-  showPrompt(els);
+  showPrompt(els, meta);
 }
 
-function showPrompt(els) {
+function formatRewardText(meta) {
+  const mins = Math.max(0, Math.round(Number(meta?.minutes || 0)));
+  const gain = Math.max(0, Math.round(Number(meta?.tokenGain || 0)));
+  if (gain > 0) return `+${gain} tokens earned from ${mins} min focus.`;
+  if (mins > 0) return `${mins} min focus logged. Token reward synced.`;
+  return 'Token reward synced.';
+}
+
+function playPromptCelebration(els) {
   const root = els?.relaxPrompt;
   if (!root) return;
+
+  root.querySelector('.relax-fireworks-layer')?.remove();
+
+  const layer = document.createElement('div');
+  layer.className = 'relax-fireworks-layer';
+  root.appendChild(layer);
+
+  for (let i = 0; i < 4; i += 1) {
+    const burst = document.createElement('span');
+    burst.className = 'relax-firework-burst';
+    burst.style.left = `${16 + Math.round(Math.random() * 68)}%`;
+    burst.style.top = `${10 + Math.round(Math.random() * 28)}%`;
+    burst.style.setProperty('--delay', `${i * 90}ms`);
+    layer.appendChild(burst);
+  }
+
+  setTimeout(() => {
+    layer.remove();
+  }, 1600);
+}
+
+function showPrompt(els, meta) {
+  const root = els?.relaxPrompt;
+  if (!root) return;
+  if (els?.relaxRewardMeta) {
+    els.relaxRewardMeta.textContent = formatRewardText(meta);
+  }
   root.classList.remove('mg-hidden');
+  playPromptCelebration(els);
 }
 
 function hidePrompt(els) {

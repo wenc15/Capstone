@@ -1,3 +1,7 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Extend DOM collection for music dock controls and settings toggles.
+
 // 2026/03/19 edited by Zhecheng Xu
 // Changes:
 //  - Collect Settings/Data Management modal DOM nodes.
@@ -39,6 +43,25 @@ export function collectDom() {
   const openCollectionBtn = document.getElementById('openCollectionBtn');
   const collectionPreviewShort = document.getElementById('collectionPreviewShort');
   const collectionOwnedMeta = document.getElementById('collectionOwnedMeta');
+  const sumFocusTime = document.getElementById('sumFocusTime');
+  const sumDistractions = document.getElementById('sumDistractions');
+  const sumCompleted = document.getElementById('sumCompleted');
+  const sumSeeMoreBtn = document.getElementById('sumSeeMoreBtn');
+
+  const ltdOverlay = document.getElementById('ltdOverlay');
+  const ltdCloseBtn = document.getElementById('ltdCloseBtn');
+  const ltdTotalFocus = document.getElementById('ltdTotalFocus');
+  const ltdSessionCount = document.getElementById('ltdSessionCount');
+  const ltdLongestStreak = document.getElementById('ltdLongestStreak');
+  const ltdTabWeekly = document.getElementById('ltdTabWeekly');
+  const ltdTabHistory = document.getElementById('ltdTabHistory');
+  const ltdWeeklyPanel = document.getElementById('ltdWeeklyPanel');
+  const ltdHistoryPanel = document.getElementById('ltdHistoryPanel');
+  const ltdWeeklyChart = document.getElementById('ltdWeeklyChart');
+  const ltdSuccessful = document.getElementById('ltdSuccessful');
+  const ltdFailed = document.getElementById('ltdFailed');
+  const ltdAborted = document.getElementById('ltdAborted');
+  const ltdHistoryList = document.getElementById('ltdHistoryList');
 
   // ===== View switching =====
   const viewTimer = document.getElementById('view-timer');
@@ -65,6 +88,9 @@ export function collectDom() {
   // ===== Minigame (Dice & Build) =====
   const mgRoot = document.getElementById('mgRoot');
   const mgMenuBtn = document.getElementById('mgMenuBtn');
+  const mgSettingsPanel = document.getElementById('mgSettingsPanel');
+  const mgSpeedModeToggle = document.getElementById('mgSpeedModeToggle');
+  const mgBackHubBtn = document.getElementById('mgBackHubBtn');
   const mgExitBtn = document.getElementById('mgExitBtn');
   const mgCash = document.getElementById('mgCash');
   const mgStage = document.getElementById('mgStage');
@@ -104,6 +130,7 @@ export function collectDom() {
 
   // Relax prompt overlay
   const relaxPrompt = document.getElementById('relaxPrompt');
+  const relaxRewardMeta = document.getElementById('relaxRewardMeta');
   const relaxPlayBtn = document.getElementById('relaxPlayBtn');
   const relaxLaterBtn = document.getElementById('relaxLaterBtn');
   
@@ -124,6 +151,7 @@ export function collectDom() {
   //2026/1/22 added token dom
   const tokenValue = document.getElementById('tokenValue');
   const tokenAdd1000Btn = document.getElementById('tokenAdd1000Btn');
+  const tokenChip = document.getElementById('tokenChip');
 
   // ===== Settings / Archive =====
   const settingsOpenBtn = document.getElementById('settingsOpenBtn');
@@ -131,11 +159,38 @@ export function collectDom() {
   const settingsCloseBtn = document.getElementById('settingsCloseBtn');
   const settingShowWidget = document.getElementById('settingShowWidget');
   const settingCloseBehavior = document.getElementById('settingCloseBehavior');
+  const settingUiTone = document.getElementById('settingUiTone');
+  const settingMusicAutoPlay = document.getElementById('settingMusicAutoPlay');
+  const settingMusicVolume = document.getElementById('settingMusicVolume');
+  const settingMusicVolumeValue = document.getElementById('settingMusicVolumeValue');
+  const openMusicFolderBtn = document.getElementById('openMusicFolderBtn');
   const settingsBehaviorMeta = document.getElementById('settingsBehaviorMeta');
   const archiveExportBtn = document.getElementById('archiveExportBtn');
   const archiveImportFile = document.getElementById('archiveImportFile');
   const archiveImportBtn = document.getElementById('archiveImportBtn');
   const archiveImportMeta = document.getElementById('archiveImportMeta');
+  const archiveReselectBtn = document.getElementById('archiveReselectBtn');
+  const archiveDeleteBtn = document.getElementById('archiveDeleteBtn');
+
+  // ===== Music dock =====
+  const musicDock = document.getElementById('musicDock');
+  const musicModeBtn = document.getElementById('musicModeBtn');
+  const musicPrevBtn = document.getElementById('musicPrevBtn');
+  const musicPlayPauseBtn = document.getElementById('musicPlayPauseBtn');
+  const musicNextBtn = document.getElementById('musicNextBtn');
+  const musicQueueBtn = document.getElementById('musicQueueBtn');
+  const musicQueuePanel = document.getElementById('musicQueuePanel');
+  const musicQueueList = document.getElementById('musicQueueList');
+  const musicDockTrack = document.getElementById('musicDockTrack');
+  const musicDockMeta = document.getElementById('musicDockMeta');
+  const musicVolumeWrap = document.getElementById('musicVolumeWrap');
+  const musicVolumeBtn = document.getElementById('musicVolumeBtn');
+  const musicVolumePop = document.getElementById('musicVolumePop');
+  const musicVolumeSlider = document.getElementById('musicVolumeSlider');
+  const musicVolumeValue = document.getElementById('musicVolumeValue');
+  const musicProgress = document.getElementById('musicProgress');
+  const musicCurrentTime = document.getElementById('musicCurrentTime');
+  const musicDurationTime = document.getElementById('musicDurationTime');
 
   // ===== Pet view =====
   const feedBtn = document.getElementById('feedBtn');
@@ -166,6 +221,25 @@ export function collectDom() {
     openCollectionBtn,
     collectionPreviewShort,
     collectionOwnedMeta,
+    sumFocusTime,
+    sumDistractions,
+    sumCompleted,
+    sumSeeMoreBtn,
+
+    ltdOverlay,
+    ltdCloseBtn,
+    ltdTotalFocus,
+    ltdSessionCount,
+    ltdLongestStreak,
+    ltdTabWeekly,
+    ltdTabHistory,
+    ltdWeeklyPanel,
+    ltdHistoryPanel,
+    ltdWeeklyChart,
+    ltdSuccessful,
+    ltdFailed,
+    ltdAborted,
+    ltdHistoryList,
 
     // Views & Nav
     viewTimer,
@@ -223,6 +297,7 @@ export function collectDom() {
     //token/credits
     tokenValue,
     tokenAdd1000Btn,
+    tokenChip,
 
     // Settings / Archive
     settingsOpenBtn,
@@ -230,15 +305,45 @@ export function collectDom() {
     settingsCloseBtn,
     settingShowWidget,
     settingCloseBehavior,
+    settingUiTone,
+    settingMusicAutoPlay,
+    settingMusicVolume,
+    settingMusicVolumeValue,
+    openMusicFolderBtn,
     settingsBehaviorMeta,
     archiveExportBtn,
     archiveImportFile,
     archiveImportBtn,
     archiveImportMeta,
+    archiveReselectBtn,
+    archiveDeleteBtn,
+
+    // Music dock
+    musicDock,
+    musicModeBtn,
+    musicPrevBtn,
+    musicPlayPauseBtn,
+    musicNextBtn,
+    musicQueueBtn,
+    musicQueuePanel,
+    musicQueueList,
+    musicDockTrack,
+    musicDockMeta,
+    musicVolumeWrap,
+    musicVolumeBtn,
+    musicVolumePop,
+    musicVolumeSlider,
+    musicVolumeValue,
+    musicProgress,
+    musicCurrentTime,
+    musicDurationTime,
 
     // Minigame
     mgRoot,
     mgMenuBtn,
+    mgSettingsPanel,
+    mgSpeedModeToggle,
+    mgBackHubBtn,
     mgExitBtn,
     mgCash,
     mgStage,
@@ -278,6 +383,7 @@ export function collectDom() {
 
     // Relax prompt
     relaxPrompt,
+    relaxRewardMeta,
     relaxPlayBtn,
     relaxLaterBtn,
 
@@ -299,6 +405,10 @@ export function collectDom() {
     tetStatus: document.getElementById('tetStatus'),
     tetNext: document.getElementById('tetNext'),
     tetStartBtn: document.getElementById('tetStartBtn'),
+    tetPauseBtn: document.getElementById('tetPauseBtn'),
+    tetScreen: document.getElementById('tetScreen'),
+    tetScreenTitle: document.getElementById('tetScreenTitle'),
+    tetScreenBtn: document.getElementById('tetScreenBtn'),
     tetHint: document.getElementById('tetHint'),
 
     // Snake
@@ -309,6 +419,10 @@ export function collectDom() {
     snakeScore: document.getElementById('snakeScore'),
     snakeHighScore: document.getElementById('snakeHighScore'),
     snakeStartBtn: document.getElementById('snakeStartBtn'),
+    snakePauseBtn: document.getElementById('snakePauseBtn'),
+    snakeScreen: document.getElementById('snakeScreen'),
+    snakeScreenTitle: document.getElementById('snakeScreenTitle'),
+    snakeScreenBtn: document.getElementById('snakeScreenBtn'),
     snakeHint: document.getElementById('snakeHint'),
     snakeStatus: document.getElementById('snakeStatus'),
   };

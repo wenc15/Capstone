@@ -40,6 +40,7 @@ function defaultState() {
     score: 0,
     highScore: 0,
     gameOver: false,
+    paused: false,
     playing: false,
     gameLoop: null,
     lastMove: 0,
@@ -53,7 +54,7 @@ function normalizeLoadedState(raw) {
   const skinId = typeof raw.skinId === 'string' && raw.skinId in SNAKE_SKINS
     ? raw.skinId
     : DEFAULT_SKIN_ID;
-  return { ...raw, skinId };
+  return { ...raw, skinId, paused: !!raw.paused };
 }
 
 async function syncSkinFromCollection(st) {
@@ -121,6 +122,7 @@ function initGame(st) {
   st.food = spawnFood(st);
   st.score = 0;
   st.gameOver = false;
+  st.paused = false;
   st.playing = true;
   st.lastMove = Date.now();
 }
@@ -153,7 +155,7 @@ function changeDirection(st, dx, dy) {
 }
 
 function moveSnake(st, els) {
-  if (st.gameOver || !st.playing) return;
+  if (st.gameOver || !st.playing || st.paused) return;
 
   st.direction = { ...st.nextDirection };
 
@@ -199,6 +201,8 @@ function endGame(st, els, result = 'lose') {
     clearInterval(st.gameLoop);
     st.gameLoop = null;
   }
+  st.paused = false;
+  consumeDiceBuildEligibility();
   save(st);
   pushHistory({ result, score: st.score });
   if (els?.toastEl) showToast(els.toastEl, `Snake over - score ${st.score}`);
@@ -222,11 +226,37 @@ function render(els, st) {
 
   if (els.snakeStatus) {
     if (st.gameOver) els.snakeStatus.textContent = 'Game Over';
+    else if (st.paused) els.snakeStatus.textContent = 'Paused';
     else if (st.playing) els.snakeStatus.textContent = 'Playing';
     else els.snakeStatus.textContent = 'Ready';
   }
 
-  if (els.snakeStartBtn) els.snakeStartBtn.disabled = st.playing;
+  if (els.snakeStartBtn) {
+    els.snakeStartBtn.disabled = false;
+    els.snakeStartBtn.textContent = (st.playing && st.paused) ? 'Resume' : 'Start';
+    els.snakeStartBtn.style.display = 'none';
+  }
+
+  if (els.snakePauseBtn) {
+    els.snakePauseBtn.disabled = !st.playing || st.gameOver;
+    els.snakePauseBtn.textContent = st.paused ? 'Resume' : 'Pause';
+    els.snakePauseBtn.style.display = st.playing && !st.gameOver ? 'inline-block' : 'none';
+  }
+
+  if (els.snakeScreen && els.snakeScreenTitle && els.snakeScreenBtn) {
+    const show = !st.playing || st.paused || st.gameOver;
+    els.snakeScreen.classList.toggle('mg-hidden', !show);
+    if (st.gameOver) {
+      els.snakeScreenTitle.textContent = 'Game Over';
+      els.snakeScreenBtn.textContent = 'Restart';
+    } else if (st.playing && st.paused) {
+      els.snakeScreenTitle.textContent = 'Paused';
+      els.snakeScreenBtn.textContent = 'Resume';
+    } else {
+      els.snakeScreenTitle.textContent = '';
+      els.snakeScreenBtn.textContent = 'Start';
+    }
+  }
 
   renderBoard(els, st);
 }
@@ -280,20 +310,60 @@ function showSnakeView(els) {
 function attachHandlers(els, stRef) {
   const ui = els;
 
-  ui.snakeHubBtn?.addEventListener('click', () => {
+  const pauseSnake = (st) => {
+    if (!st || !st.playing || st.gameOver) return;
+    st.paused = true;
+    save(st);
+    render(ui, st);
+  };
+
+  const resumeSnake = (st) => {
+    if (!st || !st.playing || st.gameOver) return;
+    st.paused = false;
+    st.lastMove = Date.now();
+    save(st);
+    render(ui, st);
+  };
+
+  const startOrResumeSnake = () => {
+    const st = stRef.current;
+    if (!st) return;
+    if (!st.playing || st.gameOver) {
+      startGame(st);
+      startGameLoop(st, ui);
+      render(ui, st);
+      return;
+    }
+    if (st.paused) {
+      resumeSnake(st);
+    }
+  };
+
+  const stopSnakeLoop = () => {
+    const st = stRef.current;
+    if (!st) return;
+    if (st.gameLoop) {
+      clearInterval(st.gameLoop);
+      st.gameLoop = null;
+    }
+    st.playing = false;
+    st.paused = false;
+    save(st);
+  };
+
+  ui.snakeExitBtn?.addEventListener('click', () => {
+    stopSnakeLoop();
     openMinigameHub(ui, { bypassGate: true, reason: 'hub' });
   });
 
-  ui.snakeExitBtn?.addEventListener('click', () => {
-    closeSnake(ui);
-  });
+  ui.snakeStartBtn?.addEventListener('click', startOrResumeSnake);
+  ui.snakeScreenBtn?.addEventListener('click', startOrResumeSnake);
 
-  ui.snakeStartBtn?.addEventListener('click', () => {
+  ui.snakePauseBtn?.addEventListener('click', () => {
     const st = stRef.current;
-    if (!st) return;
-    startGame(st);
-    startGameLoop(st, ui);
-    render(ui, st);
+    if (!st || !st.playing || st.gameOver) return;
+    if (st.paused) resumeSnake(st);
+    else pauseSnake(st);
   });
 
   window.addEventListener('keydown', (ev) => {
@@ -329,6 +399,16 @@ function startGameLoop(st, ui) {
   st.lastMove = Date.now();
 
   st.gameLoop = setInterval(() => {
+    const minigameHidden = ui?.viewMinigame?.style.display === 'none' || ui?.snakeRoot?.style.display === 'none';
+    if (minigameHidden) {
+      clearInterval(st.gameLoop);
+      st.gameLoop = null;
+      st.playing = false;
+      st.paused = false;
+      save(st);
+      return;
+    }
+
     if (!st.playing || st.gameOver) {
       clearInterval(st.gameLoop);
       st.gameLoop = null;
@@ -365,6 +445,9 @@ export function mountSnake(els) {
   attachHandlers(els, stRef);
 
   const st = load() || defaultState();
+  st.playing = false;
+  st.paused = false;
+  st.gameLoop = null;
   stRef.current = st;
   save(st);
   syncSkinFromCollection(st).then(() => render(els, st));
@@ -392,8 +475,6 @@ export function openSnake(els, meta) {
     return;
   }
 
-  if (!bypass && meta?.reason !== 'dev') consumeDiceBuildEligibility();
-
   showMinigameSection(els);
   showSnakeView(els);
   enableGateHint(els, true);
@@ -403,12 +484,21 @@ export function openSnake(els, meta) {
     stRef.current = defaultState();
   }
   syncSkinFromCollection(stRef.current).finally(() => {
-    startGame(stRef.current);
-    startGameLoop(stRef.current, els);
     render(els, stRef.current);
   });
 }
 
 export function closeSnake(els) {
+  const stRef = els?.__snake;
+  const st = stRef?.current;
+  if (st?.gameLoop) {
+    clearInterval(st.gameLoop);
+    st.gameLoop = null;
+  }
+  if (st) {
+    st.playing = false;
+    st.paused = false;
+    save(st);
+  }
   closeMinigameSection(els);
 }

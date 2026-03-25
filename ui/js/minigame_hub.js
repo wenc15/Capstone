@@ -1,13 +1,17 @@
-import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Keep minigame hub navigation behavior aligned with relax prompt entry flow.
+
+import { hasDiceBuildEligibility } from './relax_prompt.js';
 import { showToast } from './utils.js';
 
 export function showMinigameSection(els) {
-  const views = [els?.viewTimer, els?.viewStats, els?.viewPet, els?.viewGacha, els?.viewMinigame];
+  const views = [els?.viewTimer, els?.viewStats, els?.viewAchievements, els?.viewPet, els?.viewGacha, els?.viewMinigame];
   views.forEach((view) => {
     if (view) view.style.display = view === els?.viewMinigame ? 'block' : 'none';
   });
 
-  const navs = [els?.navTimer, els?.navStats, els?.navPet, els?.navGacha, els?.navMinigame];
+  const navs = [els?.navTimer, els?.navStats, els?.navAchievements, els?.navPet, els?.navGacha, els?.navMinigame];
   navs.forEach((nav) => {
     if (!nav) return;
     const active = nav === els?.navMinigame;
@@ -28,7 +32,7 @@ export function closeMinigameSection(els) {
   if (els?.viewMinigame) els.viewMinigame.style.display = 'none';
   if (els?.viewTimer) els.viewTimer.style.display = 'block';
 
-  const navs = [els?.navTimer, els?.navStats, els?.navPet, els?.navGacha, els?.navMinigame];
+  const navs = [els?.navTimer, els?.navStats, els?.navAchievements, els?.navPet, els?.navGacha, els?.navMinigame];
   navs.forEach((nav) => {
     if (!nav) return;
     const active = nav === els?.navTimer;
@@ -47,8 +51,6 @@ export function openMinigameHub(els, meta = {}) {
     return false;
   }
 
-  if (!bypass) consumeDiceBuildEligibility();
-
   showMinigameSection(els);
   showMinigamePanel(els, 'hub');
   return true;
@@ -63,16 +65,16 @@ export function mountMinigameHub(els) {
 
   els.mgOpenDicebuildBtn?.addEventListener('click', async () => {
     const mod = await import('./minigame_dicebuild.js');
-    mod.openDiceBuild?.(els, { bypassGate: true, reason: 'hub' });
+    mod.openDiceBuild?.(els, { reason: 'hub' });
   });
 
   els.mgOpenTetrisBtn?.addEventListener('click', async () => {
     const mod = await import('./minigame_tetris.js');
-    mod.openTetris?.(els, { bypassGate: true, reason: 'hub' });
+    mod.openTetris?.(els, { reason: 'hub' });
   });
 
   els.mgOpenSnakeBtn?.addEventListener('click', async () => {
     const mod = await import('./minigame_snake.js');
-    mod.openSnake?.(els, { bypassGate: true, reason: 'hub' });
+    mod.openSnake?.(els, { reason: 'hub' });
   });
 }

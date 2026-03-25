@@ -1,3 +1,7 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Document page-visibility time tracking and background message handoff.
+
 // Growin: per-page time tracking in the content script
 
 let growinPageStartTime = Date.now();

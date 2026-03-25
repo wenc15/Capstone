@@ -27,6 +27,7 @@ public static class CollectionCatalog
     {
         new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
         new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin", Rarity = "Epic", Category = "minigame", Game = "snake" },
+        new() { ItemId = "skin_dicebuild_petstand", DisplayName = "Pet Standee Dice & Build Skin", Rarity = "Epic", Category = "minigame", Game = "dicebuild" },
     };
 }
 

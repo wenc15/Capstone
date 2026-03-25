@@ -295,15 +295,33 @@ export function createDiceBuildRender({
   }
 
   function hideResult(ui) {
-    ui?.mgResult?.classList.add('mg-hidden');
+    if (!ui?.mgResult) return;
+    ui.mgResult.classList.add('mg-hidden');
+    ui.mgResult.classList.remove('is-win', 'is-lose');
   }
 
   function showResult(ui, st, score) {
     if (!ui?.mgResult) return;
     ui.mgResult.classList.remove('mg-hidden');
-    if (ui.mgResultTitle) ui.mgResultTitle.textContent = score.win ? 'Victory' : 'Defeat';
-    const meta = `Score: ${score.value} · Cash: ${st.cash} · Stage: ${st.stageIdx + 1}/${STAGE_COUNT}`;
-    if (ui.mgResultMeta) ui.mgResultMeta.textContent = meta;
+    ui.mgResult.classList.toggle('is-win', !!score.win);
+    ui.mgResult.classList.toggle('is-lose', !score.win);
+
+    if (ui.mgResultTitle) {
+      ui.mgResultTitle.textContent = score.win ? 'Victory' : 'Defeat';
+    }
+    if (ui.mgResultMeta) {
+      const note = score.win
+        ? 'Stage cleared. Great board building!'
+        : 'Try adjusting your build path and economy.';
+      ui.mgResultMeta.innerHTML = `
+        <div class="mg-result-note">${note}</div>
+        <div class="mg-result-stats">
+          <span class="mg-result-chip">🏆 Score ${score.value}</span>
+          <span class="mg-result-chip">💵 Cash ${st.cash}</span>
+          <span class="mg-result-chip">🎯 Stage ${st.stageIdx + 1}/${STAGE_COUNT}</span>
+        </div>
+      `;
+    }
   }
 
   function showFloat(ui, text) {
@@ -418,6 +436,18 @@ export function createDiceBuildRender({
     root.classList.toggle('mg-layout-stack', available < need);
   }
 
+  function createPlayerMarker(st, isHop = false) {
+    const marker = document.createElement('div');
+    marker.className = `mg-player${isHop ? ' is-hop' : ''}`;
+    if (st?.skinId === 'skin_dicebuild_petstand') {
+      marker.classList.add('is-skin-petstand');
+      marker.textContent = '';
+    } else {
+      marker.textContent = '🙂';
+    }
+    return marker;
+  }
+
   function render(els, st, helpers) {
     if (!els || !st) return;
 
@@ -526,9 +556,7 @@ export function createDiceBuildRender({
             }
 
             if (cellIdx === playerCell) {
-              const marker = document.createElement('div');
-              marker.className = `mg-player${st.isMoving ? ' is-hop' : ''}`;
-              marker.textContent = '🙂';
+              const marker = createPlayerMarker(st, !!st.isMoving);
               cell.appendChild(marker);
             }
 
@@ -626,6 +654,7 @@ export function createDiceBuildRender({
     showFloat,
     playStageClearCelebration,
     syncDiceBuildLayout,
+    createPlayerMarker,
     render,
   };
 }
