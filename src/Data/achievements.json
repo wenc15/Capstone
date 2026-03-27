@@ -1,6 +1,19 @@
-[
+{
+  "changelog": "2026/03/26 edited by JS",
+  "achievements": [
     { "id": "first_focus", "title": "First Focus", "desc": "Complete 1 focus session", "type": "total_sessions", "target": 1 },
     { "id": "focus_10", "title": "Getting Started", "desc": "Complete 10 focus sessions", "type": "total_sessions", "target": 10 },
     { "id": "first_food_draw", "title": "First Bite", "desc": "Draw your first food", "type": "food_draws_total", "target": 1 },
-    { "id": "food_draw_10", "title": "Snack Time", "desc": "Draw 10 foods", "type": "food_draws_total", "target": 10 }
+    { "id": "food_draw_10", "title": "Snack Time", "desc": "Draw 10 foods", "type": "food_draws_total", "target": 10 },
+
+    { "id": "pet_level_up_once", "title": "Level Up Once", "desc": "Reach Lv 2 with any pet", "type": "pet_level_max", "target": 2 },
+    { "id": "pet_max_level", "title": "A Max-Level Pet", "desc": "Reach max level (Lv 20) with any pet", "type": "pet_any_max_level", "target": 1 },
+    { "id": "pet_interact_once", "title": "Say Hi", "desc": "Interact with your pet once", "type": "pet_interactions_total", "target": 1 },
+
+    { "id": "focus_streak_1", "title": "Focus Streak: 1 Day", "desc": "Reach a 1-day successful focus streak (best streak)", "type": "focus_best_streak_days", "target": 1 },
+    { "id": "focus_streak_3", "title": "Focus Streak: 3 Days", "desc": "Reach a 3-day successful focus streak (best streak)", "type": "focus_best_streak_days", "target": 3 },
+    { "id": "focus_streak_7", "title": "Focus Streak: 7 Days", "desc": "Reach a 7-day successful focus streak (best streak)", "type": "focus_best_streak_days", "target": 7 },
+
+    { "id": "fail_once", "title": "A Setback", "desc": "Fail a focus session once", "type": "failed_sessions", "target": 1 }
   ]
+}

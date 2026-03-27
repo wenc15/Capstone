@@ -268,6 +268,9 @@ export function mountTimer(els) {
       }
 
       const data = await res.json();
+
+      // Clear failure latch once backend clears failure.
+      if (!data.isFailed) backendFailureHandled = false;
       // Credits: if backend session just completed successfully, refresh credits
       if (prevBackendRunning && !data.isRunning && !data.isFailed) {
         refreshCredits();
@@ -303,7 +306,8 @@ export function mountTimer(els) {
       broadcastState();
 
       // 如果后端判定失败，就在前端也结束这次 session
-      if (data.isFailed) {
+      if (data.isFailed && !backendFailureHandled) {
+        backendFailureHandled = true;
         console.log('Session failed from backend:', data.failReason);
         handleBackendFailure(data.failReason);
       }
@@ -448,6 +452,9 @@ export function mountTimer(els) {
   // Credits: track backend running edge (for success completion)
   let prevBackendRunning = false;
   let stopRequestInFlight = false;
+
+  // Prevent repeating failure side-effects while polling.
+  let backendFailureHandled = false;
 
 
 
@@ -599,6 +606,7 @@ export function mountTimer(els) {
       alert('Failed to start focus session (backend). Please try again later.');
       return;
     }
+    backendFailureHandled = false;
     startBackendStatusPolling();
     startCountdown();
   });

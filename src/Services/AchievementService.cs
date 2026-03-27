@@ -1,3 +1,4 @@
+// 2026/03/26 edited by JS
 // 2026/03/04 created by Darren (Chengyuan Wen)
 // =============================================================
 // 文件：AchievementService.cs
@@ -21,6 +22,7 @@
 // =============================================================
 
 using System.Text.Json;
+using System.Globalization;
 using CapstoneBackend.Models;
 using CapstoneBackend.Services.Dtos;
 
@@ -32,7 +34,20 @@ public class AchievementService
     private readonly LocalDataService _dataService;
     private readonly IWebHostEnvironment _env;
 
+    // Keep in sync with ui/js/pet.js
+    private const int PetExpPerLevel = 100;
+    private const int PetMaxLevel = 20;
+    private const int PetMaxGrowth = (PetMaxLevel - 1) * PetExpPerLevel;
+
     private List<AchievementDefinition>? _cachedDefs;
+    private DateTimeOffset _cachedDefsLastWriteUtc;
+    private readonly object _defsLock = new();
+
+    private sealed class AchievementDefinitionsFile
+    {
+        public string? Changelog { get; set; }
+        public List<AchievementDefinition>? Achievements { get; set; }
+    }
 
     public AchievementService(LocalDataService dataService, IWebHostEnvironment env)
     {
@@ -42,28 +57,42 @@ public class AchievementService
 
     public List<AchievementDefinition> GetDefinitions()
     {
-        if (_cachedDefs != null) return _cachedDefs;
-
         var path = Path.Combine(_env.ContentRootPath, "Data", "achievements.json");
         if (!File.Exists(path))
+            return new List<AchievementDefinition>();
+
+        var lastWriteUtc = File.GetLastWriteTimeUtc(path);
+
+        lock (_defsLock)
         {
-            _cachedDefs = new List<AchievementDefinition>();
+            if (_cachedDefs != null && _cachedDefsLastWriteUtc == lastWriteUtc)
+                return _cachedDefs;
+
+            var json = File.ReadAllText(path);
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            List<AchievementDefinition> defs;
+            try
+            {
+                // Back-compat: allow either a raw array or an object wrapper.
+                defs = JsonSerializer.Deserialize<List<AchievementDefinition>>(json, opts) ?? new List<AchievementDefinition>();
+            }
+            catch (JsonException)
+            {
+                var file = JsonSerializer.Deserialize<AchievementDefinitionsFile>(json, opts);
+                defs = file?.Achievements ?? new List<AchievementDefinition>();
+            }
+
+            // Remove empty IDs and dedupe
+            _cachedDefs = defs
+                .Where(d => !string.IsNullOrWhiteSpace(d.Id))
+                .GroupBy(d => d.Id.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            _cachedDefsLastWriteUtc = lastWriteUtc;
             return _cachedDefs;
         }
-
-        var json = File.ReadAllText(path);
-        var defs = JsonSerializer.Deserialize<List<AchievementDefinition>>(json,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-            ?? new List<AchievementDefinition>();
-
-        // Remove empty IDs and dedupe
-        _cachedDefs = defs
-            .Where(d => !string.IsNullOrWhiteSpace(d.Id))
-            .GroupBy(d => d.Id.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
-
-        return _cachedDefs;
     }
 
     /// <summary>
@@ -75,9 +104,12 @@ public class AchievementService
         var defs = GetDefinitions();
         var profile = _dataService.GetUserProfile();
 
+        var maxPetLevel = ComputeMaxPetLevel(profile.PetGrowth);
+        var bestFocusStreakDays = ComputeBestFocusStreakDays();
+
         foreach (var def in defs)
         {
-            var progress = GetProgressFor(def.Type, profile);
+            var progress = GetProgressFor(def.Type, profile, maxPetLevel, bestFocusStreakDays);
 
             if (progress >= def.Target)
             {
@@ -99,7 +131,7 @@ public class AchievementService
         // Build response
         return defs.Select(def =>
         {
-            var progress = GetProgressFor(def.Type, profile);
+            var progress = GetProgressFor(def.Type, profile, maxPetLevel, bestFocusStreakDays);
             var unlocked = profile.UnlockedAchievements.Contains(def.Id);
             profile.AchievementUnlockedAt.TryGetValue(def.Id, out var unlockedAt);
 
@@ -117,7 +149,7 @@ public class AchievementService
         }).ToList();
     }
 
-    private static int GetProgressFor(string type, UserProfile profile)
+    private int GetProgressFor(string type, UserProfile profile, int maxPetLevel, int bestFocusStreakDays)
     {
         // Computed-from-profile types (no extra counters required)
         if (type.Equals("total_sessions", StringComparison.OrdinalIgnoreCase))
@@ -126,14 +158,104 @@ public class AchievementService
         if (type.Equals("successful_sessions", StringComparison.OrdinalIgnoreCase))
             return profile.SuccessfulSessions;
 
+        if (type.Equals("failed_sessions", StringComparison.OrdinalIgnoreCase))
+            return profile.FailedSessions;
+
         if (type.Equals("total_focus_minutes", StringComparison.OrdinalIgnoreCase))
             return (int)(profile.TotalFocusSeconds / 60);
+
+        // Pet-related (computed from profile.PetGrowth)
+        if (type.Equals("pet_level_max", StringComparison.OrdinalIgnoreCase))
+            return maxPetLevel;
+
+        if (type.Equals("pet_any_max_level", StringComparison.OrdinalIgnoreCase))
+            return maxPetLevel >= PetMaxLevel ? 1 : 0;
+
+        // Focus streak (computed from session history)
+        if (type.Equals("focus_best_streak_days", StringComparison.OrdinalIgnoreCase))
+            return bestFocusStreakDays;
 
         // Event-style counters (stored in profile.AchievementCounters)
         if (profile.AchievementCounters.TryGetValue(type, out var v))
             return v;
 
         return 0;
+    }
+
+    private static int ComputeMaxPetLevel(List<int>? petGrowth)
+    {
+        if (petGrowth == null || petGrowth.Count == 0)
+            return 1;
+
+        var maxLevel = 1;
+        foreach (var raw in petGrowth)
+        {
+            var safe = Math.Max(0, raw);
+            var capped = Math.Min(PetMaxGrowth, safe);
+            var lv = Math.Min(PetMaxLevel, (capped / PetExpPerLevel) + 1);
+            if (lv > maxLevel) maxLevel = lv;
+        }
+
+        return maxLevel;
+    }
+
+    private int ComputeBestFocusStreakDays()
+    {
+        List<SessionHistoryDailySummaryItem> daily;
+        try
+        {
+            daily = _dataService.GetSessionHistoryDailySummary();
+        }
+        catch
+        {
+            return 0;
+        }
+
+        if (daily == null || daily.Count == 0)
+            return 0;
+
+        var days = daily
+            .Where(d => d != null && d.Success > 0 && !string.IsNullOrWhiteSpace(d.Date))
+            .Select(d => TryParseLocalDateOnly(d.Date))
+            .Where(d => d.HasValue)
+            .Select(d => d!.Value)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        if (days.Count == 0)
+            return 0;
+
+        var best = 0;
+        var run = 0;
+        DateOnly? prev = null;
+
+        foreach (var day in days)
+        {
+            if (prev.HasValue && day == prev.Value.AddDays(1))
+                run += 1;
+            else
+                run = 1;
+
+            if (run > best) best = run;
+            prev = day;
+        }
+
+        return best;
+    }
+
+    private static DateOnly? TryParseLocalDateOnly(string date)
+    {
+        if (string.IsNullOrWhiteSpace(date))
+            return null;
+
+        if (DateOnly.TryParseExact(date.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+            return d;
+
+        if (DateOnly.TryParse(date.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out d))
+            return d;
+
+        return null;
     }
 
     // Event hooks for later steps:

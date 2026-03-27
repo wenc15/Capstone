@@ -58,7 +58,8 @@ function loadSummaryState() {
   const st = readJson(SUMMARY_KEY, null) || {};
   return {
     focusMinutes: Number.isFinite(st.focusMinutes) ? Math.max(0, Math.round(st.focusMinutes)) : 0,
-    distractions: Number.isFinite(st.distractions) ? Math.max(0, Math.round(st.distractions)) : 0,
+    // For the home card we show the last distraction app name, not a running counter.
+    distractionApp: typeof st.distractionApp === 'string' ? st.distractionApp : '',
     completed: Number.isFinite(st.completed) ? Math.max(0, Math.round(st.completed)) : 0,
   };
 }
@@ -82,8 +83,20 @@ function saveSummaryState(st) {
 function renderSummary(st) {
   if (!boundEls) return;
   if (boundEls.sumFocusTime) boundEls.sumFocusTime.textContent = formatDurationHM(st.focusMinutes);
-  if (boundEls.sumDistractions) boundEls.sumDistractions.textContent = String(st.distractions);
+  if (boundEls.sumDistractions) boundEls.sumDistractions.textContent = st.distractionApp || '—';
   if (boundEls.sumCompleted) boundEls.sumCompleted.textContent = String(st.completed);
+}
+
+function prettifyProcessName(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const token = s.split(',')[0].trim().replace(/^"|"$/g, '');
+  const noExe = token.toLowerCase().endsWith('.exe') ? token.slice(0, -4) : token;
+  // Basic title-case for single-token process names: chrome -> Chrome
+  if (/^[a-z0-9._-]+$/.test(noExe) && noExe === noExe.toLowerCase()) {
+    return noExe.charAt(0).toUpperCase() + noExe.slice(1);
+  }
+  return noExe;
 }
 
 function normalizeOutcome(raw) {
@@ -317,7 +330,8 @@ export function updateSessionSummary({ minutes, distractedApp }) {
   const st = loadSummaryState();
   const m = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
   st.focusMinutes = m;
-  if (distractedApp && String(distractedApp).trim()) st.distractions += 1;
+  if (distractedApp && String(distractedApp).trim()) st.distractionApp = prettifyProcessName(distractedApp);
+  else st.distractionApp = '';
   if (m > 0 && !(distractedApp && String(distractedApp).trim())) st.completed += 1;
   saveSummaryState(st);
   renderSummary(st);
