@@ -1,3 +1,7 @@
+// 2026/03/29 edited by JS
+// Changes:
+//  - Stop focus autoplay when focus session ends (remove keep-playing latch).
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Add dock player controls, queue behavior, and volume popover interactions.
@@ -804,13 +808,8 @@ export function mountMusic(opts = {}) {
   const unsub = subscribeFocusStatus((st) => {
     if (disposed) return;
     const wasRunning = isFocusRunning;
-    const wasPlaying = ((!audio.paused) || pendingPlay) && !!audio.src;
     isFocusRunning = !!st?.isRunning;
     if (wasRunning && !isFocusRunning) {
-      if (wasPlaying && !isManualPlaying) {
-        // Keep playback when focus ends; do not auto-pause.
-        isManualPlaying = true;
-      }
       pausedByUserWhileFocus = false;
     }
     syncPlaybackWithState();

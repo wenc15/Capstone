@@ -1,3 +1,8 @@
+/* 2026/03/29 edited by JS
+ * Changes:
+ *  - Add Pet view stage background image (pet-back.png).
+ */
+
 /* 2026/03/25 edited by Zhecheng Xu
  * Changes:
  *  - Tune widget frosted-glass transparency, border tone, and control tile color balance.
@@ -2267,7 +2272,11 @@ body{
   width: 100%;
   border:1px solid var(--muted);
   border-radius: 16px;
-  background:#fff;
+  background-color:#fff;
+  background-image: url('assets/pet-back.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
   padding: 18px;
   display:flex;
   align-items:center;
