@@ -32,6 +32,7 @@
 import { subscribeFocusStatus, getFocusStatus } from './focusStatusStore.js';
 
 const APP_SETTINGS_LOCAL_KEY = 'growin:appBehaviorSettings';
+const DEFAULT_GRACE_SECONDS = 10;
 
 function normalizeUiTone(v) {
   return String(v || '').trim().toLowerCase() === 'sky' ? 'sky' : 'default';
@@ -97,8 +98,16 @@ export function mountWidget() {
     return `${m}:${s}`;
   }
 
+  function getWidgetDisplaySeconds(st) {
+    const base = Math.max(0, Number(st?.remainingSeconds ?? 0) || 0);
+    if (!st?.isRunning || !st?.isViolating) return base;
+
+    const violatingFor = Math.max(0, Number(st?.violationSeconds ?? 0) || 0);
+    return Math.max(0, DEFAULT_GRACE_SECONDS - violatingFor);
+  }
+
   function render(st) {
-    elTime.textContent = formatSeconds(st.remainingSeconds ?? 0);
+    elTime.textContent = formatSeconds(getWidgetDisplaySeconds(st));
 
     // ✅ 运行中显示 Stop 图标，不再是 Pause
     btnPlay.innerHTML = st.isRunning ? iconStop : iconPlay;
