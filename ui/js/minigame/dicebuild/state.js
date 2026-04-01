@@ -4,8 +4,14 @@
 // Changes:
 //  - Reset Dice & Build save once per app launch to start fresh each restart.
 
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Add scheduled save strategy to reduce burst writes during interactions.
+//  - Persist stable game state only, excluding transient runtime-only fields.
+
 import { BUILDING_IDS, BOARD_COLS, BOARD_ROWS, HIST_KEY, SAVE_KEY } from './constants.js';
 import { idxOf, makeBoard } from './board.js';
+import { LOCAL_STORAGE_KEYS, createScheduledSaver, readJsonSafe, writeJsonSafe } from '../../local_storage.js';
 
 const LOCKED_UNLOCK_ORDER = [
   idxOf(0, 2), idxOf(0, 3), idxOf(0, 4),
@@ -13,25 +19,39 @@ const LOCKED_UNLOCK_ORDER = [
 ];
 
 function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
+  return readJsonSafe(key, fallback);
 }
 
 function writeJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
+  writeJsonSafe(key, value);
 }
 
 export function createDiceBuildState({ makeInstance }) {
-  const BOOT_RESET_FLAG = 'dicebuild.boot.reset.v1';
+  const BOOT_RESET_FLAG = LOCAL_STORAGE_KEYS.dicebuildBootReset;
+
+  function toPersistedState(st) {
+    if (!st || typeof st !== 'object') return st;
+
+    return {
+      ...st,
+      selectingPlace: null,
+      selected: null,
+      detail: null,
+      selectingUnlock: false,
+      pendingUnlockCost: 0,
+      isMoving: false,
+      isRolling: false,
+      dragPreview: null,
+      fxPulse: {},
+      cellFxItems: [],
+    };
+  }
+
+  const saver = createScheduledSaver({
+    key: SAVE_KEY,
+    select: toPersistedState,
+    minDelayMs: 700,
+  });
 
   function defaultState() {
     const board = makeBoard();
@@ -77,7 +97,11 @@ export function createDiceBuildState({ makeInstance }) {
   }
 
   function save(st) {
-    writeJson(SAVE_KEY, st);
+    saver.schedule(st);
+  }
+
+  function saveNow(st) {
+    saver.saveNow(st);
   }
 
   function load() {
@@ -151,6 +175,7 @@ export function createDiceBuildState({ makeInstance }) {
   return {
     defaultState,
     save,
+    saveNow,
     load,
     pushHistory,
   };

@@ -2,6 +2,10 @@
 // Changes:
 //  - Extend DOM collection for music dock controls and settings toggles.
 
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Collect website usage cleanup controls in Settings.
+
 // 2026/03/19 edited by Zhecheng Xu
 // Changes:
 //  - Collect Settings/Data Management modal DOM nodes.
@@ -171,6 +175,9 @@ export function collectDom() {
   const archiveImportMeta = document.getElementById('archiveImportMeta');
   const archiveReselectBtn = document.getElementById('archiveReselectBtn');
   const archiveDeleteBtn = document.getElementById('archiveDeleteBtn');
+  const usageCleanupDaysInput = document.getElementById('usageCleanupDaysInput');
+  const usageCleanupBtn = document.getElementById('usageCleanupBtn');
+  const usageCleanupMeta = document.getElementById('usageCleanupMeta');
 
   // ===== Music dock =====
   const musicDock = document.getElementById('musicDock');
@@ -317,6 +324,9 @@ export function collectDom() {
     archiveImportMeta,
     archiveReselectBtn,
     archiveDeleteBtn,
+    usageCleanupDaysInput,
+    usageCleanupBtn,
+    usageCleanupMeta,
 
     // Music dock
     musicDock,

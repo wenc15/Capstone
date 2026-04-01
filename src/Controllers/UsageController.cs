@@ -21,6 +21,13 @@
 //   - 依赖：AppDbContext, WebsiteUsage, UsageItemDto。
 // =============================================================
 
+// 2026/03/31 edited by Zikai Lu
+// 新增内容：
+//   - 新增使用记录清理接口：清空全部 / 按保留天数删除旧记录。
+// 新增的作用：
+//   - 在不影响历史保留策略的前提下，提供可控的数据维护能力。
+// =============================================================
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -133,6 +140,61 @@ public class UsageController : ControllerBase
             .ToListAsync();
 
         return Ok(query);
+    }
+
+    // ---------------------------------------------------------
+    // POST /api/usage/clear
+    // 用途：清空全部网站使用记录（用于“删除本地数据”场景）
+    // ---------------------------------------------------------
+    [HttpPost("clear")]
+    public async Task<IActionResult> ClearAll()
+    {
+        var all = await _db.WebsiteUsages.ToListAsync();
+        if (all.Count == 0)
+        {
+            return Ok(new { removed = 0 });
+        }
+
+        _db.WebsiteUsages.RemoveRange(all);
+        var removed = await _db.SaveChangesAsync();
+        return Ok(new { removed });
+    }
+
+    // ---------------------------------------------------------
+    // POST /api/usage/cleanup
+    // 用途：删除 keepDays 之前的记录，默认保留最近 90 天
+    // ---------------------------------------------------------
+    [HttpPost("cleanup")]
+    public async Task<IActionResult> CleanupOld([FromQuery] int keepDays = 90)
+    {
+        if (keepDays < 1)
+        {
+            keepDays = 1;
+        }
+
+        var cutoffUtc = DateTime.UtcNow.Date.AddDays(-keepDays);
+        var oldRows = await _db.WebsiteUsages
+            .Where(x => x.StartTimeUtc < cutoffUtc)
+            .ToListAsync();
+
+        if (oldRows.Count == 0)
+        {
+            return Ok(new
+            {
+                removed = 0,
+                keepDays,
+                cutoffUtc,
+            });
+        }
+
+        _db.WebsiteUsages.RemoveRange(oldRows);
+        var removed = await _db.SaveChangesAsync();
+        return Ok(new
+        {
+            removed,
+            keepDays,
+            cutoffUtc,
+        });
     }
 }
 

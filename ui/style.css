@@ -3,6 +3,11 @@
  *  - Add Pet view stage background image (pet-back.png).
  */
 
+/* 2026/03/31 edited by Zikai Lu
+ * Changes:
+ *  - Add settings styles for website usage cleanup controls.
+ */
+
 /* 2026/03/25 edited by Zhecheng Xu
  * Changes:
  *  - Tune widget frosted-glass transparency, border tone, and control tile color balance.
@@ -1416,6 +1421,45 @@ body{
 .settings-action-danger{
     background: linear-gradient(180deg, #d96e6e 0%, #c44c4c 100%);
     box-shadow: 0 4px 10px rgba(163, 54, 54, 0.24);
+}
+
+.settings-action-subtle{
+    background: linear-gradient(180deg, #7e9f8a 0%, #688977 100%);
+    box-shadow: 0 4px 10px rgba(71, 103, 83, 0.24);
+}
+
+.settings-divider{
+    height: 1px;
+    margin: 14px 0 12px;
+    background: linear-gradient(90deg, rgba(201, 159, 159, 0.15), rgba(201, 159, 159, 0.5), rgba(201, 159, 159, 0.15));
+}
+
+.settings-inline-row{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: end;
+}
+
+.settings-field-inline{
+    margin-top: 0;
+}
+
+.settings-number{
+    border: 1px solid #d7e2da;
+    border-radius: 10px;
+    background: #fff;
+    color: #2f3a34;
+    height: 40px;
+    padding: 0 12px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+@media (min-width: 640px){
+    .settings-inline-row{
+        grid-template-columns: 160px 1fr;
+    }
 }
 
 .settings-meta{

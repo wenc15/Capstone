@@ -1,5 +1,8 @@
 # Growin 后端接口文档（面向前端）
 
+> 2026/03/31 edited by Zikai Lu  
+> Changes: 新增网站使用记录维护接口文档（`/api/usage/clear`, `/api/usage/cleanup`），并补齐 `/api/usage` 系列接口说明。
+
 默认服务地址示例：`http://localhost:5024`（端口以实际运行为准）  
 所有接口默认使用 `Content-Type: application/json`。
 
@@ -10,6 +13,7 @@
 - 点数系统接口开发者：**Zikai Lu（Team 31 后端）**
 - 白名单预设相关接口开发者：**Zikai Lu（Team 31 后端）**
 - 专注历史与本地档案接口开发者：**Zikai Lu（Team 31 后端）**
+- 网站使用记录接口开发者：**Zikai Lu（Team 31 后端）**
 - 收藏品（Collection）接口开发者：**OpenCode（Team 31 后端）**
 ---
 
@@ -215,6 +219,88 @@
 - **响应状态码**
   - `200 OK`：导入成功。
   - `400 Bad Request`：文件为空、不是 JSON、或 JSON 结构非法。
+
+---
+
+## 3.5 网站使用记录接口（/api/usage）
+
+> 开发者：**Zikai Lu**
+
+### 3.5.1 上报网站使用记录
+
+- **方法**：`POST`
+- **路径**：`/api/usage`
+- **功能**：批量上报网站使用记录（通常由浏览器扩展调用）。
+- **请求头**：`Content-Type: application/json`
+- **请求体**：`UsageItemDto[]`
+
+| 字段        | 类型     | 必填 | 说明 |
+| ----------- | -------- | ---- | ---- |
+| `url`       | string   | 是   | 完整 URL。 |
+| `domain`    | string   | 否   | 域名。 |
+| `title`     | string   | 否   | 页面标题。 |
+| `icon`      | string   | 否   | 页面图标 URL。 |
+| `startTime` | string   | 是   | 开始时间（ISO8601）。 |
+| `endTime`   | string   | 是   | 结束时间（ISO8601）。 |
+| `duration`  | number   | 是   | 使用时长（秒，必须 > 0）。 |
+| `userId`    | string   | 否   | 用户标识，不传默认 `local`。 |
+
+- **响应状态码**
+  - `200 OK`：写入成功。
+  - `400 Bad Request`：请求体为空或非法。
+
+### 3.5.2 查询今日网站使用汇总
+
+- **方法**：`GET`
+- **路径**：`/api/usage/today`
+- **功能**：返回当天按域名聚合的使用总时长（秒）。
+- **响应体**：`UsageSummaryDto[]`
+
+| 字段          | 类型   | 说明 |
+| ------------- | ------ | ---- |
+| `domain`      | string | 域名。 |
+| `totalSeconds`| number | 该域名累计秒数。 |
+
+- **响应状态码**
+  - `200 OK`：返回聚合结果（可能为空）。
+
+### 3.5.3 清空全部网站使用记录
+
+- **方法**：`POST`
+- **路径**：`/api/usage/clear`
+- **功能**：删除 `WebsiteUsages` 全部记录（用于“删除本地数据”场景）。
+- **请求体**：无
+- **响应体字段**
+
+| 字段     | 类型   | 说明 |
+| -------- | ------ | ---- |
+| `removed`| number | 实际删除条数。 |
+
+- **响应状态码**
+  - `200 OK`：清空成功。
+
+### 3.5.4 按保留天数清理旧记录
+
+- **方法**：`POST`
+- **路径**：`/api/usage/cleanup?keepDays=90`
+- **功能**：删除 `keepDays` 之前的旧记录，默认保留最近 90 天。
+- **请求体**：无
+- **查询参数**
+
+| 字段      | 类型   | 必填 | 说明 |
+| --------- | ------ | ---- | ---- |
+| `keepDays`| number | 否   | 保留天数，最小为 1。 |
+
+- **响应体字段**
+
+| 字段       | 类型   | 说明 |
+| ---------- | ------ | ---- |
+| `removed`  | number | 本次删除条数。 |
+| `keepDays` | number | 实际生效的保留天数。 |
+| `cutoffUtc`| string | 清理阈值时间（UTC）。 |
+
+- **响应状态码**
+  - `200 OK`：清理执行成功。
 
 ---
 

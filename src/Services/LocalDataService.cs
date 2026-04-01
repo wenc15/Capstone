@@ -55,6 +55,14 @@
 //   - 所有写入均使用相同的锁机制与 JSON 序列化配置，确保线程安全与格式一致。
 // =============================================================
 
+// 2026/03/31 edited by Zikai Lu
+// 新增内容：
+//   - 增加 SessionHistory 内存缓存，降低高频追加时的重复读盘开销。
+//   - 增加档案备份轮转（按文件类型保留最近备份），控制备份目录体积。
+// 新增的作用：
+//   - 在“保留全部历史”的前提下，优化本地文件存储性能与长期稳定性。
+// =============================================================
+
 //2025/11/17 created by Zikai
 // =============================================================
 // 文件：LocalDataService.cs
@@ -79,6 +87,8 @@ namespace CapstoneBackend.Services;
 public class LocalDataService
 {
     private readonly object _fileLock = new();
+    private List<SessionHistoryItem>? _sessionHistoryCache;
+    private const int ArchiveBackupKeepCountPerKind = 20;
 
     // 统一 JSON 序列化配置
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -828,19 +838,29 @@ public class LocalDataService
     {
         lock (_fileLock)
         {
+            if (_sessionHistoryCache is not null)
+            {
+                return new List<SessionHistoryItem>(_sessionHistoryCache);
+            }
+
             var path = LocalStoragePaths.SessionHistoryFilePath;
 
             if (!File.Exists(path))
+            {
+                _sessionHistoryCache = new List<SessionHistoryItem>();
                 return new List<SessionHistoryItem>();
+            }
 
             try
             {
                 var json = File.ReadAllText(path);
                 var list = JsonSerializer.Deserialize<List<SessionHistoryItem>>(json, JsonOptions);
-                return list ?? new List<SessionHistoryItem>();
+                _sessionHistoryCache = list ?? new List<SessionHistoryItem>();
+                return new List<SessionHistoryItem>(_sessionHistoryCache);
             }
             catch
             {
+                _sessionHistoryCache = new List<SessionHistoryItem>();
                 return new List<SessionHistoryItem>();
             }
         }
@@ -906,7 +926,9 @@ public class LocalDataService
     {
         lock (_fileLock)
         {
-            var list = GetSessionHistory();
+            var list = _sessionHistoryCache is not null
+                ? new List<SessionHistoryItem>(_sessionHistoryCache)
+                : GetSessionHistory();
             list.Add(entry);
             SaveSessionHistoryList(list);
         }
@@ -976,6 +998,7 @@ public class LocalDataService
         var path = LocalStoragePaths.SessionHistoryFilePath;
         var json = JsonSerializer.Serialize(list, JsonOptions);
         File.WriteAllText(path, json);
+        _sessionHistoryCache = new List<SessionHistoryItem>(list);
     }
 
     private void SaveWhitelistPresetList(List<WhitelistPreset> presets)
@@ -994,6 +1017,10 @@ public class LocalDataService
         BackupIfExists(LocalStoragePaths.UserProfileFilePath, Path.Combine(backupDir, $"user_profile.{suffix}.bak.json"));
         BackupIfExists(LocalStoragePaths.SessionHistoryFilePath, Path.Combine(backupDir, $"session_history.{suffix}.bak.json"));
         BackupIfExists(LocalStoragePaths.WhitelistPresetsFilePath, Path.Combine(backupDir, $"whitelist_presets.{suffix}.bak.json"));
+
+        TrimBackups(backupDir, "user_profile.*.bak.json");
+        TrimBackups(backupDir, "session_history.*.bak.json");
+        TrimBackups(backupDir, "whitelist_presets.*.bak.json");
     }
 
     private static void BackupIfExists(string sourcePath, string targetPath)
@@ -1001,6 +1028,26 @@ public class LocalDataService
         if (File.Exists(sourcePath))
         {
             File.Copy(sourcePath, targetPath, overwrite: true);
+        }
+    }
+
+    private static void TrimBackups(string backupDir, string pattern)
+    {
+        try
+        {
+            var files = new DirectoryInfo(backupDir)
+                .GetFiles(pattern, SearchOption.TopDirectoryOnly)
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .ToList();
+
+            for (var i = ArchiveBackupKeepCountPerKind; i < files.Count; i++)
+            {
+                files[i].Delete();
+            }
+        }
+        catch
+        {
+            // ignore backup trimming failures
         }
     }
 

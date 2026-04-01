@@ -11,12 +11,19 @@
 // Purpose:
 //  - Provide user-facing backup/restore entry under Settings.
 
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Use centralized localStorage key registry for full local data cleanup.
+//  - Keep settings persistence keys aligned across modules.
+//  - Add website usage cleanup action with configurable keep-days input.
+
 import { showToast } from './utils.js';
+import { LOCAL_STORAGE_KEYS, clearKnownLocalStorage } from './local_storage.js';
 
 const API_BASE = 'http://localhost:5024';
-const APP_SETTINGS_LOCAL_KEY = 'growin:appBehaviorSettings';
-const MUSIC_VOLUME_LOCAL_KEY = 'growin:music.volume.v1';
-const MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY = 'growin:music.autoplayOnFocus.v1';
+const APP_SETTINGS_LOCAL_KEY = LOCAL_STORAGE_KEYS.appSettings;
+const MUSIC_VOLUME_LOCAL_KEY = LOCAL_STORAGE_KEYS.musicVolume;
+const MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY = LOCAL_STORAGE_KEYS.musicAutoplayOnFocus;
 const DEFAULT_APP_SETTINGS = {
   showWidget: true,
   closeBehavior: 'minimize',
@@ -395,16 +402,14 @@ async function deleteAllLocalData(els) {
     }
 
     try {
-      [
-        'growin.whitelist.selection.v1',
-        'growin.custom_app_catalog.v1',
-        'growin.timer.selectedMins.v1',
-        'growin.session.summary.v2',
-        MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY,
-      ].forEach((k) => localStorage.removeItem(k));
+      await fetch(`${API_BASE}/api/usage/clear`, {
+        method: 'POST',
+      });
     } catch {
-      // ignore localStorage failures
+      // ignore usage clear failures; local archive already cleared
     }
+
+    clearKnownLocalStorage();
 
     showToast(els.toastEl, 'Local data deleted. Reloading UI...');
     setTimeout(() => {
@@ -413,6 +418,54 @@ async function deleteAllLocalData(els) {
   } catch (e) {
     console.warn('[Settings] Delete data failed:', e);
     showToast(els.toastEl, e?.message || 'Delete data failed.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+}
+
+function parseKeepDays(rawValue) {
+  const n = Math.round(Number(rawValue));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(1, Math.min(36500, n));
+}
+
+async function cleanupUsageData(els) {
+  const btn = els.usageCleanupBtn;
+  const input = els.usageCleanupDaysInput;
+  const meta = els.usageCleanupMeta;
+  if (!btn || !input) return;
+
+  const keepDays = parseKeepDays(input.value);
+  if (!keepDays) {
+    showToast(els.toastEl, 'Keep days must be a valid number.');
+    if (meta) meta.textContent = 'Please enter a valid keep-days value.';
+    return;
+  }
+  input.value = String(keepDays);
+
+  const prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Cleaning...';
+  if (meta) meta.textContent = '';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/usage/cleanup?keepDays=${encodeURIComponent(String(keepDays))}`, {
+      method: 'POST',
+    });
+    const body = await parseJsonSafe(res);
+    if (!res.ok) {
+      const msg = body?.error || body?.message || `${res.status} ${res.statusText}`;
+      throw new Error(msg);
+    }
+
+    const removed = Number(body?.removed ?? 0);
+    if (meta) meta.textContent = `Cleanup done: removed ${removed} records (keep ${keepDays} days).`;
+    showToast(els.toastEl, `Usage cleanup done. Removed ${removed} records.`);
+  } catch (e) {
+    console.warn('[Settings] Usage cleanup failed:', e);
+    if (meta) meta.textContent = 'Usage cleanup failed.';
+    showToast(els.toastEl, e?.message || 'Usage cleanup failed.');
   } finally {
     btn.disabled = false;
     btn.textContent = prev;
@@ -457,11 +510,18 @@ export function mountSettings(els) {
     archiveImportBtn,
     archiveReselectBtn,
     archiveDeleteBtn,
+    usageCleanupDaysInput,
+    usageCleanupBtn,
+    usageCleanupMeta,
   } = els || {};
 
-  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !archiveReselectBtn || !archiveDeleteBtn || !settingShowWidget || !settingCloseBehavior || !settingUiTone || !settingsBehaviorMeta || !openMusicFolderBtn) {
+  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !archiveReselectBtn || !archiveDeleteBtn || !usageCleanupDaysInput || !usageCleanupBtn || !usageCleanupMeta || !settingShowWidget || !settingCloseBehavior || !settingUiTone || !settingsBehaviorMeta || !openMusicFolderBtn) {
     return;
   }
+
+  const keepDaysBoot = parseKeepDays(usageCleanupDaysInput.value);
+  usageCleanupDaysInput.value = String(keepDaysBoot || 90);
+  usageCleanupMeta.textContent = 'Remove website usage records older than keep-days.';
 
   const bootMusicVol = loadMusicVolume01();
   const bootAutoPlay = loadMusicAutoplayOnFocus();
@@ -515,6 +575,7 @@ export function mountSettings(els) {
     archiveImportFile.click();
   });
   archiveDeleteBtn.addEventListener('click', () => deleteAllLocalData(els));
+  usageCleanupBtn.addEventListener('click', () => cleanupUsageData(els));
   openMusicFolderBtn.addEventListener('click', async () => {
     const api = window.electronAPI;
     if (!api?.openMusicFolder) {

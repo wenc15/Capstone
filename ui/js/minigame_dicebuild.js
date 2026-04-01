@@ -5,6 +5,11 @@
 //  - Access is gated by relax_prompt eligibility.
 //  - Core prototype with board/shop/backpack/placement/merge and staged goals.
 
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Flush Dice & Build save immediately on close/navigation-sensitive paths.
+//  - Keep regular interaction saves scheduled via stateApi for lower IO pressure.
+
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
 import { getEnabledSkinForGame } from './collection_api.js';
@@ -67,6 +72,10 @@ function defaultState() {
 
 function save(st) {
   stateApi.save(st);
+}
+
+function saveNow(st) {
+  stateApi.saveNow(st);
 }
 
 function load() {
@@ -331,6 +340,9 @@ export function mountDiceBuild(els) {
 
   // Expose dev helper
   if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      saveNow(stRef.current || null);
+    });
     window.dicebuildOpen = () => openDiceBuild(els, { reason: 'dev' });
   }
 }
@@ -374,5 +386,7 @@ export function openDiceBuild(els, meta) {
 }
 
 export function closeDiceBuild(els) {
+  const st = els?.__dicebuild?.current;
+  if (st) saveNow(st);
   closeMinigameSection(els);
 }

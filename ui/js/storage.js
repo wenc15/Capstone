@@ -1,14 +1,21 @@
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Reuse shared localStorage helper for quota-safe JSON persistence.
+//  - Keep focus session writes resilient when storage is temporarily unavailable.
+
 // storage.js
-const KEY = 'focusSessions'; // { ts, minutes, note }
+import { LOCAL_STORAGE_KEYS, readJsonSafe, writeJsonSafe } from './local_storage.js';
+
+const KEY = LOCAL_STORAGE_KEYS.focusSessions; // { ts, minutes, note }
 
 export function loadSessions(){
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
-  catch { return []; }
+  const list = readJsonSafe(KEY, []);
+  return Array.isArray(list) ? list : [];
 }
 
 export function saveSession(minutes, note){
   const list = loadSessions();
   list.push({ ts: Date.now(), minutes, note: note?.trim() || '' });
-  localStorage.setItem(KEY, JSON.stringify(list));
+  writeJsonSafe(KEY, list);
   return list;
 }

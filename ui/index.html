@@ -30,6 +30,11 @@
     - Restore food pool headline to "Feed Your Goals".
     - Add 10x draw subtext: rare food guaranteed.
 -->
+<!--
+  2026/03/31 edited by Zikai Lu
+  Changes:
+    - Add website usage cleanup controls in Settings with customizable keep-days input.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -567,6 +572,17 @@
           <h3>Delete Local Data</h3>
           <p class="settings-note">This action is irreversible. All local focus history, profile statistics, and whitelist presets will be removed.</p>
           <button class="settings-action settings-action-danger" id="archiveDeleteBtn" type="button">Delete Data</button>
+          <div class="settings-divider"></div>
+          <h3>Clean Website Usage History</h3>
+          <p class="settings-note">Keep the latest N days of website usage records and remove older records.</p>
+          <div class="settings-inline-row">
+            <label class="settings-field-col settings-field-inline" for="usageCleanupDaysInput">
+              <span>Keep Days</span>
+              <input id="usageCleanupDaysInput" class="settings-number" type="number" min="1" step="1" value="90" />
+            </label>
+            <button class="settings-action settings-action-subtle" id="usageCleanupBtn" type="button">Cleanup Usage Data</button>
+          </div>
+          <div class="settings-meta" id="usageCleanupMeta"></div>
         </article>
       </div>
     </section>

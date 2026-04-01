@@ -8,13 +8,19 @@
 // Purpose: local Tetris gameplay loop, rendering, and persisted state.
 // =============================================================
 
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Add scheduled save strategy to reduce high-frequency localStorage writes.
+//  - Persist only stable game fields to shrink save payload and avoid runtime-only data.
+
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
 import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
+import { LOCAL_STORAGE_KEYS, createScheduledSaver, readJsonSafe, writeJsonSafe } from './local_storage.js';
 
-const SAVE_KEY = 'tetris.save.v1';
-const HIST_KEY = 'tetris.history.v1';
+const SAVE_KEY = LOCAL_STORAGE_KEYS.tetrisSave;
+const HIST_KEY = LOCAL_STORAGE_KEYS.tetrisHistory;
 const DEFAULT_SKIN_ID = 'default';
 
 const COLS = 10;
@@ -51,7 +57,7 @@ function endGame(st, els) {
     st.dropInterval = null;
   }
   consumeDiceBuildEligibility();
-  save(st);
+  save(st, { immediate: true });
   pushHistory({ result: 'lose', score: st.score, level: st.level, lines: st.lines });
   if (els?.toastEl) showToast(els.toastEl, `Tetris over - score ${st.score}`);
   if (els) openMinigameHub(els, { bypassGate: true, reason: 'hub' });
@@ -77,6 +83,31 @@ function defaultState() {
   };
 }
 
+function toPersistedState(st) {
+  return {
+    version: 1,
+    board: Array.isArray(st?.board) ? st.board : Array(ROWS).fill(null).map(() => Array(COLS).fill(EMPTY)),
+    score: Number(st?.score) || 0,
+    lines: Number(st?.lines) || 0,
+    level: Number(st?.level) || 1,
+    gameOver: !!st?.gameOver,
+    paused: !!st?.paused,
+    playing: !!st?.playing,
+    nextPiece: st?.nextPiece || null,
+    currentPiece: st?.currentPiece || null,
+    currentX: Number(st?.currentX) || 0,
+    currentY: Number(st?.currentY) || 0,
+    lastDrop: Number(st?.lastDrop) || 0,
+    skinId: typeof st?.skinId === 'string' ? st.skinId : DEFAULT_SKIN_ID,
+  };
+}
+
+const saver = createScheduledSaver({
+  key: SAVE_KEY,
+  select: toPersistedState,
+  minDelayMs: 900,
+});
+
 function normalizeLoadedState(raw) {
   if (!raw || raw.version !== 1) return null;
   const skinId = typeof raw.skinId === 'string' && raw.skinId in TETRIS_SKINS
@@ -98,25 +129,19 @@ async function syncSkinFromCollection(st) {
 }
 
 function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
+  return readJsonSafe(key, fallback);
 }
 
 function writeJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
+  writeJsonSafe(key, value);
 }
 
-function save(st) {
-  writeJson(SAVE_KEY, st);
+function save(st, { immediate = false } = {}) {
+  if (immediate) {
+    saver.saveNow(st);
+    return;
+  }
+  saver.schedule(st);
 }
 
 function load() {
@@ -217,7 +242,7 @@ function spawnPiece(st, els) {
     else {
       st.gameOver = true;
       st.playing = false;
-      save(st);
+      save(st, { immediate: true });
       pushHistory({ result: 'lose', score: st.score, level: st.level, lines: st.lines });
     }
     return false;
@@ -305,7 +330,7 @@ function startGame(st) {
   st.playing = true;
   st.nextPiece = getRandomPiece();
   spawnPiece(st);
-  save(st);
+  save(st, { immediate: true });
 }
 
 function getSpeed(level) {
@@ -603,7 +628,7 @@ export function mountTetris(els) {
   st.paused = false;
   st.dropInterval = null;
   stRef.current = st;
-  save(st);
+  save(st, { immediate: true });
   syncSkinFromCollection(st).then(() => render(els, st));
   render(els, st);
 
@@ -614,6 +639,9 @@ export function mountTetris(els) {
   });
 
   if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      saver.saveNow(stRef.current || null);
+    });
     window.tetrisOpen = () => openTetris(els, { reason: 'dev' });
   }
 }
@@ -652,7 +680,8 @@ export function closeTetris(els) {
   if (st) {
     st.playing = false;
     st.paused = false;
-    save(st);
+    save(st, { immediate: true });
   }
+  saver.cancel();
   closeMinigameSection(els);
 }

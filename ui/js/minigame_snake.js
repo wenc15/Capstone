@@ -5,13 +5,19 @@
 //  - Access is gated by relax_prompt eligibility.
 //  - Classic Snake gameplay with scoring.
 
+// 2026/03/31 edited by Zikai Lu
+// Changes:
+//  - Add scheduled save strategy to reduce high-frequency localStorage writes.
+//  - Persist only stable snake fields to shrink payload and keep save compatibility.
+
 import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_prompt.js';
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
 import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
+import { LOCAL_STORAGE_KEYS, createScheduledSaver, readJsonSafe, writeJsonSafe } from './local_storage.js';
 
-const SAVE_KEY = 'snake.save.v1';
-const HIST_KEY = 'snake.history.v1';
+const SAVE_KEY = LOCAL_STORAGE_KEYS.snakeSave;
+const HIST_KEY = LOCAL_STORAGE_KEYS.snakeHistory;
 const DEFAULT_SKIN_ID = 'default';
 
 const COLS = 20;
@@ -49,6 +55,29 @@ function defaultState() {
   };
 }
 
+function toPersistedState(st) {
+  return {
+    version: 1,
+    snake: Array.isArray(st?.snake) ? st.snake : [],
+    direction: st?.direction || { x: 1, y: 0 },
+    nextDirection: st?.nextDirection || { x: 1, y: 0 },
+    food: st?.food || null,
+    score: Number(st?.score) || 0,
+    highScore: Number(st?.highScore) || 0,
+    gameOver: !!st?.gameOver,
+    paused: !!st?.paused,
+    playing: !!st?.playing,
+    speed: Number(st?.speed) || 150,
+    skinId: typeof st?.skinId === 'string' ? st.skinId : DEFAULT_SKIN_ID,
+  };
+}
+
+const saver = createScheduledSaver({
+  key: SAVE_KEY,
+  select: toPersistedState,
+  minDelayMs: 900,
+});
+
 function normalizeLoadedState(raw) {
   if (!raw || raw.version !== 1) return null;
   const skinId = typeof raw.skinId === 'string' && raw.skinId in SNAKE_SKINS
@@ -70,25 +99,19 @@ async function syncSkinFromCollection(st) {
 }
 
 function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
+  return readJsonSafe(key, fallback);
 }
 
 function writeJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
+  writeJsonSafe(key, value);
 }
 
-function save(st) {
-  writeJson(SAVE_KEY, st);
+function save(st, { immediate = false } = {}) {
+  if (immediate) {
+    saver.saveNow(st);
+    return;
+  }
+  saver.schedule(st);
 }
 
 function load() {
@@ -145,7 +168,7 @@ function startGame(st) {
     st.highScore = saved.highScore;
   }
   initGame(st);
-  save(st);
+  save(st, { immediate: true });
 }
 
 function changeDirection(st, dx, dy) {
@@ -191,7 +214,7 @@ function moveSnake(st, els) {
     st.snake.pop();
   }
 
-  save(st);
+  save(st, { immediate: true });
 }
 
 function endGame(st, els, result = 'lose') {
@@ -460,6 +483,9 @@ export function mountSnake(els) {
   });
 
   if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      saver.saveNow(stRef.current || null);
+    });
     window.snakeOpen = () => openSnake(els, { reason: 'dev' });
   }
 }
@@ -498,7 +524,8 @@ export function closeSnake(els) {
   if (st) {
     st.playing = false;
     st.paused = false;
-    save(st);
+    save(st, { immediate: true });
   }
+  saver.cancel();
   closeMinigameSection(els);
 }
