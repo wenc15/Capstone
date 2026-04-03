@@ -1865,6 +1865,13 @@ body{
     font-weight:700;
 }
 
+#usageCleanupMeta{
+    font-size: 16px;
+    font-weight: 900;
+    color: #345f47;
+    letter-spacing: 0.1px;
+}
+
 .settings-meta-row{
     margin-top: 8px;
     display: flex;
