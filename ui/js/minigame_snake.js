@@ -15,6 +15,7 @@ import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameS
 import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
 import { LOCAL_STORAGE_KEYS, createScheduledSaver, readJsonSafe, writeJsonSafe } from './local_storage.js';
+import { reportAchievementMax } from './achievement_events.js';
 
 const SAVE_KEY = LOCAL_STORAGE_KEYS.snakeSave;
 const HIST_KEY = LOCAL_STORAGE_KEYS.snakeHistory;
@@ -166,6 +167,7 @@ function startGame(st) {
   const saved = load();
   if (saved && saved.highScore) {
     st.highScore = saved.highScore;
+    reportAchievementMax('snake_best_score', st.highScore);
   }
   initGame(st);
   save(st, { immediate: true });
@@ -204,6 +206,7 @@ function moveSnake(st, els) {
     st.score += 10;
     if (st.score > st.highScore) {
       st.highScore = st.score;
+      reportAchievementMax('snake_best_score', st.highScore);
     }
     st.food = spawnFood(st);
     if (!st.food) {
@@ -467,7 +470,14 @@ export function mountSnake(els) {
 
   attachHandlers(els, stRef);
 
-  const st = load() || defaultState();
+  const loaded = load();
+  const st = defaultState();
+  if (loaded && Number.isFinite(Number(loaded.highScore))) {
+    st.highScore = Math.max(0, Number(loaded.highScore) || 0);
+  }
+  if (loaded && typeof loaded.skinId === 'string' && loaded.skinId in SNAKE_SKINS) {
+    st.skinId = loaded.skinId;
+  }
   st.playing = false;
   st.paused = false;
   st.gameLoop = null;

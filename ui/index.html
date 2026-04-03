@@ -40,6 +40,125 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Growin – Grow With Every Focus</title>
+  <script>
+    (function bootUiState() {
+      try {
+        const BOOT_TOKEN_KEY = 'growin:credits.cache.v1';
+        const BOOT_PET_KEY = 'growin:pet.boot.v1';
+        const BOOT_SUMMARY_KEY = 'growin.session.summary.v2';
+        const BOOT_COLLECTION_KEY = 'growin:collection.boot.v1';
+        const BOOT_MUSIC_DOCK_KEY = 'growin:music.dock.boot.v1';
+        const BOOT_WHITELIST_SELECTION_KEY = 'growin.whitelist.selection.v1';
+        const BOOT_CUSTOM_CATALOG_KEY = 'growin.custom_app_catalog.v1';
+        const settingsRaw = localStorage.getItem('growin:appBehaviorSettings');
+        if (settingsRaw) {
+          const settings = JSON.parse(settingsRaw);
+          if (String(settings?.uiTone || '').trim().toLowerCase() === 'sky') {
+            document.documentElement.setAttribute('data-ui-tone', 'sky');
+          }
+        }
+
+        const rawMs = localStorage.getItem('growin.timer.selectedDurationMs.v1');
+        const rawMins = localStorage.getItem('growin.timer.selectedMins.v1');
+        let selectedMs = Number(rawMs);
+        if (!Number.isFinite(selectedMs) || selectedMs <= 0) {
+          const mins = Number(rawMins);
+          if (Number.isFinite(mins) && mins > 0) selectedMs = mins * 60000;
+        }
+        if (Number.isFinite(selectedMs) && selectedMs > 0) {
+          const clamped = Math.max(1000, Math.min(90 * 60000, Math.round(selectedMs)));
+          window.__growinBootTimerMs = clamped;
+        }
+
+        const tokenRaw = localStorage.getItem(BOOT_TOKEN_KEY);
+        const tokenVal = Number(tokenRaw);
+        if (Number.isFinite(tokenVal) && tokenVal >= 0) {
+          window.__growinBootTokenValue = String(Math.round(tokenVal));
+        }
+
+        const petRaw = localStorage.getItem(BOOT_PET_KEY);
+        if (petRaw) {
+          const pet = JSON.parse(petRaw);
+          if (pet && typeof pet === 'object') {
+            if (typeof pet.previewSrc === 'string' && pet.previewSrc) {
+              window.__growinBootSidebarPetSrc = pet.previewSrc;
+            }
+            if (typeof pet.mediaSrc === 'string' && pet.mediaSrc) {
+              let mediaSrc = pet.mediaSrc;
+              let mediaKind = pet.mediaKind === 'video' ? 'video' : 'img';
+              if (/pet1-3\.gif$/i.test(mediaSrc)) {
+                mediaSrc = mediaSrc.replace(/pet1-3\.gif$/i, 'pet1-3.webm');
+                mediaKind = 'video';
+              }
+              window.__growinBootPetMediaSrc = mediaSrc;
+              window.__growinBootPetMediaKind = mediaKind;
+            }
+          }
+        }
+
+        const summaryRaw = localStorage.getItem(BOOT_SUMMARY_KEY);
+        if (summaryRaw) {
+          const summary = JSON.parse(summaryRaw);
+          const focusMinutes = Math.max(0, Math.round(Number(summary?.focusMinutes) || 0));
+          const h = Math.floor(focusMinutes / 60);
+          const m = focusMinutes % 60;
+          window.__growinBootSummaryFocus = `${h}h ${m}m`;
+          window.__growinBootSummaryDistraction = (typeof summary?.distractionApp === 'string' && summary.distractionApp.trim()) ? summary.distractionApp.trim() : '—';
+          window.__growinBootSummaryOutcome = (typeof summary?.lastOutcome === 'string' && summary.lastOutcome.trim()) ? summary.lastOutcome.trim() : '—';
+        }
+
+        const collectionRaw = localStorage.getItem(BOOT_COLLECTION_KEY);
+        if (collectionRaw) {
+          const collection = JSON.parse(collectionRaw);
+          if (typeof collection?.metaText === 'string' && collection.metaText) {
+            window.__growinBootCollectionMeta = collection.metaText;
+          }
+          if (typeof collection?.previewHtml === 'string' && collection.previewHtml) {
+            window.__growinBootCollectionHtml = collection.previewHtml;
+          }
+        }
+
+        const musicRaw = localStorage.getItem(BOOT_MUSIC_DOCK_KEY);
+        if (musicRaw) {
+          const music = JSON.parse(musicRaw);
+          if (typeof music?.track === 'string' && music.track) window.__growinBootMusicTrack = music.track;
+          if (typeof music?.meta === 'string' && music.meta) window.__growinBootMusicMeta = music.meta;
+          if (typeof music?.currentTime === 'string' && music.currentTime) window.__growinBootMusicCurrentTime = music.currentTime;
+          if (typeof music?.durationTime === 'string' && music.durationTime) window.__growinBootMusicDurationTime = music.durationTime;
+          const progressVal = Number(music?.progressValue);
+          if (Number.isFinite(progressVal)) window.__growinBootMusicProgress = Math.max(0, Math.min(1000, Math.round(progressVal)));
+          if (typeof music?.modeIcon === 'string' && music.modeIcon) window.__growinBootMusicModeIcon = music.modeIcon;
+          const volumePct = Number(music?.volumePct);
+          if (Number.isFinite(volumePct)) window.__growinBootMusicVolumePct = Math.max(0, Math.min(100, Math.round(volumePct)));
+          if (music?.isMuted === true) window.__growinBootMusicMuted = true;
+          if (music?.isLow === true) window.__growinBootMusicLow = true;
+        }
+
+        const wlRaw = localStorage.getItem(BOOT_WHITELIST_SELECTION_KEY);
+        const customRaw = localStorage.getItem(BOOT_CUSTOM_CATALOG_KEY);
+        const customList = customRaw ? JSON.parse(customRaw) : [];
+        const customMap = new Map(Array.isArray(customList)
+          ? customList.map((it) => [String(it?.id || ''), String(it?.label || '')])
+          : []);
+        const wl = wlRaw ? JSON.parse(wlRaw) : [];
+        if (Array.isArray(wl)) {
+          const selected = wl
+            .map((id) => String(id || '').trim())
+            .filter((id) => id && id.toLowerCase() !== 'electron')
+            .map((id) => {
+              const customLabel = customMap.get(id);
+              return {
+                id,
+                label: customLabel || id.replace(/^custom_/i, '').replace(/_/g, ' '),
+              };
+            });
+          if (selected.length) window.__growinBootWhitelistSelected = selected;
+        }
+      } catch {
+        // ignore boot state failures
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -56,6 +175,13 @@
         <div class="token-chip" id="tokenChip">
           <span aria-hidden="true">🪙</span>
           <span id="tokenValue">0</span>
+          <script>
+            (function applyBootTokenValue() {
+              const el = document.getElementById('tokenValue');
+              const boot = window.__growinBootTokenValue;
+              if (el && typeof boot === 'string' && boot) el.textContent = boot;
+            })();
+          </script>
           <!-- <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button> -->
         </div>
       </div>
@@ -71,20 +197,61 @@
         <button class="nav-btn" id="navMinigame">🕹️ <span>Minigame</span></button>
         
         <div class="pet-placeholder" aria-label="Current Pet Preview">
-          <img id="sidebarPetPreview" class="sidebar-pet-preview" src="assets/pet.png" alt="Pet Preview" loading="lazy" />
+          <img id="sidebarPetPreview" class="sidebar-pet-preview is-booting" src="assets/pet.png" alt="Pet Preview" loading="lazy" />
+          <script>
+            (function applyBootSidebarPetPreview() {
+              const img = document.getElementById('sidebarPetPreview');
+              const src = window.__growinBootSidebarPetSrc;
+              if (img && typeof src === 'string' && src) {
+                img.src = src;
+                img.classList.remove('is-booting');
+              }
+            })();
+          </script>
         </div>
       </aside>
 
       <div class="content">
         <div id="view-timer">
-          <div class="timer" id="timerDisplay">25:00</div>
+          <div class="timer is-editable is-booting" id="timerDisplay">
+            <span id="timerMinPart" class="timer-part" title="Click to edit minutes">25</span><span class="timer-colon">:</span><span id="timerSecPart" class="timer-part" title="Click to edit seconds">00</span>
+          </div>
 
           <div class="time-control">
             <div class="control-row">
-              <input id="timeRange" type="range" min="1" max="60" step="1" value="25" />
+              <input id="timeRange" type="range" min="1" max="90" step="1" value="25" />
               <output id="timeValue" for="timeRange">25 min</output>
             </div>
           </div>
+          <script>
+            (function applyBootTimerPreview() {
+              try {
+                const ms = Number(window.__growinBootTimerMs);
+                const display = document.getElementById('timerDisplay');
+                const minPart = document.getElementById('timerMinPart');
+                const secPart = document.getElementById('timerSecPart');
+                const range = document.getElementById('timeRange');
+                const out = document.getElementById('timeValue');
+                if (Number.isFinite(ms) && ms > 0) {
+                  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+                  const mins = Math.floor(totalSec / 60);
+                  const secs = totalSec % 60;
+                  if (minPart) minPart.textContent = String(mins).padStart(2, '0');
+                  if (secPart) secPart.textContent = String(secs).padStart(2, '0');
+                  if (range) range.value = String(Math.max(1, Math.min(90, Math.ceil(ms / 60000))));
+                  if (out) {
+                    const label = secs > 0 ? `${mins}min${secs}s` : `${mins}min`;
+                    out.value = label;
+                    out.textContent = label;
+                  }
+                }
+                if (display) display.classList.remove('is-booting');
+              } catch {
+                const display = document.getElementById('timerDisplay');
+                if (display) display.classList.remove('is-booting');
+              }
+            })();
+          </script>
 
           <div class="actions" id="timerActions">
             <button class="primary" id="startBtn">Start</button>
@@ -102,6 +269,26 @@
             <div class="wl-selected-block">
               <div class="wl-selected-title">Selected apps</div>
               <ul id="wlSelectedList" class="wl-selected-list"></ul>
+              <script>
+                (function applyBootWhitelistSelection() {
+                  const list = document.getElementById('wlSelectedList');
+                  const selected = window.__growinBootWhitelistSelected;
+                  if (!list || !Array.isArray(selected) || !selected.length) return;
+                  const esc = (s) => String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                  list.innerHTML = selected
+                    .map((it) => {
+                      const id = esc(it?.id || '');
+                      const label = esc(it?.label || it?.id || '');
+                      return `<li class="wl-pill" data-app-id="${id}"><span class="wl-pill-label">${label}</span><button type="button" class="wl-pill-remove" data-app-id="${id}">×</button></li>`;
+                    })
+                    .join('');
+                })();
+              </script>
             </div>
           </div>
 
@@ -110,29 +297,59 @@
               <h3>Your Collection</h3>
               <div class="collection-short-meta" id="collectionOwnedMeta">Owned 0 / 0</div>
               <div class="collection-short-list" id="collectionPreviewShort"></div>
+              <script>
+                (function applyBootCollectionSummary() {
+                  const meta = document.getElementById('collectionOwnedMeta');
+                  const list = document.getElementById('collectionPreviewShort');
+                  const metaText = window.__growinBootCollectionMeta;
+                  const listHtml = window.__growinBootCollectionHtml;
+                  if (meta && typeof metaText === 'string' && metaText) meta.textContent = metaText;
+                  if (list && typeof listHtml === 'string' && listHtml) list.innerHTML = listHtml;
+                })();
+              </script>
               <button class="placeholder-btn" id="openCollectionBtn" type="button">Open Collection</button>
             </div>
             <div class="card session-summary-card">
               <h3>Session Summary</h3>
               <div>Focus Time: <span id="sumFocusTime">—</span></div>
               <div>Distractions: <span id="sumDistractions">0</span></div>
-              <div>Completed: <span id="sumCompleted">0</span></div>
+              <div>Last Outcome: <span id="sumOutcome">—</span></div>
+              <script>
+                (function applyBootSessionSummary() {
+                  const focus = document.getElementById('sumFocusTime');
+                  const distract = document.getElementById('sumDistractions');
+                  const outcome = document.getElementById('sumOutcome');
+                  if (focus && typeof window.__growinBootSummaryFocus === 'string') focus.textContent = window.__growinBootSummaryFocus;
+                  if (distract && typeof window.__growinBootSummaryDistraction === 'string') distract.textContent = window.__growinBootSummaryDistraction;
+                  if (outcome && typeof window.__growinBootSummaryOutcome === 'string') outcome.textContent = window.__growinBootSummaryOutcome;
+                })();
+              </script>
               <button class="placeholder-btn" id="sumSeeMoreBtn" type="button">See more</button>
             </div>
           </div>
         </div>
 
         <div id="view-stats" style="display:none;">
-          <h2 style="margin-bottom:20px;">Focus Statistics</h2>
-          <div class="grid">
-            <div class="card">
+          <h2 style="margin:0 0 16px; transform: translateY(-4px);">Focus Statistics (Last 7 Days)</h2>
+          <div class="grid stats-grid">
+            <div class="card stats-summary-card">
               <h3>Recent Sessions</h3>
               <div class="stat">Total Sessions: <span id="statCount">0</span></div>
+              <div class="stat">Completed Sessions: <span id="statCompletedCount">0</span></div>
               <div class="stat">Total Focus Time: <span id="statTotal">0 min</span></div>
+              <div class="stat">Avg Focus Time: <span id="statAvgSession">0 min</span></div>
+              <div class="stat">Weekly Best: <span id="statBestDay">0 min</span></div>
             </div>
-            <div class="card">
-              <h3>Daily Focus (Last 7 Days)</h3>
-              <canvas id="focusChart" width="400" height="220"></canvas>
+            <div class="card stats-period-card">
+              <h3>Preferred Focus Time</h3>
+              <div class="stats-period-wrap">
+                <canvas id="timePrefChart" width="180" height="140"></canvas>
+                <div id="timePrefLegend" class="stats-period-legend" aria-label="Preferred time legend"></div>
+              </div>
+            </div>
+            <div class="card stats-daily-card">
+              <h3>Daily Focus</h3>
+              <canvas id="focusChart" width="400" height="170"></canvas>
             </div>
           </div>
         </div>
@@ -147,7 +364,6 @@
 
               <div class="achv-head-right">
                 <div class="achv-meta" id="achvMeta">—</div>
-                <button class="achv-refresh" id="achvRefreshBtn" type="button" aria-label="Refresh achievements">Refresh</button>
               </div>
             </div>
 
@@ -160,14 +376,31 @@
         <div id="view-pet" style="display:none;">
           <div class="pet-container">
             <div class="pet-stage">
-              <div id="petMedia" class="pet-media">
+              <div id="petMedia" class="pet-media is-booting">
                 <img id="petImage" src="assets/pet3_1.png" alt="Pet" class="pet-sprite is-egg" style="width: 200px">
+                <script>
+                  (function applyBootPetMedia() {
+                    const host = document.getElementById('petMedia');
+                    const src = window.__growinBootPetMediaSrc;
+                    const kind = window.__growinBootPetMediaKind;
+                    if (!host || typeof src !== 'string' || !src) return;
+                    if (kind === 'video') {
+                      host.innerHTML = '<video id="petVideo" class="pet-sprite pet-video" muted autoplay loop playsinline preload="auto"><source src="' + src + '" type="video/webm" /></video>';
+                    } else {
+                      host.innerHTML = '<img id="petImage" src="' + src + '" alt="Pet" class="pet-sprite">';
+                    }
+                    host.classList.remove('is-booting');
+                  })();
+                </script>
               </div>
               <div id="petSpeechBubble" class="speech-bubble" style="display:none;">Ready to focus?</div>
             </div>
             
             <div class="pet-info">
-              <h3>Level <span id="petLevel">1</span></h3>
+              <div class="pet-info-head">
+                <h3>Level <span id="petLevel">1</span></h3>
+                <div id="petExpText" class="pet-exp-text">0 / 100 EXP</div>
+              </div>
               <div class="exp-bar">
                 <div id="petExpFill" class="exp-fill"></div>
               </div>
@@ -263,7 +496,6 @@
                 <span>Speed Mode (1x)</span>
               </label>
               <div class="mg-settings-note">Off = 0.5x speed</div>
-              <button class="mg-settings-link" id="mgBackHubBtn" type="button">↩</button>
             </div>
 
             <main class="mg-body">
@@ -277,16 +509,15 @@
               <aside class="mg-backpack" aria-label="Backpack">
                 <div class="mg-backpack-title">BACKPACK</div>
                 <div class="mg-backpack-grid" id="mgBackpack"></div>
+                <div class="mg-actionbar" aria-label="Dice actions">
+                  <div class="mg-actionbar-right">
+                    <div class="mg-last" id="mgLastRoll">—</div>
+                    <button class="mg-roll" id="mgRollBtn" type="button">🎲 Roll!!</button>
+                    <button class="mg-buyblock" id="mgBuyBlockBtn" type="button">🔑 Unlock <span id="mgBuyBlockCost">(10)</span></button>
+                  </div>
+                </div>
               </aside>
             </main>
-
-            <div class="mg-actionbar" aria-label="Dice actions">
-              <button class="mg-buyblock" id="mgBuyBlockBtn" type="button">🔑 Unlock <span id="mgBuyBlockCost">(10)</span></button>
-              <div class="mg-actionbar-right">
-                <div class="mg-last" id="mgLastRoll">—</div>
-                <button class="mg-roll" id="mgRollBtn" type="button">🎲 Roll!!</button>
-              </div>
-            </div>
 
             <footer class="mg-storebar" id="mgStorebar" aria-label="Store">
               <div class="mg-storebar-head">
@@ -422,8 +653,6 @@
           </div>
         </div>
 
-
-
       </div>
     </section>
 
@@ -473,6 +702,47 @@
         </button>
         <button class="music-dock-btn" id="musicQueueBtn" type="button" title="Queue" aria-expanded="false" aria-controls="musicQueuePanel">☰</button>
       </div>
+      <script>
+        (function applyBootMusicDock() {
+          const track = document.getElementById('musicDockTrack');
+          const meta = document.getElementById('musicDockMeta');
+          const cur = document.getElementById('musicCurrentTime');
+          const dur = document.getElementById('musicDurationTime');
+          const progress = document.getElementById('musicProgress');
+          const mode = document.getElementById('musicModeBtn');
+          const volumeBtn = document.getElementById('musicVolumeBtn');
+          const volumeValue = document.getElementById('musicVolumeValue');
+          const volumeSlider = document.getElementById('musicVolumeSlider');
+          if (track && typeof window.__growinBootMusicTrack === 'string') track.textContent = window.__growinBootMusicTrack;
+          if (meta && typeof window.__growinBootMusicMeta === 'string') meta.textContent = window.__growinBootMusicMeta;
+          if (cur && typeof window.__growinBootMusicCurrentTime === 'string') cur.textContent = window.__growinBootMusicCurrentTime;
+          if (dur && typeof window.__growinBootMusicDurationTime === 'string') dur.textContent = window.__growinBootMusicDurationTime;
+          if (progress && Number.isFinite(Number(window.__growinBootMusicProgress))) {
+            const val = Math.max(0, Math.min(1000, Number(window.__growinBootMusicProgress)));
+            progress.value = String(Math.round(val));
+            progress.style.setProperty('--music-progress-pct', `${(val / 1000) * 100}%`);
+          }
+          if (mode && typeof window.__growinBootMusicModeIcon === 'string') mode.textContent = window.__growinBootMusicModeIcon;
+          if (Number.isFinite(Number(window.__growinBootMusicVolumePct))) {
+            const vol = Math.max(0, Math.min(100, Number(window.__growinBootMusicVolumePct)));
+            if (volumeValue) volumeValue.textContent = `${Math.round(vol)}%`;
+            if (volumeSlider) {
+              volumeSlider.value = String(Math.round(vol));
+              volumeSlider.style.setProperty('--music-volume-pct', `${vol}%`);
+            }
+          }
+          if (volumeBtn) {
+            const hasVol = Number.isFinite(Number(window.__growinBootMusicVolumePct));
+            const vol = hasVol ? Math.max(0, Math.min(100, Number(window.__growinBootMusicVolumePct))) : null;
+            const isMuted = hasVol ? vol <= 0.0001 : (window.__growinBootMusicMuted === true);
+            const isLow = hasVol ? (vol > 0 && vol < 45) : (window.__growinBootMusicLow === true);
+            volumeBtn.classList.toggle('is-muted', isMuted);
+            volumeBtn.classList.toggle('is-low', !isMuted && isLow);
+            volumeBtn.title = isMuted ? 'Unmute' : 'Mute';
+            volumeBtn.setAttribute('aria-label', isMuted ? 'Unmute' : 'Mute');
+          }
+        })();
+      </script>
 
       <aside class="music-queue" id="musicQueuePanel" aria-label="Music queue" hidden>
         <div class="music-queue-head">
@@ -500,7 +770,7 @@
     </div>
   </div>
 
-  <div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
+  <div class="settings-overlay mg-hidden" id="settingsOverlay" aria-hidden="true">
     <section class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings">
       <div class="settings-head">
         <h2 class="settings-title">Settings</h2>

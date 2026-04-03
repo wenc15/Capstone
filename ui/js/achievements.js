@@ -34,13 +34,6 @@ export function mountAchievements(els) {
   mounted = true;
   latestEls = els || latestEls;
 
-  const { achvRefreshBtn } = els || {};
-  if (achvRefreshBtn) {
-    achvRefreshBtn.addEventListener('click', () => {
-      refreshAchievements(els, { force: true });
-    });
-  }
-
   // Keep achievements synced globally so newly unlocked popup can appear
   // even when user is not currently on the achievements page.
   refreshAchievements(els, { force: true }).catch(() => {});
@@ -71,7 +64,7 @@ export function onEnterAchievements(els) {
 
 async function refreshAchievements(els, { force = false, silent = false } = {}) {
   latestEls = els || latestEls;
-  const { achvList, achvMeta, achvEmpty, achvError, toastEl, achvRefreshBtn } = els || {};
+  const { achvList, achvMeta, achvEmpty, achvError, toastEl } = els || {};
   if (!achvList || !achvMeta) return;
 
   if (inFlight && !force) return inFlight;
@@ -84,7 +77,6 @@ async function refreshAchievements(els, { force = false, silent = false } = {}) 
     if (!hasExistingRows) {
       renderSkeleton(achvList);
     }
-    if (achvRefreshBtn) achvRefreshBtn.disabled = true;
   }
 
   inFlight = (async () => {
@@ -130,7 +122,6 @@ async function refreshAchievements(els, { force = false, silent = false } = {}) 
         }
       }
     } finally {
-      if (!silent && achvRefreshBtn) achvRefreshBtn.disabled = false;
       inFlight = null;
     }
   })();
@@ -162,21 +153,55 @@ function numberOrZero(v) {
 }
 
 function sortAchievements(list) {
-  // In-progress first, most complete first; unlocked later, newest first.
+  // Sort by category, keep unlocked and in-progress mixed together.
+  // Do NOT push unlocked achievements to the bottom.
   return [...list].sort((a, b) => {
-    if (a.unlocked !== b.unlocked) return a.unlocked ? 1 : -1;
-    if (!a.unlocked) {
-      const ap = a.target > 0 ? clamp01(a.progress / a.target) : 0;
-      const bp = b.target > 0 ? clamp01(b.progress / b.target) : 0;
-      if (bp !== ap) return bp - ap;
-      return String(a.title).localeCompare(String(b.title));
-    }
+    const ca = achievementCategoryRank(a.type);
+    const cb = achievementCategoryRank(b.type);
+    if (ca !== cb) return ca - cb;
 
-    const at = Date.parse(a.unlockedAt || '') || 0;
-    const bt = Date.parse(b.unlockedAt || '') || 0;
-    if (bt !== at) return bt - at;
+    const ta = achievementTypeRank(a.type);
+    const tb = achievementTypeRank(b.type);
+    if (ta !== tb) return ta - tb;
+
+    const targetA = Number(a?.target) || 0;
+    const targetB = Number(b?.target) || 0;
+    if (targetA !== targetB) return targetA - targetB;
+
     return String(a.title).localeCompare(String(b.title));
   });
+}
+
+function achievementCategoryRank(type) {
+  const t = String(type || '').toLowerCase();
+
+  // 1) Focus / session
+  if (t.includes('session') || t.includes('focus') || t.includes('streak') || t.includes('failed')) return 1;
+  // 2) Pet
+  if (t.includes('pet')) return 2;
+  // 3) Minigame
+  if (t.includes('tetris') || t.includes('snake') || t.includes('dicebuild') || t.includes('minigame')) return 3;
+  // 4) Gacha / food / credits
+  if (t.includes('food') || t.includes('gacha') || t.includes('credit')) return 4;
+  // 5) Misc
+  return 9;
+}
+
+function achievementTypeRank(type) {
+  const t = String(type || '').toLowerCase();
+
+  // Focus progression order: sessions -> streak -> setbacks.
+  if (t === 'successful_sessions' || t === 'total_sessions') return 1;
+  if (t === 'focus_best_streak_days') return 2;
+  if (t === 'failed_sessions') return 3;
+
+  // Pet progression order.
+  if (t === 'pet_interactions_total') return 1;
+  if (t === 'pet_feeds_total') return 2;
+  if (t === 'pet_level_max') return 3;
+  if (t === 'pet_any_max_level') return 4;
+
+  return 5;
 }
 
 function clamp01(v) {
@@ -187,8 +212,22 @@ function renderAchievementList(els, list) {
   const { achvList } = els;
   achvList.innerHTML = '';
   const shouldKeepOpen = Date.now() <= keepOpenUntil;
+  let lastCategoryKey = '';
 
   for (const a of list) {
+    const categoryKey = achievementCategoryKey(a.type);
+    if (categoryKey && categoryKey !== lastCategoryKey) {
+      const divider = document.createElement('div');
+      divider.className = 'achv-divider';
+      divider.innerHTML = `
+        <span class="achv-divider-line" aria-hidden="true"></span>
+        <span class="achv-divider-label">${escapeHtml(achievementCategoryLabel(categoryKey))}</span>
+        <span class="achv-divider-line" aria-hidden="true"></span>
+      `.trim();
+      achvList.appendChild(divider);
+      lastCategoryKey = categoryKey;
+    }
+
     const row = document.createElement('button');
     row.type = 'button';
     row.className = `achv-row${a.unlocked ? ' is-unlocked' : ''}`;
@@ -291,6 +330,23 @@ function buildDetailHtml(a) {
       <div class="achv-bar" aria-hidden="true"><div class="achv-bar-fill" style="width:${barPct}%"></div></div>
     </div>
   `.trim();
+}
+
+function achievementCategoryKey(type) {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('session') || t.includes('focus') || t.includes('streak') || t.includes('failed')) return 'focus';
+  if (t.includes('pet')) return 'pet';
+  if (t.includes('tetris') || t.includes('snake') || t.includes('dicebuild') || t.includes('minigame')) return 'minigame';
+  if (t.includes('food') || t.includes('gacha') || t.includes('credit') || t.includes('skin')) return 'collect';
+  return 'other';
+}
+
+function achievementCategoryLabel(key) {
+  if (key === 'focus') return 'Focus';
+  if (key === 'pet') return 'Pet';
+  if (key === 'minigame') return 'Minigame';
+  if (key === 'collect') return 'Collection & Gacha';
+  return 'Other';
 }
 
 function buildListDigest(list) {
@@ -528,17 +584,46 @@ function escapeHtml(s) {
 function iconSvgFor(type) {
   const t = String(type || '').toLowerCase();
 
-  if (t.includes('focus') && t.includes('minute')) return svgClock();
-  if (t.includes('total_sessions') || t.includes('session')) return svgSprout();
-  if (t.includes('food')) return svgBowl();
+  if (t === 'focus_best_streak_days') return svgBadge();
+  if (t === 'focus_long_60plus_sessions') return svgHourglass();
+  if (t === 'focus_night_sessions') return unicodeIcon('☾', 'is-moon');
+  if (t === 'failed_sessions') return svgWarning();
+  if (t === 'successful_sessions' || t === 'total_sessions') return svgSprout();
+
+  if (t === 'pet_interactions_total') return unicodeIcon('🐾');
+  if (t === 'pet_feeds_total') return svgBowl();
+  if (t === 'pet_level_max' || t === 'pet_any_max_level') return svgSparkStar();
+
+  if (t === 'dicebuild_wins') return svgTown();
+  if (t === 'tetris_best_score') return svgBlocks();
+  if (t === 'snake_best_score') return unicodeIcon('🐍', 'is-snake');
+
+  if (t === 'skins_owned_total') return svgShirt();
+  if (t === 'gacha_draws_total' || t.includes('food')) return svgGachaCards();
   if (t.includes('credits')) return svgCoin();
   return svgBadge();
 }
 
-function svgBase(pathD) {
+function unicodeIcon(symbol, extraClass = '') {
+  const cls = `achv-ico-unicode${extraClass ? ` ${extraClass}` : ''}`;
+  return `<span class="${cls}" aria-hidden="true">${escapeHtml(String(symbol || '') + '\uFE0E')}</span>`;
+}
+
+function svgBase(pathD, extraClass = '') {
+  const cls = `achv-ico-svg${extraClass ? ` ${extraClass}` : ''}`;
+  return `
+    <svg class="${cls}" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="${pathD}" />
+    </svg>
+  `.trim();
+}
+
+function svgBaseTransformed(pathD, transform) {
   return `
     <svg class="achv-ico-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="${pathD}" />
+      <g transform="${transform}">
+        <path d="${pathD}" />
+      </g>
     </svg>
   `.trim();
 }
@@ -561,4 +646,76 @@ function svgCoin() {
 
 function svgBadge() {
   return svgBase('M12 2a6 6 0 0 0-3 11.2V22l3-1.6L15 22v-8.8A6 6 0 0 0 12 2Zm0 2a4 4 0 1 1 0 8a4 4 0 0 1 0-8Z');
+}
+
+function svgFlame() {
+  return svgBase('M12.1 21.2c-3.8 0-6.8-2.8-6.8-6.5c0-2.9 1.7-5.2 4.1-6.9c.2 1.6 1.1 2.7 2.6 3.2c-.4-2.8.6-5.3 2.9-7.8c2.2 2.6 3.6 5.5 3.6 8.9c0 .4 0 .9-.1 1.3c.9-.8 1.5-1.8 1.8-3.1c1.3 1.3 2.1 3 2.1 5c0 3.4-2.9 5.9-7 5.9Zm0-2.2c2.3 0 4-1.7 4-3.9c0-1.4-.7-2.5-1.9-3.7c-.3 1.4-1.2 2.3-2.5 3c-.1-1.1-.6-2.1-1.6-3.1c-1.1 1.1-1.8 2.3-1.8 3.8c0 2.2 1.7 3.9 3.8 3.9Z');
+}
+
+function svgHourglass() {
+  return svgBaseTransformed('M6.1 2.6h11.8a1.1 1.1 0 0 1 1.1 1.1v1.2c0 2-1.1 3.8-2.9 4.8l-1.4.8l1.4.8c1.8 1 2.9 2.8 2.9 4.8v1.2a1.1 1.1 0 0 1-1.1 1.1H6.1A1.1 1.1 0 0 1 5 17.3v-1.2c0-2 1.1-3.8 2.9-4.8l1.4-.8l-1.4-.8A5.5 5.5 0 0 1 5 4.9V3.7a1.1 1.1 0 0 1 1.1-1.1Zm1.1 2.2c0 1.3.7 2.5 1.9 3.1l2.5 1.3a.9.9 0 0 0 .8 0L15 7.9c1.2-.6 1.9-1.8 1.9-3.1V4.6H7.2v.2Zm9.7 11.4c0-1.3-.7-2.5-1.9-3.1l-2.5-1.3a.9.9 0 0 0-.8 0L9 13.1c-1.2.6-1.9 1.8-1.9 3.1v.2h9.8v-.2Z', 'translate(0,0.8)');
+}
+
+function svgMoon() {
+  return `
+    <svg class="achv-ico-svg" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g transform="rotate(-30 12 12)">
+        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18Zm4.1 2.6a6.8 6.8 0 1 1 0 12.8a6.8 6.8 0 0 0 0-12.8Z"/>
+      </g>
+    </svg>
+  `.trim();
+}
+
+function svgWarning() {
+  return svgBase('M12 2.8c.5 0 .9.2 1.2.7l7.5 12.7a1.4 1.4 0 0 1-1.2 2.1H4.5a1.4 1.4 0 0 1-1.2-2.1L10.8 3.5c.3-.5.7-.7 1.2-.7Zm0 2.7a1 1 0 0 0-1 1v3.6a1 1 0 1 0 2 0V6.5a1 1 0 0 0-1-1Zm0 7a1.1 1.1 0 1 0 0 2.2a1.1 1.1 0 0 0 0-2.2Z');
+}
+
+function svgTarget() {
+  return svgBase('M12 21a9 9 0 1 1 9-9a1 1 0 1 1-2 0a7 7 0 1 0-7 7a7 7 0 0 0 7-7a1 1 0 1 1 2 0a9 9 0 0 1-9 9Zm0-4.7a4.7 4.7 0 1 1 4.7-4.7a4.7 4.7 0 0 1-4.7 4.7Zm0-2.5a2.2 2.2 0 1 0 0-4.4a2.2 2.2 0 0 0 0 4.4Zm8.7-11.2l-5.8 2.3l1.8 1.8l-2.2 2.2l-1.8-1.8l-2.2 5.7l3.7-4.2l1.8 1.8l2.2-2.2l-1.8-1.8l4.3-3.8Z');
+}
+
+function svgPaw() {
+  return `
+    <svg class="achv-ico-svg" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g fill="currentColor">
+        <circle cx="7" cy="8.4" r="1.9"/>
+        <circle cx="10.2" cy="5.6" r="1.9"/>
+        <circle cx="13.8" cy="5.6" r="1.9"/>
+        <circle cx="17" cy="8.4" r="1.9"/>
+        <path d="M12 20.4c-4.2 0-6.5-1.8-6.5-4.2c0-1.9 1.5-3.6 3.6-3.6c1.2 0 2 .5 2.9 1.1c.9-.6 1.7-1.1 2.9-1.1c2.1 0 3.6 1.7 3.6 3.6c0 2.4-2.3 4.2-6.5 4.2Z"/>
+      </g>
+    </svg>
+  `.trim();
+}
+
+function svgSparkStar() {
+  return svgBase('M12 2l1.8 3.6L18 6.2l-3 2.9l.7 4.1L12 11.3L8.3 13.2L9 9.1L6 6.2l4.2-.6L12 2Zm7.5 10.5l.8 1.6l1.7.3l-1.2 1.2l.3 1.7l-1.6-.8l-1.6.8l.3-1.7L17 14.4l1.7-.3l.8-1.6ZM4.5 13l.9 1.7l1.8.3L6 16.2l.3 1.8l-1.8-.9l-1.8.9l.3-1.8L1.8 15l1.8-.3L4.5 13Z', 'is-star');
+}
+
+function svgTown() {
+  return svgBase('M3 20h18v-2h-1V9.6l-3-2V5h-3v1L12 4L4 9.6V18H3v2Zm3-2v-6h4v6H6Zm6 0v-8h4v8h-4Zm6 0v-7h1v7h-1Z');
+}
+
+function svgBlocks() {
+  return svgBase('M4.2 4.2h6.4v4.4H4.2V4.2Zm8.2 0h7.4v4.4h-7.4V4.2ZM4.2 10.2h4.4v4.4H4.2v-4.4Zm6.2 0h4.4v4.4h-4.4v-4.4Zm6.2 0h3.2v4.4h-3.2v-4.4ZM4.2 16.2h6.4v3.6H4.2v-3.6Zm8.2 0h7.4v3.6h-7.4v-3.6Z');
+}
+
+function svgSnake() {
+  return svgBase('M7 6.5c1.8-2.2 5.1-2.6 7.4-.8c1.7 1.3 2.4 3.6 1.9 5.6c1.8.1 3.3 1.6 3.3 3.5c0 2-1.6 3.6-3.6 3.6h-2.5a1 1 0 0 1 0-2h2.5a1.6 1.6 0 1 0 0-3.2h-2.7a1 1 0 0 1-.9-1.4c.7-1.4.4-3.1-.7-4c-1.4-1-3.3-.8-4.3.5c-1 1.3-1 3 .1 4.2l2.9 3a4.7 4.7 0 0 1 .1 6.5l-1 1a1 1 0 1 1-1.4-1.4l1-1a2.7 2.7 0 0 0 0-3.7l-2.9-3A5.8 5.8 0 0 1 7 6.5Zm10.5-.9a1.1 1.1 0 1 1 2.2 0a1.1 1.1 0 0 1-2.2 0Z');
+}
+
+function svgShirt() {
+  return svgBase('M7.2 4.3L12 6.1l4.8-1.8l2.8 2.4l-1.9 2.7l-1.5-.9v8.8H7.8V8.5l-1.5.9L4.4 6.7l2.8-2.4Z', 'is-shirt');
+}
+
+function svgGachaCards() {
+  return `
+    <svg class="achv-ico-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3.5" y="8.6" width="8.1" height="10.4" rx="1.6" transform="rotate(-16 3.5 8.6)" fill="var(--achv-icon-bg)" stroke="currentColor" stroke-width="1.6"/>
+        <rect x="7.8" y="5.1" width="8.3" height="12.1" rx="1.6" fill="var(--achv-icon-bg)" stroke="currentColor" stroke-width="1.6"/>
+        <rect x="12.2" y="7.0" width="8.1" height="10.4" rx="1.6" transform="rotate(15 12.2 7)" fill="var(--achv-icon-bg)" stroke="currentColor" stroke-width="1.6"/>
+      </g>
+    </svg>
+  `.trim();
 }

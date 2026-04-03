@@ -61,6 +61,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using CapstoneBackend.Models;
@@ -88,6 +89,9 @@ public class FocusSessionService
     private readonly object _lock = new();
     private System.Threading.Timer? _timer;
     private readonly LocalDataService _dataService;
+    private readonly Stopwatch _sessionStopwatch = new();
+    private long _lastTickElapsedMs;
+    private long _violationElapsedMs;
 
     private DateTimeOffset _startAt;
     private DateTimeOffset _endAt;
@@ -153,16 +157,18 @@ public class FocusSessionService
 
             _sessionId = Guid.NewGuid().ToString("N");          // 新增：给本次专注生成唯一 ID
             _startedAt = DateTimeOffset.Now;                    // 新增：记录专注开始时间
-            _remainingSeconds = Math.Max(0,                     // 新增：初始化剩余秒数
-                (int)(_endAt - _startedAt.Value).TotalSeconds);
+            _remainingSeconds = req.DurationSeconds;
 
             _failed = false;
             _failReason = null;
             _violationStart = null;
             _violationSeconds = 0;
+            _violationElapsedMs = 0;
             _sessionTrustedProcesses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _websiteViolationSeconds = 0;
-            _remainingSeconds = req.DurationSeconds;
+            _sessionStopwatch.Reset();
+            _sessionStopwatch.Start();
+            _lastTickElapsedMs = 0;
             _isRunning = true;
 
             _timer?.Dispose();
@@ -224,7 +230,12 @@ public class FocusSessionService
             if (!_isRunning) return;
 
             var now = DateTimeOffset.Now;
-            _remainingSeconds = Math.Max(0, (int)Math.Ceiling((_endAt - now).TotalSeconds));
+            var elapsedMs = _sessionStopwatch.ElapsedMilliseconds;
+            var deltaMs = Math.Max(0, elapsedMs - _lastTickElapsedMs);
+            _lastTickElapsedMs = elapsedMs;
+
+            var elapsedSeconds = (int)(elapsedMs / 1000L);
+            _remainingSeconds = Math.Max(0, _plannedDurationSeconds - elapsedSeconds);
 
             if (_remainingSeconds <= 0)
             {
@@ -240,6 +251,7 @@ public class FocusSessionService
             {
                 _violationStart = null;
                 _violationSeconds = 0;
+                _violationElapsedMs = 0;
                 return;
             }
 
@@ -255,6 +267,7 @@ public class FocusSessionService
             {
                 _violationStart = null;
                 _violationSeconds = 0;
+                _violationElapsedMs = 0;
                 return;
             }
 
@@ -263,12 +276,14 @@ public class FocusSessionService
             {
                 _violationStart = now;
                 _violationSeconds = 0;
+                _violationElapsedMs = 0;
             }
             else
             {
-                _violationSeconds = (int)(now - _violationStart.Value).TotalSeconds;
+                _violationElapsedMs += deltaMs;
+                _violationSeconds = (int)(_violationElapsedMs / 1000L);
 
-                if (now - _violationStart.Value >= _grace)
+                if (_violationElapsedMs >= _grace.TotalMilliseconds)
                 {
                     _failed = true;
                     _failReason = $"Used non-whitelisted program：{_currentProcess}";
@@ -289,12 +304,13 @@ public class FocusSessionService
         _isRunning = false;
         _timer?.Dispose();
         _timer = null;
+        _sessionStopwatch.Stop();
 
         var now = DateTimeOffset.Now;
 
         var elapsedSeconds = _startAt == default
             ? 0
-            : Math.Max(0, (int)(now - _startAt).TotalSeconds);
+            : Math.Max(0, (int)(_sessionStopwatch.ElapsedMilliseconds / 1000L));
 
         // 更新总体 Profile 统计
         _dataService.RecordSession(outcome, elapsedSeconds);

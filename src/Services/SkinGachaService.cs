@@ -81,6 +81,7 @@ public class SkinGachaService : ISkinGachaService
     private readonly AppDbContext _db;
     private readonly LocalDataService _dataService;
     private readonly SkinCatalogService _skinCatalog;
+    private readonly AchievementService _achievementService;
 
     private static readonly (string Key, int Weight)[] RarityWeights =
     {
@@ -89,11 +90,12 @@ public class SkinGachaService : ISkinGachaService
         ("epic", 5),
     };
 
-    public SkinGachaService(AppDbContext db, LocalDataService dataService, SkinCatalogService skinCatalog)
+    public SkinGachaService(AppDbContext db, LocalDataService dataService, SkinCatalogService skinCatalog, AchievementService achievementService)
     {
         _db = db;
         _dataService = dataService;
         _skinCatalog = skinCatalog;
+        _achievementService = achievementService;
     }
 
     public async Task<SkinDrawResultDto> DrawOneAsync(string userId, int cost, string pool)
@@ -109,9 +111,11 @@ public class SkinGachaService : ISkinGachaService
             .Where(f => f.IsEnabled)
             .ToListAsync();
 
-        var epicSkin = GetEpicSkinForPool(pool);
-        var drop = DrawPlannedDrop(foods, epicSkin);
-        return ApplyPlannedDrop(drop, newCredits);
+        var epicSkins = GetEpicSkinsForPool(pool);
+        var drop = DrawPlannedDrop(foods, epicSkins);
+        var result = ApplyPlannedDrop(drop, newCredits);
+        _achievementService.IncrementCounter("gacha_draws_total", 1);
+        return result;
     }
 
     private SkinDrawResultDto DrawSkin(CollectionItemDefinition skin, int newCredits)
@@ -170,19 +174,22 @@ public class SkinGachaService : ISkinGachaService
         };
     }
 
-    private CollectionItemDefinition? GetEpicSkinForPool(string pool)
+    private List<CollectionItemDefinition> GetEpicSkinsForPool(string pool)
     {
         var poolKey = NormalizePoolKey(pool);
         return _skinCatalog.GetEpicSkins()
-            .FirstOrDefault(x => string.Equals(x.Game, poolKey, StringComparison.OrdinalIgnoreCase));
+            .Where(x => string.Equals(x.Game, poolKey, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
-    private PlannedSkinDrop DrawPlannedDrop(List<FoodDefinition> foods, CollectionItemDefinition? epicSkin)
+    private PlannedSkinDrop DrawPlannedDrop(List<FoodDefinition> foods, List<CollectionItemDefinition>? epicSkins)
     {
-        var rarity = RollRarity(epicSkin is not null);
-        if (rarity == "epic" && epicSkin is not null)
+        var hasEpicSkin = epicSkins is { Count: > 0 };
+        var rarity = RollRarity(hasEpicSkin);
+        if (rarity == "epic" && hasEpicSkin)
         {
-            return PlannedSkinDrop.FromSkin(epicSkin);
+            var pickedSkin = epicSkins![Random.Shared.Next(epicSkins.Count)];
+            return PlannedSkinDrop.FromSkin(pickedSkin);
         }
 
         var food = PickFoodByRarity(foods, rarity);
@@ -236,7 +243,7 @@ public class SkinGachaService : ISkinGachaService
             throw new InvalidOperationException("Invalid planned drop.");
 
         var drawn = drop.Food;
-        var itemId = $"food:{drawn.FoodId}";
+        var itemId = drawn.FoodId;
         var inv = _dataService.GetInventory();
         var before = inv.TryGetValue(itemId, out var c) ? c : 0;
 
@@ -298,7 +305,7 @@ public class SkinGachaService : ISkinGachaService
         if (foods.Count == 0)
             throw new InvalidOperationException("Food pool is empty. Seed foods.json first.");
 
-        var epicSkin = GetEpicSkinForPool(pool);
+        var epicSkins = GetEpicSkinsForPool(pool);
 
         var totalCost = checked(cost * 10);
         var ok = _dataService.TryConsumeCredits(totalCost, out var newCredits);
@@ -308,14 +315,15 @@ public class SkinGachaService : ISkinGachaService
         var planned = new List<PlannedSkinDrop>(10);
         for (var i = 0; i < 10; i++)
         {
-            planned.Add(DrawPlannedDrop(foods, epicSkin));
+            planned.Add(DrawPlannedDrop(foods, epicSkins));
         }
 
         var guaranteedSkinApplied = false;
 
-        if (epicSkin is not null && !planned.Any(x => x.DropType == "skin"))
+        if (epicSkins.Count > 0 && !planned.Any(x => x.DropType == "skin"))
         {
-            planned[9] = PlannedSkinDrop.FromSkin(epicSkin);
+            var guaranteedSkin = epicSkins[Random.Shared.Next(epicSkins.Count)];
+            planned[9] = PlannedSkinDrop.FromSkin(guaranteedSkin);
             guaranteedSkinApplied = true;
         }
 
@@ -345,7 +353,7 @@ public class SkinGachaService : ISkinGachaService
                 throw new InvalidOperationException("invalid planned drop");
 
             var food = plannedDrop.Food;
-            var itemId = $"food:{food.FoodId}";
+            var itemId = food.FoodId;
             var invSnapshot = _dataService.GetInventory();
             var before = invSnapshot.TryGetValue(itemId, out var c) ? c : 0;
 
@@ -361,6 +369,8 @@ public class SkinGachaService : ISkinGachaService
                 IsNew: before == 0
             ));
         }
+
+        _achievementService.IncrementCounter("gacha_draws_total", 10);
 
         return new SkinDraw10ResultDto(
             Drops: drops,

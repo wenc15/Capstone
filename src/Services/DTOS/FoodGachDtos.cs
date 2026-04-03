@@ -49,7 +49,8 @@ public record DrawnFoodDto(
     string? Rarity,
     int ExpValue,
     string? ImageKey,
-    bool IsNew
+    bool IsNew,
+    int Amount
 );
 
 public record FoodDrawResultDto(

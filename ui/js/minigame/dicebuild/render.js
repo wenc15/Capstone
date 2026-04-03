@@ -317,6 +317,7 @@ export function createDiceBuildRender({
         <div class="mg-result-note">${note}</div>
         <div class="mg-result-stats">
           <span class="mg-result-chip">🏆 Score ${score.value}</span>
+          <span class="mg-result-chip">🥇 Best ${Number(score?.best) || Number(score.value) || 0}</span>
           <span class="mg-result-chip">💵 Cash ${st.cash}</span>
           <span class="mg-result-chip">🎯 Stage ${st.stageIdx + 1}/${STAGE_COUNT}</span>
         </div>
@@ -428,9 +429,9 @@ export function createDiceBuildRender({
       return;
     }
 
-    const minBoard = 560;
-    const minSide = 160;
-    const shellAllowance = 4;
+    const minBoard = 486;
+    const minSide = 116;
+    const shellAllowance = 6;
     const need = minBoard + minSide + shellAllowance;
     const available = Math.max(0, root.clientWidth);
     root.classList.toggle('mg-layout-stack', available < need);
@@ -484,7 +485,7 @@ export function createDiceBuildRender({
       const now = Date.now();
       const pulseMap = st.fxPulse || {};
       const fxItems = Array.isArray(st.cellFxItems) ? st.cellFxItems.filter((it) => (it.until || 0) > now) : [];
-      els.mgBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      els.mgBoard.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
 
       for (let y = 0; y < rows; y += 1) {
         for (let x = 0; x < cols; x += 1) {

@@ -6,11 +6,19 @@
 
 import { showToast } from './utils.js';
 import { getCollectionItems, setCollectionSkinEnabled } from './collection_api.js';
+import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './overlay_motion.js';
+
+const COLLECTION_BOOT_CACHE_KEY = 'growin:collection.boot.v1';
 
 const COLLECTION_ICONS = {
   skin_tetris_starlit: '🧱',
+  skin_tetris_jelly: '🍮',
   skin_snake_nebula: '🐍',
   skin_dicebuild_petstand: '🎲',
+};
+
+const COLLECTION_NAME_OVERRIDES = {
+  skin_tetris_jelly: 'Jelly Tetris Skin',
 };
 
 function iconForItem(itemId) {
@@ -22,9 +30,15 @@ function iconForItem(itemId) {
   return '🧩';
 }
 
+function displayNameForItem(item) {
+  const itemId = String(item?.itemId || '').trim();
+  if (itemId && COLLECTION_NAME_OVERRIDES[itemId]) return COLLECTION_NAME_OVERRIDES[itemId];
+  return item?.displayName || itemId || 'Unknown Item';
+}
+
 function buildOverlay() {
   const overlay = document.createElement('div');
-  overlay.className = 'bag-overlay collection-overlay';
+  overlay.className = 'bag-overlay collection-overlay mg-hidden';
   overlay.setAttribute('aria-hidden', 'true');
 
   overlay.innerHTML = `
@@ -60,7 +74,7 @@ function formatCollectionRow(item) {
     <div class="bag-row collection-row ${stateClass}" data-item-id="${item.itemId}">
       <div class="bag-ico" aria-hidden="true">${iconForItem(item.itemId)}</div>
       <div class="bag-mid">
-        <div class="bag-name">${item.displayName}</div>
+        <div class="bag-name">${displayNameForItem(item)}</div>
         <div class="bag-id">${item.itemId}${item.game ? ` • ${item.game}` : ''}</div>
       </div>
       <div class="bag-count collection-state ${stateClass}">${stateText}</div>
@@ -84,11 +98,36 @@ function renderCollectionPreview(items, previewEl, metaEl) {
   const preview = items.slice(0, 8)
     .map((item) => {
       const stateClass = item.state <= 0 ? 'is-unowned' : (item.isEnabled ? 'is-enabled' : 'is-owned');
-      return `<div class="collection-short-chip ${stateClass}" title="${item.displayName}">${iconForItem(item.itemId)}</div>`;
+      return `<div class="collection-short-chip ${stateClass}" title="${displayNameForItem(item)}">${iconForItem(item.itemId)}</div>`;
     })
     .join('');
 
   previewEl.innerHTML = preview;
+}
+
+function saveCollectionBootCache({ metaText, previewHtml }) {
+  try {
+    localStorage.setItem(COLLECTION_BOOT_CACHE_KEY, JSON.stringify({
+      metaText: String(metaText || ''),
+      previewHtml: String(previewHtml || ''),
+    }));
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+function loadCollectionBootCache() {
+  try {
+    const raw = localStorage.getItem(COLLECTION_BOOT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      metaText: typeof parsed?.metaText === 'string' ? parsed.metaText : '',
+      previewHtml: typeof parsed?.previewHtml === 'string' ? parsed.previewHtml : '',
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function mountCollection(els) {
@@ -108,17 +147,21 @@ export function mountCollection(els) {
   let isOpen = false;
   let inFlight = false;
 
+  const boot = loadCollectionBootCache();
+  if (boot) {
+    if (boot.metaText) metaEl.textContent = boot.metaText;
+    if (boot.previewHtml) previewEl.innerHTML = boot.previewHtml;
+  }
+
   function open() {
     isOpen = true;
-    overlay.classList.add('open');
-    overlay.setAttribute('aria-hidden', 'false');
+    openOverlayWithMotion(overlay, { openDurationMs: CLEANUP_MS });
     refresh();
   }
 
   function close() {
     isOpen = false;
-    overlay.classList.remove('open');
-    overlay.setAttribute('aria-hidden', 'true');
+    closeOverlayWithMotion(overlay, { closeDurationMs: CLEANUP_MS });
   }
 
   async function refresh() {
@@ -128,6 +171,10 @@ export function mountCollection(els) {
     try {
       const items = await getCollectionItems();
       renderCollectionPreview(items, previewEl, metaEl);
+      saveCollectionBootCache({
+        metaText: metaEl.textContent,
+        previewHtml: previewEl.innerHTML,
+      });
 
       if (!items.length) {
         if (listEl) listEl.innerHTML = '';

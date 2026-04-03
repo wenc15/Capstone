@@ -18,6 +18,7 @@ import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameS
 import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
 import { LOCAL_STORAGE_KEYS, createScheduledSaver, readJsonSafe, writeJsonSafe } from './local_storage.js';
+import { reportAchievementMax } from './achievement_events.js';
 
 const SAVE_KEY = LOCAL_STORAGE_KEYS.tetrisSave;
 const HIST_KEY = LOCAL_STORAGE_KEYS.tetrisHistory;
@@ -43,6 +44,9 @@ const TETRIS_SKINS = {
   default: {
     boardClass: '',
   },
+  skin_tetris_jelly: {
+    boardClass: 'tetris-skin-jelly',
+  },
   skin_tetris_starlit: {
     boardClass: 'tetris-skin-starlit',
   },
@@ -59,6 +63,7 @@ function endGame(st, els) {
   consumeDiceBuildEligibility();
   save(st, { immediate: true });
   pushHistory({ result: 'lose', score: st.score, level: st.level, lines: st.lines });
+  reportAchievementMax('tetris_best_score', st.score);
   if (els?.toastEl) showToast(els.toastEl, `Tetris over - score ${st.score}`);
   if (els) openMinigameHub(els, { bypassGate: true, reason: 'hub' });
 }
@@ -155,6 +160,15 @@ function pushHistory(entry) {
   writeJson(HIST_KEY, list);
 }
 
+function getBestHistoryScore() {
+  const list = readJson(HIST_KEY, []);
+  if (!Array.isArray(list) || list.length === 0) return 0;
+  return list.reduce((best, item) => {
+    const score = Number(item?.score) || 0;
+    return score > best ? score : best;
+  }, 0);
+}
+
 function getRandomPiece() {
   const keys = Object.keys(TETROMINOES);
   const key = keys[Math.floor(Math.random() * keys.length)];
@@ -244,6 +258,7 @@ function spawnPiece(st, els) {
       st.playing = false;
       save(st, { immediate: true });
       pushHistory({ result: 'lose', score: st.score, level: st.level, lines: st.lines });
+      reportAchievementMax('tetris_best_score', st.score);
     }
     return false;
   }
@@ -450,10 +465,11 @@ function renderNext(els, st) {
       const cell = document.createElement('div');
       cell.className = 'tet-cell tet-next-cell';
       if (piece.shape[y][x]) {
+        const skin = getPieceSkin(piece.type);
         cell.classList.add('tet-filled');
-        cell.dataset.piece = piece.type;
-        cell.style.setProperty('--tet-fill', piece.color);
-        cell.style.setProperty('--tet-accent', piece.accent);
+        if (skin.type) cell.dataset.piece = skin.type;
+        cell.style.setProperty('--tet-fill', skin.color);
+        cell.style.setProperty('--tet-accent', skin.accent);
       }
       display.appendChild(cell);
     }
@@ -623,11 +639,16 @@ export function mountTetris(els) {
 
   attachHandlers(els, stRef);
 
-  const st = load() || defaultState();
+  const loaded = load();
+  const st = defaultState();
+  if (loaded && typeof loaded.skinId === 'string') {
+    st.skinId = loaded.skinId;
+  }
   st.playing = false;
   st.paused = false;
   st.dropInterval = null;
   stRef.current = st;
+  reportAchievementMax('tetris_best_score', Math.max(Number(st.score) || 0, getBestHistoryScore()));
   save(st, { immediate: true });
   syncSkinFromCollection(st).then(() => render(els, st));
   render(els, st);

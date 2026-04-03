@@ -34,12 +34,12 @@ export function collectDom() {
 
   // ===== Timer area =====
   const display   = document.getElementById('timerDisplay');
+  const timerMinPart = document.getElementById('timerMinPart');
+  const timerSecPart = document.getElementById('timerSecPart');
   const startBtn  = document.getElementById('startBtn');
   const stopBtn   = document.getElementById('stopBtn');
   const range     = document.getElementById('timeRange');
   const out       = document.getElementById('timeValue');
-  // const noteInput = document.getElementById('sessionNote'); // removed
-  const focusLast = document.getElementById('focusLast');
   const toastEl   = document.getElementById('doneToast');
 
   // Whitelist checkbox group container (replaces old <select id="whitelistSelect">)
@@ -49,7 +49,7 @@ export function collectDom() {
   const collectionOwnedMeta = document.getElementById('collectionOwnedMeta');
   const sumFocusTime = document.getElementById('sumFocusTime');
   const sumDistractions = document.getElementById('sumDistractions');
-  const sumCompleted = document.getElementById('sumCompleted');
+  const sumOutcome = document.getElementById('sumOutcome');
   const sumSeeMoreBtn = document.getElementById('sumSeeMoreBtn');
 
   const ltdOverlay = document.getElementById('ltdOverlay');
@@ -87,14 +87,12 @@ export function collectDom() {
   const achvMeta = document.getElementById('achvMeta');
   const achvEmpty = document.getElementById('achvEmpty');
   const achvError = document.getElementById('achvError');
-  const achvRefreshBtn = document.getElementById('achvRefreshBtn');
 
   // ===== Minigame (Dice & Build) =====
   const mgRoot = document.getElementById('mgRoot');
   const mgMenuBtn = document.getElementById('mgMenuBtn');
   const mgSettingsPanel = document.getElementById('mgSettingsPanel');
   const mgSpeedModeToggle = document.getElementById('mgSpeedModeToggle');
-  const mgBackHubBtn = document.getElementById('mgBackHubBtn');
   const mgExitBtn = document.getElementById('mgExitBtn');
   const mgCash = document.getElementById('mgCash');
   const mgStage = document.getElementById('mgStage');
@@ -139,8 +137,6 @@ export function collectDom() {
   const relaxLaterBtn = document.getElementById('relaxLaterBtn');
   
   // ===== Gacha =====
-  
-  const gachaRoot = document.getElementById('gachaRoot');
 
   // ===== Pet/Store =====
   const storeBtn = document.getElementById('storeBtn');
@@ -148,9 +144,13 @@ export function collectDom() {
 
   // ===== Stats area =====
   const statCount    = document.getElementById('statCount');
+  const statCompletedCount = document.getElementById('statCompletedCount');
   const statTotal    = document.getElementById('statTotal');
-  const statLastNote = document.getElementById('statLastNote');
+  const statAvgSession = document.getElementById('statAvgSession');
+  const statBestDay = document.getElementById('statBestDay');
   const chartCanvas  = document.getElementById('focusChart');
+  const timePrefCanvas = document.getElementById('timePrefChart');
+  const timePrefLegend = document.getElementById('timePrefLegend');
 
   //2026/1/22 added token dom
   const tokenValue = document.getElementById('tokenValue');
@@ -165,8 +165,6 @@ export function collectDom() {
   const settingCloseBehavior = document.getElementById('settingCloseBehavior');
   const settingUiTone = document.getElementById('settingUiTone');
   const settingMusicAutoPlay = document.getElementById('settingMusicAutoPlay');
-  const settingMusicVolume = document.getElementById('settingMusicVolume');
-  const settingMusicVolumeValue = document.getElementById('settingMusicVolumeValue');
   const openMusicFolderBtn = document.getElementById('openMusicFolderBtn');
   const settingsBehaviorMeta = document.getElementById('settingsBehaviorMeta');
   const archiveExportBtn = document.getElementById('archiveExportBtn');
@@ -205,6 +203,7 @@ export function collectDom() {
   const petImage = document.getElementById('petImage');
   const petSpeechBubble = document.getElementById('petSpeechBubble');
   const petLevel = document.getElementById('petLevel');
+  const petExpText = document.getElementById('petExpText');
   const petExpFill = document.getElementById('petExpFill');
   const petEvoHint = document.getElementById('petEvoHint');
 
@@ -218,11 +217,12 @@ export function collectDom() {
 
     // Timer
     display,
+    timerMinPart,
+    timerSecPart,
     startBtn,
     stopBtn,
     range,
     out,
-    focusLast,
     toastEl,
     whitelistGroup,
     openCollectionBtn,
@@ -230,7 +230,7 @@ export function collectDom() {
     collectionOwnedMeta,
     sumFocusTime,
     sumDistractions,
-    sumCompleted,
+    sumOutcome,
     sumSeeMoreBtn,
 
     ltdOverlay,
@@ -267,11 +267,6 @@ export function collectDom() {
     achvMeta,
     achvEmpty,
     achvError,
-    achvRefreshBtn,
-
-    //Gacha
-    gachaRoot,
-
 
     // Pet/Store
     storeBtn,
@@ -283,6 +278,7 @@ export function collectDom() {
     petImage,
     petSpeechBubble,
     petLevel,
+    petExpText,
     petExpFill,
     petEvoHint,
 
@@ -291,15 +287,19 @@ export function collectDom() {
 
     // Stats
     statCount,
+    statCompletedCount,
     statTotal,
-    statLastNote,
+    statAvgSession,
+    statBestDay,
     chartCanvas,
+    timePrefCanvas,
+    timePrefLegend,
 
     // Chart.js instance holder
     chartRef: { current: null },
 
     // Convenience object for stats.js
-    statsEls: { statCount, statTotal, statLastNote, chartCanvas },
+    statsEls: { statCount, statCompletedCount, statTotal, statAvgSession, statBestDay, chartCanvas, timePrefCanvas, timePrefLegend },
 
     //token/credits
     tokenValue,
@@ -314,8 +314,6 @@ export function collectDom() {
     settingCloseBehavior,
     settingUiTone,
     settingMusicAutoPlay,
-    settingMusicVolume,
-    settingMusicVolumeValue,
     openMusicFolderBtn,
     settingsBehaviorMeta,
     archiveExportBtn,
@@ -353,7 +351,6 @@ export function collectDom() {
     mgMenuBtn,
     mgSettingsPanel,
     mgSpeedModeToggle,
-    mgBackHubBtn,
     mgExitBtn,
     mgCash,
     mgStage,

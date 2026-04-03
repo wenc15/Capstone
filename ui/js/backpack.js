@@ -12,6 +12,7 @@
 
 import { showToast } from './utils.js';
 import { getPetsState, setActivePet } from './petsApi.js';
+import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './overlay_motion.js';
 
 const API_BASE = 'http://localhost:5024';
 
@@ -84,7 +85,7 @@ function formatItemRow(itemId, count) {
 
 function buildOverlay() {
   const overlay = document.createElement('div');
-  overlay.className = 'bag-overlay';
+  overlay.className = 'bag-overlay mg-hidden';
   overlay.setAttribute('aria-hidden', 'true');
 
   overlay.innerHTML = `
@@ -133,15 +134,13 @@ export function mountBackpack(els) {
 
   function open() {
     isOpen = true;
-    overlay.classList.add('open');
-    overlay.setAttribute('aria-hidden', 'false');
+    openOverlayWithMotion(overlay, { openDurationMs: CLEANUP_MS });
     refresh();
   }
 
   function close() {
     isOpen = false;
-    overlay.classList.remove('open');
-    overlay.setAttribute('aria-hidden', 'true');
+    closeOverlayWithMotion(overlay, { closeDurationMs: CLEANUP_MS });
   }
 
   function formatPetRow(p, growth, isActive) {

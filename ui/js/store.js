@@ -18,6 +18,7 @@
 import { refreshCredits, subscribeCredits, consumeCredits as storeConsumeCredits } from './creditsStore.js';
 import { showToast } from './utils.js';
 import { getPetsState, unlockPet } from './petsApi.js';
+import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './overlay_motion.js';
 
 const API_BASE = 'http://localhost:5024';
 
@@ -80,7 +81,7 @@ async function addInventoryItem(itemId, amount) {
 
 function buildOverlay() {
   const overlay = document.createElement('div');
-  overlay.className = 'store-overlay';
+  overlay.className = 'store-overlay mg-hidden';
   overlay.setAttribute('aria-hidden', 'true');
 
   overlay.innerHTML = `
@@ -261,8 +262,7 @@ export function mountStore(els) {
 
   function openStore() {
     isOpen = true;
-    overlay.classList.add('open');
-    overlay.setAttribute('aria-hidden', 'false');
+    openOverlayWithMotion(overlay, { openDurationMs: CLEANUP_MS });
     refreshCredits().catch((e) => console.warn('[Store] Failed to refresh credits:', e));
     refreshInventory();
     refreshPets();
@@ -270,8 +270,7 @@ export function mountStore(els) {
 
   function closeStore() {
     isOpen = false;
-    overlay.classList.remove('open');
-    overlay.setAttribute('aria-hidden', 'true');
+    closeOverlayWithMotion(overlay, { closeDurationMs: CLEANUP_MS });
   }
 
   els.storeBtn.addEventListener('click', openStore);

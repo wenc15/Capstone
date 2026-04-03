@@ -42,6 +42,7 @@ let mainWin, ballWin;
 let hasAppliedInitialWidgetVisibility = false;
 let isBallReadyToShow = false;
 let pendingWidgetVisibility = null;
+let widgetShowAnimTimer = null;
 const APP_SETTINGS_FILE = 'growin-ui-settings.json';
 const DEFAULT_APP_SETTINGS = Object.freeze({
   showWidget: true,
@@ -154,9 +155,40 @@ function setWidgetVisible(visible, { focus = false, save = false, notify = false
     if (!isBallReadyToShow) {
       pendingWidgetVisibility = v;
     } else if (v) {
-      if (!ballWin.isVisible()) ballWin.show();
+      if (!ballWin.isVisible()) {
+        if (widgetShowAnimTimer) {
+          clearInterval(widgetShowAnimTimer);
+          widgetShowAnimTimer = null;
+        }
+        try { ballWin.setOpacity(0); } catch {}
+        ballWin.showInactive();
+        const durationMs = 110;
+        const stepMs = 16;
+        const startFade = () => {
+          const startTs = Date.now();
+          widgetShowAnimTimer = setInterval(() => {
+            if (!ballWin || ballWin.isDestroyed()) {
+              clearInterval(widgetShowAnimTimer);
+              widgetShowAnimTimer = null;
+              return;
+            }
+            const t = Math.min(1, (Date.now() - startTs) / durationMs);
+            try { ballWin.setOpacity(t); } catch {}
+            if (t >= 1) {
+              clearInterval(widgetShowAnimTimer);
+              widgetShowAnimTimer = null;
+            }
+          }, stepMs);
+        };
+        setTimeout(startFade, 0);
+      }
       if (focus) ballWin.focus();
     } else if (ballWin.isVisible()) {
+      if (widgetShowAnimTimer) {
+        clearInterval(widgetShowAnimTimer);
+        widgetShowAnimTimer = null;
+      }
+      try { ballWin.setOpacity(0); } catch {}
       ballWin.hide();
     }
   }
@@ -242,7 +274,9 @@ function createBall() {
   pendingWidgetVisibility = null;
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const winSize = 180;
+  // Keep widget window close to the visual circle bounds
+  // (#widget is 140px + 2px border on each side => ~144px).
+  const winSize = 144;
 
   ballWin = new BrowserWindow({
     show: false,
@@ -267,6 +301,7 @@ function createBall() {
 
   // 更“凶”的置顶等级
   ballWin.setAlwaysOnTop(true, 'screen-saver');
+  try { ballWin.setOpacity(0); } catch {}
 
   ballWin.loadFile('widget.html');
 

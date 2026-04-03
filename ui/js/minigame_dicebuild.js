@@ -14,6 +14,8 @@ import { hasDiceBuildEligibility, consumeDiceBuildEligibility } from './relax_pr
 import { closeMinigameSection, openMinigameHub, showMinigamePanel, showMinigameSection } from './minigame_hub.js';
 import { getEnabledSkinForGame } from './collection_api.js';
 import { showToast } from './utils.js';
+import { reportAchievementIncrement } from './achievement_events.js';
+import { LOCAL_STORAGE_KEYS, readJsonSafe } from './local_storage.js';
 import {
   STAGES,
   STAGE_COUNT,
@@ -187,6 +189,7 @@ function finalizeStageIfNeeded(st, ui) {
     consumeDiceBuildEligibility();
     showResult(ui, st, true);
     pushHistory({ result: 'win', score: computeScore(st) });
+    reportAchievementIncrement('dicebuild_wins', 1);
     return;
   }
 
@@ -203,6 +206,17 @@ function computeScore(st) {
     .filter(Boolean)
     .reduce((sum, inst) => sum + sellValue(inst), 0);
   return cashScore + completedGoals + buildingScore;
+}
+
+function computeBestScore(currentScore = 0) {
+  const history = readJsonSafe(LOCAL_STORAGE_KEYS.dicebuildHistory, []);
+  const historyBest = Array.isArray(history)
+    ? history.reduce((best, item) => {
+      const score = Number(item?.score) || 0;
+      return score > best ? score : best;
+    }, 0)
+    : 0;
+  return Math.max(historyBest, Math.max(0, Number(currentScore) || 0));
 }
 
 const uiRender = createDiceBuildRender({
@@ -222,7 +236,9 @@ const uiRender = createDiceBuildRender({
 });
 
 function showResult(ui, st, win) {
-  uiRender.showResult(ui, st, { win, value: computeScore(st) });
+  const value = computeScore(st);
+  const best = computeBestScore(value);
+  uiRender.showResult(ui, st, { win, value, best });
 }
 
 function showBuildingDetail(ui, st, inst, cellIdx) {
@@ -320,8 +336,9 @@ export function mountDiceBuild(els) {
     syncDiceBuildLayout(els);
   });
 
-  // Initial render uses persisted state when available.
-  const st = load() || defaultState();
+  // Refreshing the app should always start a fresh run.
+  // Keep only skin/speed mode preferences via resetRunState.
+  const st = resetRunState(load() || defaultState());
   stRef.current = st;
   if (!Array.isArray(st.shop) || st.shop.length === 0) {
     buildShopItems(st);
@@ -357,9 +374,6 @@ export function openDiceBuild(els, meta) {
     showToast(els.toastEl, 'Minigame is only available after focus completion.');
     return;
   }
-
-  // Improve visibility for full board layout on smaller windows.
-  window.electronAPI?.maximizeMainWindowForMinigame?.();
 
   showMinigameSection(els);
   showDiceBuildView(els);

@@ -29,6 +29,7 @@ public static class CollectionCatalog
     // 预设收藏品目录：可按业务继续扩展。
     public static readonly IReadOnlyList<CollectionItemDefinition> PresetItems = new List<CollectionItemDefinition>
     {
+        new() { ItemId = "skin_tetris_jelly", DisplayName = "Jelly Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
         new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
         new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin", Rarity = "Epic", Category = "minigame", Game = "snake" },
         new() { ItemId = "skin_dicebuild_petstand", DisplayName = "Pet Standee Growin Town Skin", Rarity = "Epic", Category = "minigame", Game = "dicebuild" },

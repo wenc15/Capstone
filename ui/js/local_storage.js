@@ -26,6 +26,11 @@ export const LOCAL_STORAGE_KEYS = Object.freeze({
   tetrisSave: 'tetris.save.v1',
   tetrisHistory: 'tetris.history.v1',
   achievementsSeenUnlocked: 'growin:achievements:seenUnlocked',
+  creditsCache: 'growin:credits.cache.v1',
+  petBootCache: 'growin:pet.boot.v1',
+  collectionBootCache: 'growin:collection.boot.v1',
+  musicDockBootCache: 'growin:music.dock.boot.v1',
+  navActiveView: 'growin:nav.active.view.v1',
 });
 
 const CLEAR_PREFIXES = Object.freeze([

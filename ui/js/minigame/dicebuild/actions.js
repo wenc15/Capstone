@@ -550,11 +550,6 @@ export function attachDiceBuildHandlers(els, stRef, deps) {
     toggleSettingsPanel();
   });
 
-  ui.mgBackHubBtn?.addEventListener('click', () => {
-    hideSettingsPanel();
-    openMinigameHub(ui, { bypassGate: true, reason: 'hub' });
-  });
-
   ui.mgSpeedModeToggle?.addEventListener('change', () => {
     const st = stRef.current;
     if (!st) return;

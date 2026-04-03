@@ -23,6 +23,18 @@ namespace CapstoneBackend.Controllers;
 [Route("api/[controller]")]
 public class AchievementsController : ControllerBase
 {
+    public sealed class AchievementCounterIncrementRequest
+    {
+        public string Type { get; set; } = string.Empty;
+        public int Delta { get; set; } = 1;
+    }
+
+    public sealed class AchievementCounterMaxRequest
+    {
+        public string Type { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+
     private readonly AchievementService _service;
 
     public AchievementsController(AchievementService service)
@@ -35,5 +47,25 @@ public class AchievementsController : ControllerBase
     {
         var list = _service.GetStatusesAndAutoUnlock();
         return Ok(new { achievements = list });
+    }
+
+    [HttpPost("counter/increment")]
+    public ActionResult IncrementCounter([FromBody] AchievementCounterIncrementRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Type) || request.Delta <= 0)
+            return BadRequest(new { message = "type and positive delta are required." });
+
+        _service.IncrementCounter(request.Type.Trim(), request.Delta);
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("counter/max")]
+    public ActionResult UpdateCounterMax([FromBody] AchievementCounterMaxRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Type) || request.Value < 0)
+            return BadRequest(new { message = "type and non-negative value are required." });
+
+        _service.SetCounterMax(request.Type.Trim(), request.Value);
+        return Ok(new { ok = true });
     }
 }

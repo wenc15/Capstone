@@ -12,6 +12,7 @@ import { subscribeFocusStatus } from './focusStatusStore.js';
 const MUSIC_VOLUME_LOCAL_KEY = 'growin:music.volume.v1';
 const MUSIC_MODE_LOCAL_KEY = 'growin:music.mode.v1';
 const MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY = 'growin:music.autoplayOnFocus.v1';
+const MUSIC_DOCK_BOOT_CACHE_KEY = 'growin:music.dock.boot.v1';
 const PREV_DOUBLE_TAP_MS = 360;
 const PROGRESS_MAX = 1000;
 
@@ -70,6 +71,25 @@ function loadAutoPlayOnFocus() {
     return raw !== '0' && raw !== 'false';
   } catch {
     return true;
+  }
+}
+
+function saveMusicDockBootSnapshot(snapshot) {
+  try {
+    localStorage.setItem(MUSIC_DOCK_BOOT_CACHE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore local storage failures
+  }
+}
+
+function loadMusicDockBootSnapshot() {
+  try {
+    const raw = localStorage.getItem(MUSIC_DOCK_BOOT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
@@ -204,9 +224,12 @@ export function mountMusic(opts = {}) {
   let pendingPlay = false;
   let isSeeking = false;
   let seekPreviewSec = 0;
-  let lastShownDurationSec = 0;
+  const bootSnapshot = loadMusicDockBootSnapshot();
+  const bootDurationSec = Number(bootSnapshot?.durationSec);
+  let lastShownDurationSec = Number.isFinite(bootDurationSec) && bootDurationSec > 0 ? bootDurationSec : 0;
   let pausedByUserWhileFocus = false;
   let autoPlayOnFocus = loadAutoPlayOnFocus();
+  let isGestureProbeActive = false;
 
   let currentIndex = trackItems.length ? queueOrder[0] : -1;
   let shuffleBag = [];
@@ -227,6 +250,44 @@ export function mountMusic(opts = {}) {
   const currentTimeEl = els?.musicCurrentTime || null;
   const durationTimeEl = els?.musicDurationTime || null;
   let lastNonZeroVolume = audio.volume > 0 ? audio.volume : 0.35;
+  let lastBootSnapshotAt = 0;
+
+  function persistMusicDockBootSnapshot() {
+    if (isGestureProbeActive) return;
+    const now = Date.now();
+    if (now - lastBootSnapshotAt < 220) return;
+    lastBootSnapshotAt = now;
+
+    const activeTitle = (currentIndex >= 0 && trackItems[currentIndex]?.title)
+      ? trackItems[currentIndex].title
+      : 'No track selected';
+    const activeAlbum = (currentIndex >= 0 && trackItems[currentIndex]?.album)
+      ? trackItems[currentIndex].album
+      : 'Unknown album';
+
+    const current = isSeeking ? seekPreviewSec : (Number.isFinite(audio.currentTime) ? audio.currentTime : 0);
+    const duration = Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : (Number.isFinite(lastShownDurationSec) ? lastShownDurationSec : 0);
+    const ratio = duration > 0 ? Math.max(0, Math.min(1, current / duration)) : 0;
+    const effectiveVol = audio.muted ? 0 : audio.volume;
+    const volPct = Math.round(Math.max(0, Math.min(1, effectiveVol)) * 100);
+
+    const mode = modeByKey(playMode);
+    saveMusicDockBootSnapshot({
+      track: String(activeTitle || ''),
+      meta: String(activeAlbum || ''),
+      currentTime: formatTime(current),
+      durationTime: formatTime(duration),
+      currentSec: Math.max(0, current),
+      durationSec: Math.max(0, duration),
+      progressValue: Math.max(0, Math.min(PROGRESS_MAX, Math.round(ratio * PROGRESS_MAX))),
+      modeIcon: String(mode?.icon || '↺'),
+      volumePct: volPct,
+      isMuted: volPct <= 0,
+      isLow: volPct > 0 && volPct < 45,
+    });
+  }
 
   function shouldPlay() {
     return (isFocusRunning && autoPlayOnFocus && !pausedByUserWhileFocus) || isManualPlaying;
@@ -335,6 +396,7 @@ export function mountMusic(opts = {}) {
       const ratio = duration > 0 ? (current / duration) : 0;
       progressEl.value = String(Math.max(0, Math.min(PROGRESS_MAX, Math.round(ratio * PROGRESS_MAX))));
     }
+    persistMusicDockBootSnapshot();
   }
 
   function renderQueue() {
@@ -413,6 +475,7 @@ export function mountMusic(opts = {}) {
 
     renderQueue();
     renderProgress();
+    persistMusicDockBootSnapshot();
   }
 
   function loadTrackDuration(index) {
@@ -473,6 +536,7 @@ export function mountMusic(opts = {}) {
     const prevTime = audio.currentTime || 0;
     const prevSrc = audio.src;
     try {
+      isGestureProbeActive = true;
       audio.muted = true;
       const playable = ensurePlayablePool();
       if (!playable.length) return;
@@ -489,6 +553,7 @@ export function mountMusic(opts = {}) {
       // wait for next gesture
     } finally {
       audio.muted = prevMuted;
+      isGestureProbeActive = false;
       try { if (shouldPlay() && prevTime > 0) audio.currentTime = prevTime; } catch {}
       renderDock();
     }

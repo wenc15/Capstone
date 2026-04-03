@@ -5,6 +5,7 @@
 // - Refine weekly precision and panel title icon presentation.
 
 import { loadSessions } from './storage.js';
+import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './overlay_motion.js';
 
 const API_BASE = 'http://localhost:5024';
 const SUMMARY_KEY = 'growin.session.summary.v2';
@@ -60,7 +61,7 @@ function loadSummaryState() {
     focusMinutes: Number.isFinite(st.focusMinutes) ? Math.max(0, Math.round(st.focusMinutes)) : 0,
     // For the home card we show the last distraction app name, not a running counter.
     distractionApp: typeof st.distractionApp === 'string' ? st.distractionApp : '',
-    completed: Number.isFinite(st.completed) ? Math.max(0, Math.round(st.completed)) : 0,
+    lastOutcome: typeof st.lastOutcome === 'string' && st.lastOutcome.trim() ? st.lastOutcome.trim() : '—',
   };
 }
 
@@ -84,7 +85,7 @@ function renderSummary(st) {
   if (!boundEls) return;
   if (boundEls.sumFocusTime) boundEls.sumFocusTime.textContent = formatDurationHM(st.focusMinutes);
   if (boundEls.sumDistractions) boundEls.sumDistractions.textContent = st.distractionApp || '—';
-  if (boundEls.sumCompleted) boundEls.sumCompleted.textContent = String(st.completed);
+  if (boundEls.sumOutcome) boundEls.sumOutcome.textContent = st.lastOutcome || '—';
 }
 
 function prettifyProcessName(raw) {
@@ -291,17 +292,19 @@ async function refreshLongTermData() {
   renderHistory(list);
 }
 
-function openLongTerm() {
+export function openLongTermData() {
   if (!boundEls?.ltdOverlay) return;
-  boundEls.ltdOverlay.classList.remove('mg-hidden');
-  boundEls.ltdOverlay.setAttribute('aria-hidden', 'false');
+  openOverlayWithMotion(boundEls.ltdOverlay, {
+    openDurationMs: CLEANUP_MS,
+  });
   refreshLongTermData();
 }
 
-function closeLongTerm() {
+export function closeLongTermData() {
   if (!boundEls?.ltdOverlay) return;
-  boundEls.ltdOverlay.classList.add('mg-hidden');
-  boundEls.ltdOverlay.setAttribute('aria-hidden', 'true');
+  closeOverlayWithMotion(boundEls.ltdOverlay, {
+    closeDurationMs: CLEANUP_MS,
+  });
 }
 
 function activateTab(which) {
@@ -317,10 +320,10 @@ export function mountSessionSummary(els) {
   boundEls = els;
   renderSummary(loadSummaryState());
 
-  els?.sumSeeMoreBtn?.addEventListener('click', openLongTerm);
-  els?.ltdCloseBtn?.addEventListener('click', closeLongTerm);
+  els?.sumSeeMoreBtn?.addEventListener('click', openLongTermData);
+  els?.ltdCloseBtn?.addEventListener('click', closeLongTermData);
   els?.ltdOverlay?.addEventListener('click', (ev) => {
-    if (ev.target === els.ltdOverlay) closeLongTerm();
+    if (ev.target === els.ltdOverlay) closeLongTermData();
   });
   els?.ltdTabWeekly?.addEventListener('click', () => activateTab('weekly'));
   els?.ltdTabHistory?.addEventListener('click', () => activateTab('history'));
@@ -330,9 +333,14 @@ export function updateSessionSummary({ minutes, distractedApp }) {
   const st = loadSummaryState();
   const m = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
   st.focusMinutes = m;
-  if (distractedApp && String(distractedApp).trim()) st.distractionApp = prettifyProcessName(distractedApp);
+  const hasDistraction = !!(distractedApp && String(distractedApp).trim());
+  if (hasDistraction) st.distractionApp = prettifyProcessName(distractedApp);
   else st.distractionApp = '';
-  if (m > 0 && !(distractedApp && String(distractedApp).trim())) st.completed += 1;
+
+  if (m > 0 && !hasDistraction) st.lastOutcome = 'Success';
+  else if (hasDistraction) st.lastOutcome = 'Failed';
+  else st.lastOutcome = 'Aborted';
+
   saveSummaryState(st);
   renderSummary(st);
 }

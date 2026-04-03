@@ -43,7 +43,6 @@ export function mountNav(els) {
     viewGacha,
     viewMinigame,
     statsEls,
-    gachaRoot,
     chartRef
   } = els;
 
@@ -73,19 +72,31 @@ export function mountNav(els) {
  const hasMissing = Object.values(missing).some(Boolean);
  if (hasMissing) {
    console.warn('[Nav] Missing nav or view elements. Navigation not mounted.', missing, {
-     navTimer, navStats, navPet, navGacha, navMinigame,
-     viewTimer, viewStats, viewPet, viewGacha, viewMinigame, gachaRoot
-   });
-   return;
- }
+      navTimer, navStats, navPet, navGacha, navMinigame,
+      viewTimer, viewStats, viewPet, viewGacha, viewMinigame
+    });
+    return;
+  }
 
 
   const allBtns  = [btnTimer, btnStats, btnAchievements, btnPet, btnGacha, btnMinigame];
   const allViews = [viewTimer, viewStats, viewAchievements, viewPet, viewGacha, viewMinigame];
+  let hasPlayedStatsEnterAnimation = false;
+
+  document.addEventListener('pointerdown', (ev) => {
+    const target = ev?.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('input, textarea, [contenteditable="true"], [contenteditable=""], .allow-text-select')) return;
+
+    const selection = window.getSelection?.();
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+      selection.removeAllRanges();
+    }
+  });
 
   function setActive(btn, view) {
     allViews.forEach((v) => {
-      v.style.display = v === view ? 'block' : 'none';
+      v.style.display = v === view ? '' : 'none';
     });
 
     allBtns.forEach((b) => {
@@ -96,7 +107,17 @@ export function mountNav(els) {
 
     if (view === viewStats) {
       try {
-        renderStats({ els: statsEls, chartRef });
+        const animateFirstEnter = !hasPlayedStatsEnterAnimation;
+        if (animateFirstEnter && chartRef?.periodCurrent) {
+          try { chartRef.periodCurrent.destroy(); } catch {}
+          chartRef.periodCurrent = null;
+        }
+        renderStats({
+          els: statsEls,
+          chartRef,
+          animateOnEnter: animateFirstEnter,
+        });
+        hasPlayedStatsEnterAnimation = true;
       } catch (err) {
         console.error('[Nav] Failed to render stats view:', err);
       }
@@ -117,6 +138,7 @@ export function mountNav(els) {
         console.error('[Nav] Failed to render gacha view:', err);
       }
     }
+
   }
 
   btnTimer.addEventListener('click', () => setActive(btnTimer, viewTimer));

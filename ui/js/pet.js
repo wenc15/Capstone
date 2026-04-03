@@ -21,8 +21,10 @@
 // js/pet.js
 
 import { getPetsState, onPetsChanged } from './petsApi.js';
+import { reportAchievementIncrement } from './achievement_events.js';
 
 const API_BASE = 'http://localhost:5024';
+const PET_BOOT_CACHE_KEY = 'growin:pet.boot.v1';
 const EXP_PER_LEVEL = 100;
 const MAX_LEVEL = 20;
 const MAX_GROWTH = (MAX_LEVEL - 1) * EXP_PER_LEVEL;
@@ -58,17 +60,83 @@ const PET_CATALOG = {
     id: 1,
     name: 'Sprig',
     phases: {
-      1: { kind: 'img', src: 'assets/pet1-1.png' },
+      1: { kind: 'img', src: 'assets/pet1-1.png', wobble: true },
       2: { kind: 'img', src: 'assets/pet1-2.gif' },
       3: { kind: 'video', src: 'assets/pet1-3.webm' },
     },
   },
 };
 
-const PET_PREVIEW_OVERRIDE = {
-  // Sidebar preview prefers static adult images.
-  1: { 3: 'assets/pet1-3.png' },
-};
+const PET_PREVIEW_OVERRIDE = {};
+
+function loadPetBootSnapshot() {
+  try {
+    const raw = localStorage.getItem(PET_BOOT_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const petId = Number(data?.petId);
+    const growth = Number(data?.growth);
+    if (!Number.isFinite(petId) || !PET_CATALOG[petId]) return null;
+    let mediaSrc = typeof data?.mediaSrc === 'string' ? data.mediaSrc : null;
+    let mediaKind = data?.mediaKind === 'video' ? 'video' : 'img';
+
+    // Legacy migration: if cache still points to gif, normalize back to webm.
+    if (typeof mediaSrc === 'string' && /pet1-3\.gif$/i.test(mediaSrc)) {
+      mediaSrc = mediaSrc.replace(/pet1-3\.gif$/i, 'pet1-3.webm');
+      mediaKind = 'video';
+    }
+
+    return {
+      petId,
+      growth: Number.isFinite(growth) ? Math.max(0, growth) : 0,
+      previewSrc: typeof data?.previewSrc === 'string' ? data.previewSrc : null,
+      mediaSrc,
+      mediaKind,
+      phase: Number(data?.phase) || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePetBootSnapshot(snapshot) {
+  try {
+    localStorage.setItem(PET_BOOT_CACHE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+function resolvePetCfg(petId, phase) {
+  const pet = PET_CATALOG[petId] || PET_CATALOG[3];
+  return pet?.phases?.[phase] || pet?.phases?.[1] || null;
+}
+
+function getSidebarPreviewSrc(petId, phase) {
+  const pet = PET_CATALOG[petId] || PET_CATALOG[3];
+  const override = PET_PREVIEW_OVERRIDE?.[pet?.id]?.[phase] || null;
+  const cfg = resolvePetCfg(petId, phase);
+  if (override) return override;
+  if (cfg?.kind === 'img' && cfg?.src) return cfg.src;
+  if (cfg?.kind === 'video' && typeof cfg.src === 'string' && cfg.src.toLowerCase().endsWith('.webm')) {
+    return cfg.src.replace(/\.webm$/i, '.png');
+  }
+  return 'assets/pet.png';
+}
+
+function persistPetBootFromState(petId, growth) {
+  const safeGrowth = Math.max(0, Number(growth) || 0);
+  const phase = getPetPhaseFromGrowth(safeGrowth);
+  const cfg = resolvePetCfg(petId, phase);
+  savePetBootSnapshot({
+    petId,
+    growth: safeGrowth,
+    phase,
+    previewSrc: getSidebarPreviewSrc(petId, phase),
+    mediaSrc: cfg?.src || null,
+    mediaKind: cfg?.kind === 'video' ? 'video' : 'img',
+  });
+}
 
 const PET_SPEECH = {
   egg: [
@@ -86,32 +154,32 @@ const PET_SPEECH = {
     '🥚💤',
   ],
   juvenile: [
-    'Hi!',
-    "I'm here!",
-    'There you are!',
-    'I missed you!',
-    'Look! Me!',
-    'Pet me?',
-    'Boop!',
-    'Hehe.',
-    'Yay!',
-    'Wiggle wiggle.',
-    'I like you.',
-    "You're my favorite.",
-    'Stay with me!',
-    'We hang out?',
-    "I'm comfy.",
-    'Ooh!',
-    'Snack time?',
-    "I'm bouncy today!",
-    'I brought good vibes.',
-    "I'll just chill here.",
-    'You do your thing.',
-    "I'm not going anywhere.",
-    'Tiny happy dance!',
-    'Squeak!',
-    'Bestie!',
-    'More taps!',
+    'Hiiiii~',
+    'You came back!',
+    'Hehe, hi hi!',
+    'Play with me?',
+    'Boop me again!',
+    'Yaaay!',
+    'I did a wiggle!',
+    'Look look look!',
+    'Tiny paws ready!',
+    'Can we be besties?',
+    'I like you sooo much!',
+    'Stay here, okay?',
+    'Can I get a snackie?',
+    'Nom nom time?',
+    'Bouncy bouncy!',
+    'Eep! So happy!',
+    'More pats please!',
+    'I am a good baby!',
+    'I did my happy dance!',
+    'Squeee!',
+    'Yip yip!',
+    'You are my favorite human!',
+    'Tippy-tappy paws!',
+    'Can we cuddle?',
+    'One more boop!',
+    'Hehe~ again again!',
   ],
   adult: [
     "Hey, I'm here.",
@@ -212,6 +280,9 @@ function renderGrowthUI(els, growth) {
   const pct = level >= MAX_LEVEL ? 100 : Math.max(0, Math.min(100, Math.round((inLevel / EXP_PER_LEVEL) * 100)));
 
   els.petLevel.textContent = String(level);
+  if (els.petExpText) {
+    els.petExpText.textContent = `${inLevel} / ${EXP_PER_LEVEL} EXP`;
+  }
   els.petExpFill.style.width = `${pct}%`;
 
   if (els.petEvoHint) {
@@ -238,12 +309,13 @@ function renderPetMedia(els, petId, phase) {
 
   const pet = PET_CATALOG[petId] || PET_CATALOG[3];
   const cfg = pet?.phases?.[phase] || pet?.phases?.[1];
+  host.className = `pet-media pet-media--pet-${pet?.id || 3}-phase-${phase}`;
 
   if (!cfg) return;
 
   if (cfg.kind === 'video') {
     host.innerHTML = `
-      <video id="petVideo" class="pet-sprite pet-video" width="200" height="200" muted autoplay loop playsinline preload="auto">
+      <video id="petVideo" class="pet-sprite pet-video" muted autoplay loop playsinline preload="auto">
         <source src="${cfg.src}" type="video/webm" />
       </video>
     `.trim();
@@ -256,22 +328,56 @@ function renderPetMedia(els, petId, phase) {
 
   const extraClass = cfg.wobble ? ' is-egg' : '';
   host.innerHTML = `
-    <img id="petImage" src="${cfg.src}" alt="Pet" class="pet-sprite${extraClass}" style="width: 200px">
+    <img id="petImage" src="${cfg.src}" alt="Pet" class="pet-sprite${extraClass}">
   `.trim();
 }
 
 function renderSidebarPreview(els, petId, growth) {
-  const img = els?.sidebarPetPreview;
-  if (!img) return;
+  const cur = els?.sidebarPetPreview;
+  if (!cur) return;
 
   const phase = getPetPhaseFromGrowth(growth);
   const pet = PET_CATALOG[petId] || PET_CATALOG[3];
   const override = PET_PREVIEW_OVERRIDE?.[pet?.id]?.[phase] || null;
-  const cfg = pet?.phases?.[phase] || pet?.phases?.[1] || null;
+  const cfg = resolvePetCfg(petId, phase);
+  const parent = cur.parentElement;
+  if (!parent) return;
 
-  const src = override || (cfg?.kind === 'img' ? cfg?.src : null);
-  img.src = src || 'assets/pet.png';
-  img.alt = `${pet?.name || 'Pet'} Preview`;
+  if (!override && cfg?.kind === 'video' && cfg?.src) {
+    let videoEl = cur;
+    if (cur.tagName !== 'VIDEO') {
+      videoEl = document.createElement('video');
+      videoEl.id = 'sidebarPetPreview';
+      videoEl.className = 'sidebar-pet-preview';
+      videoEl.muted = true;
+      videoEl.autoplay = true;
+      videoEl.loop = true;
+      videoEl.playsInline = true;
+      videoEl.preload = 'auto';
+      parent.replaceChild(videoEl, cur);
+      els.sidebarPetPreview = videoEl;
+    }
+    videoEl.src = cfg.src;
+    videoEl.classList.remove('is-booting');
+    const p = videoEl.play?.();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+    return;
+  }
+
+  let imgEl = cur;
+  if (cur.tagName !== 'IMG') {
+    imgEl = document.createElement('img');
+    imgEl.id = 'sidebarPetPreview';
+    imgEl.className = 'sidebar-pet-preview';
+    imgEl.loading = 'lazy';
+    parent.replaceChild(imgEl, cur);
+    els.sidebarPetPreview = imgEl;
+  }
+
+  const src = getSidebarPreviewSrc(petId, phase);
+  imgEl.src = src || 'assets/pet.png';
+  imgEl.alt = `${pet?.name || 'Pet'} Preview`;
+  imgEl.classList.remove('is-booting');
 }
 
 function pickRandom(list) {
@@ -329,14 +435,30 @@ export function mountPet(els) {
   let currentPetId = 3;
   let currentGrowth = 0;
   let currentPhase = null;
+  let renderedPetId = null;
   let lastPetClickSpeakAt = 0;
+
+  const boot = loadPetBootSnapshot();
+  const hasBootSnapshot = !!boot;
+  if (boot) {
+    currentPetId = boot.petId;
+    currentGrowth = Math.min(MAX_GROWTH, Math.max(0, Number(boot.growth) || 0));
+    currentPhase = getPetPhaseFromGrowth(currentGrowth);
+    renderGrowthUI(els, currentGrowth);
+    renderPetMedia(els, currentPetId, currentPhase);
+    renderedPetId = currentPetId;
+    renderSidebarPreview(els, currentPetId, currentGrowth);
+  }
 
   function refreshMedia() {
     const phase = getPetPhaseFromGrowth(currentGrowth);
-    if (phase === currentPhase) return;
-    currentPhase = phase;
-    renderPetMedia(els, currentPetId, phase);
+    if (phase !== currentPhase || renderedPetId !== currentPetId) {
+      currentPhase = phase;
+      renderPetMedia(els, currentPetId, phase);
+      renderedPetId = currentPetId;
+    }
     renderSidebarPreview(els, currentPetId, currentGrowth);
+    persistPetBootFromState(currentPetId, currentGrowth);
   }
 
   async function loadActivePetAndGrowth() {
@@ -348,22 +470,26 @@ export function mountPet(els) {
       currentPetId = 3;
     }
 
-    // Default to phase-1 visuals immediately; update once growth loads.
-    currentGrowth = 0;
-    currentPhase = null;
-    renderGrowthUI(els, currentGrowth);
-    renderPetMedia(els, currentPetId, 1);
-    renderSidebarPreview(els, currentPetId, currentGrowth);
+    if (!hasBootSnapshot && currentPhase == null) {
+      // No boot snapshot available: render a safe default first.
+      currentGrowth = 0;
+      currentPhase = null;
+      renderGrowthUI(els, currentGrowth);
+      renderPetMedia(els, currentPetId, 1);
+      renderSidebarPreview(els, currentPetId, currentGrowth);
+    }
 
     try {
       const growth = await getPetGrowth(currentPetId);
       currentGrowth = Math.min(MAX_GROWTH, Math.max(0, Number(growth) || 0));
       renderGrowthUI(els, currentGrowth);
+      persistPetBootFromState(currentPetId, currentGrowth);
       refreshMedia();
     } catch (e) {
       console.warn('[Pet] Failed to load growth:', e);
       currentGrowth = 0;
       renderGrowthUI(els, currentGrowth);
+      persistPetBootFromState(currentPetId, currentGrowth);
       refreshMedia();
     }
   }
@@ -372,8 +498,9 @@ export function mountPet(els) {
 
   onPetsChanged((st) => {
     const next = Number(st?.activePetId);
-    if (!next || next === currentPetId) return;
-    currentPetId = next;
+    if (next) {
+      currentPetId = next;
+    }
     loadActivePetAndGrowth();
   });
 
@@ -381,6 +508,8 @@ export function mountPet(els) {
     const now = Date.now();
     if (now - lastPetClickSpeakAt < 1000) return; // at most one response per second
     lastPetClickSpeakAt = now;
+
+    reportAchievementIncrement('pet_interactions_total', 1);
 
     const phase = getPetPhaseFromGrowth(currentGrowth);
     const key = phase === 1 ? 'egg' : phase === 2 ? 'juvenile' : 'adult';
@@ -406,6 +535,7 @@ export function mountPet(els) {
 
       await consumeInventoryItem(best.id, 1);
       const growth = await addPetGrowth(currentPetId, best.exp);
+      reportAchievementIncrement('pet_feeds_total', 1);
       currentGrowth = Math.min(MAX_GROWTH, Math.max(0, Number(growth) || 0));
       renderGrowthUI(els, currentGrowth);
       refreshMedia();

@@ -155,14 +155,16 @@ public class FoodGachaService : IFoodGachaService
         var drawn = PickByRarityWeighted(pool);
 
         // 4) Inventory upsert
-        var itemId = $"food:{drawn.FoodId}";
+        var itemId = drawn.FoodId;
         var inv = _dataService.GetInventory();
         var before = inv.TryGetValue(itemId, out var c) ? c : 0;
+        var amount = RollFoodAmount(drawn);
 
-        _dataService.AddInventoryItem(itemId, 1);
+        _dataService.AddInventoryItem(itemId, amount);
 
         // 5) Achievements
         _achievementService.IncrementCounter("food_draws_total", 1);
+        _achievementService.IncrementCounter("gacha_draws_total", 1);
 
         var isNew = before == 0;
 
@@ -173,7 +175,8 @@ public class FoodGachaService : IFoodGachaService
                 Rarity: drawn.Rarity,
                 ExpValue: drawn.ExpValue,
                 ImageKey: drawn.ImageKey,
-                IsNew: isNew
+                IsNew: isNew,
+                Amount: amount
             ),
             NewCredits: newCredits
         );
@@ -230,6 +233,12 @@ public class FoodGachaService : IFoodGachaService
 private static bool IsEpic(FoodDefinition f)
     => NormalizeRarity(f.Rarity) == "epic";
 
+private static int RollFoodAmount(FoodDefinition food)
+{
+    if (!IsEpic(food)) return 1;
+    return 1;
+}
+
 
 public async Task<FoodDraw10ResultDto> DrawTenAsync(string userId, int cost)
 {
@@ -273,12 +282,13 @@ public async Task<FoodDraw10ResultDto> DrawTenAsync(string userId, int cost)
 
     foreach (var drawn in planned)
     {
-        var itemId = $"food:{drawn.FoodId}";
+        var itemId = drawn.FoodId;
         var before = invSnapshot.TryGetValue(itemId, out var c) ? c : 0;
+        var amount = RollFoodAmount(drawn);
 
-        _dataService.AddInventoryItem(itemId, 1);
+        _dataService.AddInventoryItem(itemId, amount);
 
-        invSnapshot[itemId] = before + 1;
+        invSnapshot[itemId] = before + amount;
 
         items.Add(new DrawnFoodDto(
             FoodId: drawn.FoodId,
@@ -286,12 +296,14 @@ public async Task<FoodDraw10ResultDto> DrawTenAsync(string userId, int cost)
             Rarity: drawn.Rarity,
             ExpValue: drawn.ExpValue,
             ImageKey: drawn.ImageKey,
-            IsNew: before == 0
+            IsNew: before == 0,
+            Amount: amount
         ));
     }
 
     // Achievements: count 10 food draws
     _achievementService.IncrementCounter("food_draws_total", 10);
+    _achievementService.IncrementCounter("gacha_draws_total", 10);
 
     return new FoodDraw10ResultDto(
         Items: items,

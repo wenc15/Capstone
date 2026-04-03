@@ -305,6 +305,13 @@ public class LocalDataService
                 SaveUserProfile(profile);
             }
 
+            var changed = NormalizeInventoryKeys(profile.Inventory, out var normalized);
+            if (changed)
+            {
+                profile.Inventory = normalized;
+                SaveUserProfile(profile);
+            }
+
             return new Dictionary<string, int>(profile.Inventory, StringComparer.OrdinalIgnoreCase);
         }
     }
@@ -315,7 +322,8 @@ public class LocalDataService
     /// </summary>
     public int AddInventoryItem(string itemId, int amount)
     {
-        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        var normalizedItemId = NormalizeInventoryItemId(itemId);
+        if (string.IsNullOrWhiteSpace(normalizedItemId) || amount <= 0)
         {
             return 0;
         }
@@ -328,7 +336,13 @@ public class LocalDataService
                 profile.Inventory = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             }
 
-            profile.Inventory.TryGetValue(itemId, out var current);
+            var changed = NormalizeInventoryKeys(profile.Inventory, out var normalized);
+            if (changed)
+            {
+                profile.Inventory = normalized;
+            }
+
+            profile.Inventory.TryGetValue(normalizedItemId, out var current);
             if (current < 0)
             {
                 current = 0;
@@ -339,7 +353,7 @@ public class LocalDataService
                 current += amount;
             }
 
-            profile.Inventory[itemId] = current;
+            profile.Inventory[normalizedItemId] = current;
             SaveUserProfile(profile);
             return current;
         }
@@ -352,6 +366,7 @@ public class LocalDataService
     /// </summary>
     public bool TryConsumeInventoryItem(string itemId, int amount, out int newCount)
     {
+        var normalizedItemId = NormalizeInventoryItemId(itemId);
         lock (_fileLock)
         {
             var profile = GetUserProfile();
@@ -360,24 +375,85 @@ public class LocalDataService
                 profile.Inventory = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             }
 
-            profile.Inventory.TryGetValue(itemId, out var current);
+            var changed = NormalizeInventoryKeys(profile.Inventory, out var normalized);
+            if (changed)
+            {
+                profile.Inventory = normalized;
+            }
+
+            profile.Inventory.TryGetValue(normalizedItemId, out var current);
             if (current < 0)
             {
                 current = 0;
             }
 
-            if (string.IsNullOrWhiteSpace(itemId) || amount <= 0 || current < amount)
+            if (string.IsNullOrWhiteSpace(normalizedItemId) || amount <= 0 || current < amount)
             {
                 newCount = current;
                 return false;
             }
 
-            profile.Inventory[itemId] = current - amount;
+            profile.Inventory[normalizedItemId] = current - amount;
             SaveUserProfile(profile);
 
-            newCount = profile.Inventory[itemId];
+            newCount = profile.Inventory[normalizedItemId];
             return true;
         }
+    }
+
+    private static string NormalizeInventoryItemId(string? itemId)
+    {
+        var raw = itemId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+
+        const string foodPrefix = "food:";
+        if (raw.StartsWith(foodPrefix, StringComparison.OrdinalIgnoreCase) && raw.Length > foodPrefix.Length)
+        {
+            return raw.Substring(foodPrefix.Length).Trim();
+        }
+
+        return raw;
+    }
+
+    private static bool NormalizeInventoryKeys(
+        Dictionary<string, int> source,
+        out Dictionary<string, int> normalized)
+    {
+        normalized = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+
+        foreach (var kv in source)
+        {
+            var key = NormalizeInventoryItemId(kv.Key);
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                changed = true;
+                continue;
+            }
+
+            var count = Math.Max(0, kv.Value);
+            if (!string.Equals(key, kv.Key, StringComparison.OrdinalIgnoreCase) || count != kv.Value)
+            {
+                changed = true;
+            }
+
+            if (normalized.TryGetValue(key, out var existing))
+            {
+                normalized[key] = checked(existing + count);
+                changed = true;
+            }
+            else
+            {
+                normalized[key] = count;
+            }
+        }
+
+        if (!changed && normalized.Count != source.Count)
+        {
+            changed = true;
+        }
+
+        return changed;
     }
 
     /// <summary>
@@ -726,6 +802,10 @@ public class LocalDataService
                     .OrderByDescending(id => id)
                     .ToList();
             }
+
+            // 规则：购买宠物蛋（包含重复购买）都会将该宠物成长值重置为 0。
+            EnsurePetGrowthList(profile, petId);
+            profile.PetGrowth[petId] = 0;
 
             SaveUserProfile(profile);
             state = BuildPetState(profile);

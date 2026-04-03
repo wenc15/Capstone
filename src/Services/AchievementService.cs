@@ -106,10 +106,21 @@ public class AchievementService
 
         var maxPetLevel = ComputeMaxPetLevel(profile.PetGrowth);
         var bestFocusStreakDays = ComputeBestFocusStreakDays();
+        var ownedSkinCount = ComputeOwnedSkinCount(profile);
+        var longFocusSessionsCount = ComputeLongFocusSessionsCount();
+        var nightFocusSessionsCount = ComputeNightFocusSessionsCount();
 
         foreach (var def in defs)
         {
-            var progress = GetProgressFor(def.Type, profile, maxPetLevel, bestFocusStreakDays);
+            var progress = GetProgressFor(
+                def.Type,
+                profile,
+                maxPetLevel,
+                bestFocusStreakDays,
+                ownedSkinCount,
+                longFocusSessionsCount,
+                nightFocusSessionsCount
+            );
 
             if (progress >= def.Target)
             {
@@ -131,7 +142,15 @@ public class AchievementService
         // Build response
         return defs.Select(def =>
         {
-            var progress = GetProgressFor(def.Type, profile, maxPetLevel, bestFocusStreakDays);
+            var progress = GetProgressFor(
+                def.Type,
+                profile,
+                maxPetLevel,
+                bestFocusStreakDays,
+                ownedSkinCount,
+                longFocusSessionsCount,
+                nightFocusSessionsCount
+            );
             var unlocked = profile.UnlockedAchievements.Contains(def.Id);
             profile.AchievementUnlockedAt.TryGetValue(def.Id, out var unlockedAt);
 
@@ -149,7 +168,14 @@ public class AchievementService
         }).ToList();
     }
 
-    private int GetProgressFor(string type, UserProfile profile, int maxPetLevel, int bestFocusStreakDays)
+    private int GetProgressFor(
+        string type,
+        UserProfile profile,
+        int maxPetLevel,
+        int bestFocusStreakDays,
+        int ownedSkinCount,
+        int longFocusSessionsCount,
+        int nightFocusSessionsCount)
     {
         // Computed-from-profile types (no extra counters required)
         if (type.Equals("total_sessions", StringComparison.OrdinalIgnoreCase))
@@ -170,6 +196,15 @@ public class AchievementService
 
         if (type.Equals("pet_any_max_level", StringComparison.OrdinalIgnoreCase))
             return maxPetLevel >= PetMaxLevel ? 1 : 0;
+
+        if (type.Equals("skins_owned_total", StringComparison.OrdinalIgnoreCase))
+            return ownedSkinCount;
+
+        if (type.Equals("focus_long_60plus_sessions", StringComparison.OrdinalIgnoreCase))
+            return longFocusSessionsCount;
+
+        if (type.Equals("focus_night_sessions", StringComparison.OrdinalIgnoreCase))
+            return nightFocusSessionsCount;
 
         // Focus streak (computed from session history)
         if (type.Equals("focus_best_streak_days", StringComparison.OrdinalIgnoreCase))
@@ -258,6 +293,56 @@ public class AchievementService
         return null;
     }
 
+    private static int ComputeOwnedSkinCount(UserProfile profile)
+    {
+        if (profile?.Collection == null || profile.Collection.Count == 0)
+            return 0;
+
+        return profile.Collection.Count(kv => kv.Value > 0 && !string.IsNullOrWhiteSpace(kv.Key));
+    }
+
+    private int ComputeLongFocusSessionsCount()
+    {
+        try
+        {
+            var list = _dataService.GetSessionHistory();
+            if (list == null || list.Count == 0) return 0;
+
+            return list.Count(x =>
+                string.Equals(x?.Outcome, "success", StringComparison.OrdinalIgnoreCase)
+                && (x?.Minutes ?? 0) >= 60);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private int ComputeNightFocusSessionsCount()
+    {
+        try
+        {
+            var list = _dataService.GetSessionHistory();
+            if (list == null || list.Count == 0) return 0;
+
+            return list.Count(x =>
+            {
+                if (!string.Equals(x?.Outcome, "success", StringComparison.OrdinalIgnoreCase)) return false;
+
+                var ts = x?.Ts ?? 0;
+                if (ts <= 0) return false;
+
+                var local = DateTimeOffset.FromUnixTimeMilliseconds(ts).ToLocalTime();
+                var hour = local.Hour;
+                return hour >= 18 || hour <= 4;
+            });
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     // Event hooks for later steps:
     public void IncrementCounter(string type, int delta = 1)
     {
@@ -267,6 +352,18 @@ public class AchievementService
         profile.AchievementCounters.TryGetValue(type, out var current);
         profile.AchievementCounters[type] = checked(current + delta);
 
+        _dataService.SaveUserProfilePublic(profile);
+    }
+
+    public void SetCounterMax(string type, int value)
+    {
+        if (string.IsNullOrWhiteSpace(type) || value < 0) return;
+
+        var profile = _dataService.GetUserProfile();
+        profile.AchievementCounters.TryGetValue(type, out var current);
+        if (value <= current) return;
+
+        profile.AchievementCounters[type] = value;
         _dataService.SaveUserProfilePublic(profile);
     }
 }

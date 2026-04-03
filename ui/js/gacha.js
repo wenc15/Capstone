@@ -15,6 +15,7 @@
 
 import { refreshCredits, subscribeCredits } from './creditsStore.js';
 import { showToast } from './utils.js';
+import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './overlay_motion.js';
 
 const API_BASE = 'http://localhost:5024';
 const DRAW_COST = 5;
@@ -25,7 +26,7 @@ const POOLS = [
     key: 'food',
     title: 'Feed Your Goals',
     poolName: 'Food Pool',
-    subtitle: 'Pet foods',
+    subtitle: 'Stock up on pet food and keep your companion happily fed.',
     featured: 'Adv. Food',
     tenSubText: 'adv. food guaranteed',
     apiType: 'food',
@@ -34,13 +35,13 @@ const POOLS = [
       { label: 'Rare Food', value: '25%' },
       { label: 'Adv. Food (Epic)', value: '5%' },
     ],
-    tenDrawNote: '10x: at least one Epic food guaranteed.',
+    tenDrawNote: '10x: at least one Epic food guaranteed. Epic gives Adv. Food x1.',
   },
   {
     key: 'snake',
-    title: 'Snake Skins',
+    title: 'Slither in Style',
     poolName: 'Snake Skin Pool',
-    subtitle: 'Draw cosmetic skins for Snake minigame.',
+    subtitle: 'Unlock playful snake looks and make every run feel fresh.',
     featured: 'Snake skin',
     tenSubText: 'snake skin guaranteed',
     apiType: 'skin',
@@ -50,13 +51,13 @@ const POOLS = [
       { label: 'Rare', value: '25%' },
       { label: 'Snake skin (Epic)', value: '5%' },
     ],
-    tenDrawNote: '10x: guaranteed epic snake skin in this pool.',
+    tenDrawNote: '10x: guaranteed epic snake skin in this pool. Duplicate skin converts to Adv. Food x1.',
   },
   {
     key: 'tetris',
-    title: 'Tetris Skins',
+    title: 'Block Party Closet',
     poolName: 'Tetris Skin Pool',
-    subtitle: 'Draw cosmetic skins for Tetris minigame.',
+    subtitle: 'Collect juicy block skins and stack with personality.',
     featured: 'Tetris skin',
     tenSubText: 'tetris skin guaranteed',
     apiType: 'skin',
@@ -66,13 +67,13 @@ const POOLS = [
       { label: 'Rare', value: '25%' },
       { label: 'Tetris skin (Epic)', value: '5%' },
     ],
-    tenDrawNote: '10x: guaranteed epic tetris skin in this pool.',
+    tenDrawNote: '10x: guaranteed epic tetris skin in this pool. Duplicate skin converts to Adv. Food x1.',
   },
   {
     key: 'dicebuild',
-    title: 'Growin Town Skins',
+    title: 'Town Glow Studio',
     poolName: 'Growin Town Skin Pool',
-    subtitle: 'Draw cosmetic skins for Growin Town minigame.',
+    subtitle: 'Dress up Growin Town with cozy board styles and charm.',
     featured: 'Growin Town skin',
     tenSubText: 'growin town skin guaranteed',
     apiType: 'skin',
@@ -82,7 +83,7 @@ const POOLS = [
       { label: 'Rare', value: '25%' },
       { label: 'Growin Town skin (Epic)', value: '5%' },
     ],
-    tenDrawNote: '10x: guaranteed epic Growin Town skin in this pool.',
+    tenDrawNote: '10x: guaranteed epic Growin Town skin in this pool. Duplicate skin converts to Adv. Food x1.',
   },
 ];
 
@@ -281,17 +282,18 @@ export function mountGacha(els) {
       applyResultsToCards(panel.gridEl, items);
       lastDrawEl.textContent = formatLastDraw(items);
 
+      const convertedDuplicateSkinCount = await handleDuplicateSkinCompensation(items);
+
       panel.metaEl.textContent = count === 1 ? 'Single draw ready to reveal.' : `${items.length} results ready to reveal.`;
       await revealCardsSequentially(panel.gridEl, panel.metaEl, items);
 
-      const convertedDuplicateSkinCount = await handleDuplicateSkinCompensation(items);
       await refreshCredits();
 
       const rewardText = formatRewardSummary(items);
       panel.metaEl.textContent = `Draw complete. ${rewardText}${guaranteeApplied ? ' Guarantee triggered.' : ''}`;
       showToast(toastEl, rewardText);
       if (convertedDuplicateSkinCount > 0) {
-        const bonus = convertedDuplicateSkinCount * 5;
+        const bonus = convertedDuplicateSkinCount;
         showToast(toastEl, `Duplicate skin converted: +${bonus} Adv. Food`);
       }
       scheduleAutoFade(panel.root);
@@ -321,11 +323,11 @@ export function mountGacha(els) {
 
   infoBtn.addEventListener('click', () => {
     syncInfoModal();
-    info.root.classList.add('open');
+    openOverlayWithMotion(info.root, { openDurationMs: CLEANUP_MS });
   });
-  info.closeBtn.addEventListener('click', () => info.root.classList.remove('open'));
+  info.closeBtn.addEventListener('click', () => closeOverlayWithMotion(info.root, { closeDurationMs: CLEANUP_MS }));
   info.root.addEventListener('click', (ev) => {
-    if (ev.target === info.root) info.root.classList.remove('open');
+    if (ev.target === info.root) closeOverlayWithMotion(info.root, { closeDurationMs: CLEANUP_MS });
   });
 
   panel.skipBtn.addEventListener('click', () => {
@@ -369,7 +371,7 @@ function buildResultPanel() {
 
 function buildInfoModal() {
   const root = document.createElement('section');
-  root.className = 'gacha-info-modal';
+  root.className = 'gacha-info-modal mg-hidden';
   root.innerHTML = `
     <article class="gacha-info-card" role="dialog" aria-modal="true" aria-label="Pool information">
       <div class="gacha-info-head">
@@ -446,13 +448,17 @@ function normalizeFoodItem(item) {
   if (!item) return null;
   const rarity = formatRarity(item.rarity || item.Rarity || 'Common');
   const itemId = item.foodId || item.FoodId || item.itemId || item.ItemId || '';
+  const amountRaw = Number(item.amount ?? item.Amount ?? 1);
+  const amount = Number.isFinite(amountRaw) ? Math.max(1, Math.round(amountRaw)) : 1;
+  const baseName = item.name || item.Name || itemId || 'Food';
   return {
     itemId,
-    name: item.name || item.Name || itemId || 'Food',
+    name: baseName,
     rarity,
     kind: 'Food',
     icon: FOOD_ICON_BY_ID[itemId] || fallbackIcon(rarity),
     rarityKey: getRarityKey(rarity),
+    amount,
   };
 }
 
@@ -478,19 +484,17 @@ async function handleDuplicateSkinCompensation(items) {
 
   let converted = 0;
   for (const skin of skins) {
+    if (skin.isNew !== false) continue;
     try {
-      const acquire = await requestJson('/api/collection/acquire', {
+      await requestJson('/api/inventory/add', {
         method: 'POST',
-        body: JSON.stringify({ itemId: skin.itemId }),
+        body: JSON.stringify({ itemId: 'adv_food', amount: 1 }),
       });
-      const message = String(acquire?.message || acquire?.Message || '').trim().toLowerCase();
-      if (message === 'already owned' && skin.isNew === false) {
-        await requestJson('/api/inventory/add', {
-          method: 'POST',
-          body: JSON.stringify({ itemId: 'adv_food', amount: 5 }),
-        });
-        converted += 1;
-      }
+      skin.compensationAmount = 1;
+      skin.compensationItemId = 'adv_food';
+      skin.compensationName = 'Adv. Food';
+      skin.compensationIcon = FOOD_ICON_BY_ID.adv_food || '🐟';
+      converted += 1;
     } catch (error) {
       console.warn('[Gacha] duplicate skin compensation failed:', error);
     }
@@ -550,17 +554,18 @@ function renderCards(gridEl, items, isTenDraw) {
   gridEl.innerHTML = '';
 
   items.forEach((item, idx) => {
+    const shown = toDisplayedRewardItem(item);
     const card = document.createElement('article');
     card.className = 'gacha-flip-card';
-    card.setAttribute('data-rarity', item.rarityKey);
+    card.setAttribute('data-rarity', shown.rarityKey);
     card.setAttribute('data-index', String(idx));
     card.innerHTML = `
       <div class="gacha-flip-inner">
         <div class="gacha-face gacha-face-back">?</div>
         <div class="gacha-face gacha-face-front">
-          <div class="gacha-item-icon">${item.icon}</div>
-          <div class="gacha-item-name">${item.name}</div>
-          <div class="gacha-item-meta">${item.rarity} · ${item.kind}</div>
+          <div class="gacha-item-icon">${shown.icon}</div>
+          <div class="gacha-item-name">${shown.amount > 1 ? `${shown.name} x${shown.amount}` : shown.name}</div>
+          <div class="gacha-item-meta">${shown.rarity} · ${shown.kind}</div>
         </div>
       </div>
     `;
@@ -604,16 +609,29 @@ function applyResultsToCards(gridEl, items) {
   cards.forEach((card, idx) => {
     const item = items[idx];
     if (!item) return;
-    card.setAttribute('data-rarity', item.rarityKey);
+    const shown = toDisplayedRewardItem(item);
+    card.setAttribute('data-rarity', shown.rarityKey);
 
     const iconEl = card.querySelector('.gacha-item-icon');
     const nameEl = card.querySelector('.gacha-item-name');
     const metaEl = card.querySelector('.gacha-item-meta');
 
-    if (iconEl) iconEl.textContent = item.icon;
-    if (nameEl) nameEl.textContent = item.name;
-    if (metaEl) metaEl.textContent = `${item.rarity} · ${item.kind}`;
+    if (iconEl) iconEl.textContent = shown.icon;
+    if (nameEl) nameEl.textContent = shown.amount > 1 ? `${shown.name} x${shown.amount}` : shown.name;
+    if (metaEl) metaEl.textContent = `${shown.rarity} · ${shown.kind}`;
   });
+}
+
+function applyCompensationToCard(card, item) {
+  if (!card || !item || !(item.compensationAmount > 0)) return;
+  const iconEl = card.querySelector('.gacha-item-icon');
+  const nameEl = card.querySelector('.gacha-item-name');
+  const metaEl = card.querySelector('.gacha-item-meta');
+  card.classList.remove('is-compensating-out', 'is-compensating-in', 'is-compensated');
+
+  if (iconEl) iconEl.textContent = item.compensationIcon || '🐟';
+  if (nameEl) nameEl.textContent = `${item.compensationName || 'Adv. Food'} x${item.compensationAmount}`;
+  if (metaEl) metaEl.textContent = 'Compensation · Food';
 }
 
 async function revealCardsSequentially(gridEl, metaEl, items) {
@@ -624,27 +642,59 @@ async function revealCardsSequentially(gridEl, metaEl, items) {
     card.classList.add('is-dealt');
     if (skipRequested) {
       cards.forEach((c) => c.classList.add('is-dealt', 'is-flipped'));
+      cards.forEach((c, idx) => applyCompensationToCard(c, items[idx]));
       metaEl.textContent = 'Animation skipped. All cards revealed.';
       break;
     }
     await sleep(130);
     card.classList.add('is-flipped');
-    metaEl.textContent = `Revealed ${i + 1}/${items.length}: ${items[i].name}`;
-    await sleep(120);
+    const revealed = items[i];
+    const shown = toDisplayedRewardItem(revealed);
+    const revealName = (shown?.amount > 1) ? `${shown.name} x${shown.amount}` : shown?.name;
+    metaEl.textContent = `Revealed ${i + 1}/${items.length}: ${revealName}`;
+    await sleep(140);
   }
 }
 
 function formatRewardSummary(items) {
   const counts = items.reduce((acc, item) => {
-    acc[item.name] = (acc[item.name] || 0) + 1;
+    const shown = toDisplayedRewardItem(item);
+    const amount = Math.max(1, Number(shown?.amount || 1));
+    const name = shown?.name || 'Reward';
+    acc[name] = (acc[name] || 0) + amount;
     return acc;
   }, {});
   return Object.entries(counts).map(([n, c]) => `${n} x${c}`).join(', ');
 }
 
 function formatLastDraw(items) {
-  if (items.length === 1) return `${items[0].name} · ${items[0].rarity} · ${items[0].kind}`;
+  if (items.length === 1) {
+    const shown = toDisplayedRewardItem(items[0]);
+    const amount = Math.max(1, Number(shown?.amount || 1));
+    const name = amount > 1 ? `${shown.name} x${amount}` : shown.name;
+    return `${name} · ${shown.rarity} · ${shown.kind}`;
+  }
   return formatRewardSummary(items);
+}
+
+function toDisplayedRewardItem(item) {
+  if (!item) return null;
+  if (item.compensationAmount > 0) {
+    return {
+      ...item,
+      itemId: item.compensationItemId || 'adv_food',
+      name: item.compensationName || 'Adv. Food',
+      kind: 'Food',
+      rarity: 'Epic',
+      rarityKey: 'epic',
+      amount: Math.max(1, Number(item.compensationAmount) || 1),
+      icon: item.compensationIcon || FOOD_ICON_BY_ID.adv_food || '🐟',
+    };
+  }
+  return {
+    ...item,
+    amount: Math.max(1, Number(item.amount || 1)),
+  };
 }
 
 function sleep(ms) {

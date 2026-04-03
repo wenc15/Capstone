@@ -19,6 +19,7 @@
 
 import { showToast } from './utils.js';
 import { LOCAL_STORAGE_KEYS, clearKnownLocalStorage } from './local_storage.js';
+import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './overlay_motion.js';
 
 const API_BASE = 'http://localhost:5024';
 const APP_SETTINGS_LOCAL_KEY = LOCAL_STORAGE_KEYS.appSettings;
@@ -46,14 +47,6 @@ function loadMusicVolume01() {
   }
 }
 
-function saveMusicVolume01(v) {
-  try {
-    localStorage.setItem(MUSIC_VOLUME_LOCAL_KEY, String(clampMusicVolume01(v)));
-  } catch {
-    // ignore local storage failures
-  }
-}
-
 function loadMusicAutoplayOnFocus() {
   try {
     const raw = localStorage.getItem(MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY);
@@ -70,12 +63,6 @@ function saveMusicAutoplayOnFocus(enabled) {
   } catch {
     // ignore local storage failures
   }
-}
-
-function updateMusicVolumeLabel(els, volume01) {
-  if (!els?.settingMusicVolumeValue) return;
-  const pct = Math.round(clampMusicVolume01(volume01) * 100);
-  els.settingMusicVolumeValue.textContent = `${pct}%`;
 }
 
 function emitMusicVolume(volume01) {
@@ -117,14 +104,12 @@ async function parseJsonSafe(res) {
 
 function closeSettings(els) {
   if (!els?.settingsOverlay) return;
-  els.settingsOverlay.classList.remove('open');
-  els.settingsOverlay.setAttribute('aria-hidden', 'true');
+  closeOverlayWithMotion(els.settingsOverlay, { closeDurationMs: CLEANUP_MS });
 }
 
 function openSettings(els) {
   if (!els?.settingsOverlay) return;
-  els.settingsOverlay.classList.add('open');
-  els.settingsOverlay.setAttribute('aria-hidden', 'false');
+  openOverlayWithMotion(els.settingsOverlay, { openDurationMs: CLEANUP_MS });
 }
 
 function resolveAppSettingsFromRenderer(els) {
@@ -444,6 +429,12 @@ async function cleanupUsageData(els) {
   }
   input.value = String(keepDays);
 
+  const confirmed = window.confirm(`This will permanently remove website usage records older than ${keepDays} day(s). Continue?`);
+  if (!confirmed) {
+    if (meta) meta.textContent = 'Cleanup cancelled.';
+    return;
+  }
+
   const prev = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Cleaning...';
@@ -501,8 +492,6 @@ export function mountSettings(els) {
     settingCloseBehavior,
     settingUiTone,
     settingMusicAutoPlay,
-    settingMusicVolume,
-    settingMusicVolumeValue,
     openMusicFolderBtn,
     settingsBehaviorMeta,
     archiveExportBtn,
@@ -525,13 +514,9 @@ export function mountSettings(els) {
 
   const bootMusicVol = loadMusicVolume01();
   const bootAutoPlay = loadMusicAutoplayOnFocus();
-  if (settingMusicVolume) {
-    settingMusicVolume.value = String(Math.round(bootMusicVol * 100));
-  }
   if (settingMusicAutoPlay) {
     settingMusicAutoPlay.checked = bootAutoPlay;
   }
-  updateMusicVolumeLabel(els, bootMusicVol);
   emitMusicVolume(bootMusicVol);
   emitMusicAutoplayOnFocus(bootAutoPlay);
 
@@ -545,7 +530,7 @@ export function mountSettings(els) {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && settingsOverlay.classList.contains('open')) {
+    if (e.key === 'Escape' && !settingsOverlay.classList.contains('mg-hidden')) {
       closeSettings(els);
     }
   });
@@ -625,16 +610,6 @@ export function mountSettings(els) {
       if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = enabled
         ? 'Focus auto-play music: On.'
         : 'Focus auto-play music: Off.';
-    });
-  }
-
-  if (settingMusicVolume) {
-    settingMusicVolume.addEventListener('input', () => {
-      const volume01 = clampMusicVolume01(Number(settingMusicVolume.value) / 100);
-      updateMusicVolumeLabel(els, volume01);
-      saveMusicVolume01(volume01);
-      emitMusicVolume(volume01);
-      if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = `Music volume: ${Math.round(volume01 * 100)}%`;
     });
   }
 
