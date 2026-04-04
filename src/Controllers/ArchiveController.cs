@@ -41,7 +41,6 @@ public class ArchiveController : ControllerBase
     }
 
     [HttpPost("import")]
-    [ApiExplorerSettings(IgnoreApi = true)]
     [RequestSizeLimit(5 * 1024 * 1024)]
     public async Task<ActionResult<LocalArchiveImportResult>> Import([FromForm] IFormFile file)
     {
