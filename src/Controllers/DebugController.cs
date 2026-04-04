@@ -1,5 +1,5 @@
 #if DEBUG
-// 2026/01/22 created by <your name>
+// 2026/01/22 created by ZheCheng Xu
 // =============================================================
 // 文件：DebugController.cs
 // 作用：提供开发/测试用的调试接口，不会在 Release 构建中启用。
@@ -14,7 +14,6 @@
 using Microsoft.AspNetCore.Mvc;
 using CapstoneBackend.Services;
 using CapstoneBackend.Models;
-
 namespace CapstoneBackend.Controllers;
 
 [ApiController]

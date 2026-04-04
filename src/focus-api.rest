@@ -261,3 +261,65 @@ Content-Type: application/json
 }
 
 ###
+
+### Skin Gacha API
+
+# Base route:
+# /api/gacha/skin
+
+### 单抽 / Single Draw
+POST http://localhost:5024/api/gacha/skin/draw
+Content-Type: application/json
+
+{
+  "cost": 1,
+  "pool": "tetris"
+}
+
+###
+
+### 十连抽 / Draw 10
+POST http://localhost:5024/api/gacha/skin/draw10
+Content-Type: application/json
+
+{
+  "cost": 1,
+  "pool": "tetris"
+}
+
+###
+
+### Achievements API
+
+# Base route:
+# /api/achievements
+
+### 查询所有成就 / Get All Achievements
+GET http://localhost:5024/api/achievements
+
+###
+
+### Food Gacha API
+
+# Base route:
+# /api/gacha/food
+
+### 单抽 / Single Draw
+POST http://localhost:5024/api/gacha/food/draw
+Content-Type: application/json
+
+{
+  "cost": 1
+}
+
+###
+
+### 十连抽 / Draw 10
+POST http://localhost:5024/api/gacha/food/draw10
+Content-Type: application/json
+
+{
+  "cost": 1
+}
+
+###
