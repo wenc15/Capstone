@@ -94,6 +94,7 @@ export const BASE_APP_CATALOG = [
 
 
 const CUSTOM_CATALOG_KEY = 'growin.custom_app_catalog.v1';
+const WHITELIST_SELECTION_KEY = 'growin.whitelist.selection.v1';
 let customCatalog = loadCustomCatalog();
 
 function loadCustomCatalog() {
@@ -175,6 +176,36 @@ function findAppByExe(exeName) {
 
 // 当前选中的应用，用 id 表示（例如 ["chrome", "code"]）
 let currentWhitelistApps = ['electron'];  // 默认至少包含 Electron，避免白名单为空
+const ALWAYS_ALLOWED_APP_IDS = ['electron'];
+
+function isAlwaysAllowedId(id) {
+  return ALWAYS_ALLOWED_APP_IDS.includes(String(id || '').toLowerCase());
+}
+
+function normalizeSelection(ids) {
+  const set = new Set((Array.isArray(ids) ? ids : []).filter(Boolean));
+  ALWAYS_ALLOWED_APP_IDS.forEach((id) => set.add(id));
+  return Array.from(set);
+}
+
+function loadSelection() {
+  try {
+    const raw = localStorage.getItem(WHITELIST_SELECTION_KEY);
+    const list = raw ? JSON.parse(raw) : null;
+    if (!Array.isArray(list)) return normalizeSelection(currentWhitelistApps);
+    return normalizeSelection(list.map(String));
+  } catch {
+    return normalizeSelection(currentWhitelistApps);
+  }
+}
+
+function saveSelection() {
+  try {
+    localStorage.setItem(WHITELIST_SELECTION_KEY, JSON.stringify(normalizeSelection(currentWhitelistApps)));
+  } catch {
+    // ignore
+  }
+}
 
 function findAppById(id) {
   return getCatalog().find(app => app.id === id) || null;
@@ -184,9 +215,11 @@ function searchApps(keyword) {
   const k = keyword.trim().toLowerCase();
   if (!k) return [];
   return getCatalog().filter(app =>
-    app.label.toLowerCase().includes(k) ||
-    app.id.toLowerCase().includes(k) ||
-    (app.exeList || []).some(x => x.toLowerCase().includes(k))
+    !isAlwaysAllowedId(app.id) && (
+      app.label.toLowerCase().includes(k) ||
+      app.id.toLowerCase().includes(k) ||
+      (app.exeList || []).some(x => x.toLowerCase().includes(k))
+    )
   );
 }
 
@@ -198,12 +231,14 @@ function renderSelected(rootEl) {
   const listEl = rootEl.querySelector('#wlSelectedList');
   if (!listEl) return;
 
-  if (!currentWhitelistApps.length) {
+  const visibleSelected = currentWhitelistApps.filter((id) => !isAlwaysAllowedId(id));
+
+  if (!visibleSelected.length) {
     listEl.innerHTML = '<li class="wl-selected-empty">No apps selected yet.</li>';
     return;
   }
 
-  listEl.innerHTML = currentWhitelistApps
+  listEl.innerHTML = visibleSelected
     .map(id => {
       const app = findAppById(id);
       const label = app?.label || id;
@@ -263,7 +298,7 @@ function renderResults(rootEl, keyword) {
 export function initWhitelist(groupEl) {
   if (!groupEl) {
     console.warn('[Whitelist] initWhitelist called with null element');
-    currentWhitelistApps = ['electron'];
+    currentWhitelistApps = normalizeSelection(currentWhitelistApps);
     return;
   }
 
@@ -277,6 +312,9 @@ export function initWhitelist(groupEl) {
     console.warn('[Whitelist] Missing inner elements (input/results/selected list).');
     return;
   }
+
+  currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+  currentWhitelistApps = loadSelection();
 
   // 初始渲染：默认选中 electron
   renderSelected(groupEl);
@@ -312,6 +350,8 @@ export function initWhitelist(groupEl) {
     // 2) 选中它
     if (!currentWhitelistApps.includes(appId)) {
       currentWhitelistApps.push(appId);
+      currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+      saveSelection();
       renderSelected(groupEl);
     }
 
@@ -334,6 +374,8 @@ export function initWhitelist(groupEl) {
 
     if (!currentWhitelistApps.includes(appId)) {
       currentWhitelistApps.push(appId);
+      currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+      saveSelection();
       renderSelected(groupEl);
     }
 
@@ -348,13 +390,11 @@ export function initWhitelist(groupEl) {
     if (!btn) return;
     const appId = btn.getAttribute('data-app-id');
     if (!appId) return;
+    if (isAlwaysAllowedId(appId)) return;
 
     currentWhitelistApps = currentWhitelistApps.filter(id => id !== appId);
-
-    // 安全起见：若全删光了，回到默认 electron，避免后端白名单为空
-    if (!currentWhitelistApps.length) {
-      currentWhitelistApps = ['electron'];
-    }
+    currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+    saveSelection();
 
     renderSelected(groupEl);
   });
@@ -365,6 +405,7 @@ export function initWhitelist(groupEl) {
  * @returns {string[]}
  */
 export function getAllowedProcesses() {
+  currentWhitelistApps = normalizeSelection(currentWhitelistApps);
   const exes = [];
   currentWhitelistApps.forEach(id => {
     const app = findAppById(id);
@@ -380,8 +421,9 @@ export function getAllowedProcesses() {
  * @returns {string}
  */
 export function getWhitelistNote() {
-  if (!currentWhitelistApps.length) return '';
-  const labels = currentWhitelistApps.map(id => {
+  const visibleSelected = currentWhitelistApps.filter((id) => !isAlwaysAllowedId(id));
+  if (!visibleSelected.length) return '';
+  const labels = visibleSelected.map(id => {
     const app = findAppById(id);
     return app?.label || id;
   });

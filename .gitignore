@@ -1,0 +1,17 @@
+node_modules/
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Frontend build output and local artifacts
+dist/
+out/
+*.log
+.DS_Store
+Thumbs.db
+
+# Local SQLite database files
+src/growin.db
+src/growin.db-shm
+src/growin.db-wal

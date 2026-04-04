@@ -5,11 +5,30 @@
    新增command 转发，让悬浮球从被动监听变成主动发控制命令
 */
 
+/* 2026/03/25 edited by Zhecheng Xu:
+   - Expose music command IPC bridge and track listing bridge for renderer/widget use.
+*/
+
 // preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   setIgnoreMouse: (ignore) => ipcRenderer.invoke('ball:setIgnore', ignore),
+
+  // app behavior settings
+  getAppSettings: () => ipcRenderer.invoke('appSettings:get'),
+  updateAppSettings: (patch) => ipcRenderer.invoke('appSettings:update', patch),
+  setWidgetVisible: (visible) => ipcRenderer.invoke('widget:setVisible', !!visible),
+  onAppSettingsChanged: (cb) => ipcRenderer.on('appSettings:changed', (_e, settings) => cb(settings)),
+  maximizeMainWindowForMinigame: async () => {
+    try {
+      return await ipcRenderer.invoke('main:maximizeForDicebuild');
+    } catch {
+      return false;
+    }
+  },
+  openMusicFolder: () => ipcRenderer.invoke('music:openFolder'),
+  listMusicTracks: () => ipcRenderer.invoke('music:listTracks'),
 
   // status: already have
   emitFocusStatus: (st) => ipcRenderer.send('focus:status', st),
@@ -18,4 +37,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // command:
   sendFocusCommand: (cmd) => ipcRenderer.send('focus:command', cmd), // 'start' | 'stop' | 'toggle'
   onFocusCommand: (cb) => ipcRenderer.on('focus:command', (_e, cmd) => cb(cmd)),
+
+  // music command bridge (widget -> main)
+  sendMusicCommand: (cmd) => ipcRenderer.send('music:command', cmd), // 'prev' | 'next' | 'toggle'
+  onMusicCommand: (cb) => ipcRenderer.on('music:command', (_e, cmd) => cb(cmd)),
 });

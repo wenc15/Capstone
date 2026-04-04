@@ -1,4 +1,22 @@
 
+// 2026/03/16 edited by Zikai Lu
+// 新增内容：
+//   - 更新 Session History 测试：/api/focus/history 改为 records-only 结构。
+//   - 新增 /api/focus/history/summary 按日期汇总接口测试。
+//   - 新增 /api/archive/export 与 /api/archive/import 导出/导入接口测试。
+// 新增的作用：
+//   - 便于前端联调历史明细、每日汇总、以及本地档案迁移能力。
+// =============================================================
+// 2026/03/09 edited by Zikai Lu
+// 新增内容：
+//   - 增加 Collection（收藏品）相关接口测试：查询完整列表 / 获取指定藏品。
+// 新增的作用：
+//   - 便于前端联调皮肤等收藏品的拥有状态（0/1）与获取逻辑。
+// =============================================================
+// 2026/01/27 edited by Zikai Lu
+// 修改内容：
+//   - 修改专注开始测试以便同时测试chrome extention
+// =============================================================
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 增加背包（Inventory）相关接口测试。
@@ -43,6 +61,7 @@ Content-Type: application/json
 {
   "durationSeconds": 60,
   "allowedProcesses": ["chrome.exe", "notepad.exe", "Code.exe"],
+  "allowedWebsites": ["https://leetcode.com", "github.com"],
   "graceSeconds": 10
 }
 
@@ -66,6 +85,40 @@ Content-Type: application/json
 
 ### 读取用户 Profile（包含取消会话数和点数）
 GET http://localhost:5024/api/profile
+
+###
+
+### 读取 Session History 明细（records-only，不含汇总）
+GET http://localhost:5024/api/focus/history
+
+###
+
+### 读取 Session History 按日期汇总
+GET http://localhost:5024/api/focus/history/summary
+
+###
+
+### 导出本地配置与档案（下载 JSON）
+GET http://localhost:5024/api/archive/export
+
+# 说明：VS Code REST Client 不支持通过 " >> 文件路径 " 自动保存响应。
+# 请在响应面板点击 "Save Response"，手动保存为 ./growin-archive.json，记得删掉http的header。
+
+###
+
+### 导入本地配置与档案（multipart/form-data）
+# 使用步骤：
+#   1. 先执行上面的“导出本地配置与档案”，保存为本地 json 文件；
+#   2. 把下面 < ./growin-archive.json 替换成你的实际文件路径。
+POST http://localhost:5024/api/archive/import
+Content-Type: multipart/form-data; boundary=GrowinBoundary
+
+--GrowinBoundary
+Content-Disposition: form-data; name="file"; filename="growin-archive.json"
+Content-Type: application/json
+
+< C:\Users\charl\Downloads\growin-archive.json
+--GrowinBoundary--
 
 ###
 
@@ -180,5 +233,93 @@ Content-Type: application/json
 #   - 600 秒 -> 预期 addedMinutes = 10，credits += 10
 POST http://localhost:5024/api/debug/fake-success-session?focusSeconds=600
 Content-Type: application/json
+
+###
+
+### 查询 Collection 全部藏品（预设列表 + 0/1 拥有状态）
+GET http://localhost:5024/api/collection
+
+###
+
+### 获取指定藏品（未拥有会置为 1；已拥有会返回 alreadyOwned=true）
+POST http://localhost:5024/api/collection/acquire
+Content-Type: application/json
+
+{
+  "itemId": "skin_cat_sakura"
+}
+
+###
+
+### 设置皮肤启用状态（同游戏仅可启用一个；全部关闭则走默认皮肤）
+POST http://localhost:5024/api/collection/skin/enable
+Content-Type: application/json
+
+{
+  "itemId": "skin_tetris_starlit",
+  "enable": true
+}
+
+###
+
+### Skin Gacha API
+
+# Base route:
+# /api/gacha/skin
+
+### 单抽 / Single Draw
+POST http://localhost:5024/api/gacha/skin/draw
+Content-Type: application/json
+
+{
+  "cost": 1,
+  "pool": "tetris"
+}
+
+###
+
+### 十连抽 / Draw 10
+POST http://localhost:5024/api/gacha/skin/draw10
+Content-Type: application/json
+
+{
+  "cost": 1,
+  "pool": "tetris"
+}
+
+###
+
+### Achievements API
+
+# Base route:
+# /api/achievements
+
+### 查询所有成就 / Get All Achievements
+GET http://localhost:5024/api/achievements
+
+###
+
+### Food Gacha API
+
+# Base route:
+# /api/gacha/food
+
+### 单抽 / Single Draw
+POST http://localhost:5024/api/gacha/food/draw
+Content-Type: application/json
+
+{
+  "cost": 1
+}
+
+###
+
+### 十连抽 / Draw 10
+POST http://localhost:5024/api/gacha/food/draw10
+Content-Type: application/json
+
+{
+  "cost": 1
+}
 
 ###

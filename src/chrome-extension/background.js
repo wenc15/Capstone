@@ -1,3 +1,8 @@
+// 2026/03/25 edited by Zhecheng Xu
+// Changes:
+//  - Add focus control and status message bridge for popup sync.
+//  - Keep usage tracking + backend communication flow documented.
+
 // ================================
 // Growin background script
 // ================================
@@ -73,9 +78,21 @@ async function getFocusStatus() {
 }
 
 async function startFocusSession() {
+  let durationSeconds = 25 * 60;
+  try {
+    const prefRes = await fetch(`${FOCUS_ENDPOINT}/preference`);
+    if (prefRes.ok) {
+      const pref = await prefRes.json();
+      const n = Number(pref?.preferredDurationSeconds ?? pref?.PreferredDurationSeconds);
+      if (Number.isFinite(n) && n > 0) durationSeconds = Math.round(n);
+    }
+  } catch {
+    // fallback to 25min
+  }
+
   // ⚠️ This body must match your StartFocusRequest model
   const body = {
-    durationSeconds: 25*60,          // 25 minutes default
+    durationSeconds,
     allowedProcesses: ["chrome.exe"],  // simple example, adjust for your app
     allowedWebsites: []                // optional
   };

@@ -1,0 +1,80 @@
+// 2026/03/09 created by Zikai Lu
+// 新增内容：
+//   - 新增 Collection（收藏品）系统模型与预设目录。
+//   - 定义查询返回模型、获取收藏品请求/响应模型。
+// 新增的作用：
+//   - 为“皮肤/收藏品”提供固定列表 + 0/1 拥有状态的数据结构。
+//   - 统一前后端对 Collection 接口的字段约定。
+// =============================================================
+
+// 2026/03/25 edited by JS
+// Changes:
+//   - Rename Dice & Build skin display name to Growin Town.
+
+using System.Collections.Generic;
+
+namespace CapstoneBackend.Models;
+
+public class CollectionItemDefinition
+{
+    public string ItemId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string? Rarity { get; set; }
+    public string? Category { get; set; }
+    public string? Game { get; set; }
+}
+
+public static class CollectionCatalog
+{
+    // 预设收藏品目录：可按业务继续扩展。
+    public static readonly IReadOnlyList<CollectionItemDefinition> PresetItems = new List<CollectionItemDefinition>
+    {
+        new() { ItemId = "skin_tetris_jelly", DisplayName = "Jelly Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
+        new() { ItemId = "skin_tetris_starlit", DisplayName = "Starlit Tetris Skin", Rarity = "Epic", Category = "minigame", Game = "tetris" },
+        new() { ItemId = "skin_snake_nebula", DisplayName = "Nebula Snake Skin", Rarity = "Epic", Category = "minigame", Game = "snake" },
+        new() { ItemId = "skin_dicebuild_petstand", DisplayName = "Pet Standee Growin Town Skin", Rarity = "Epic", Category = "minigame", Game = "dicebuild" },
+    };
+}
+
+public class CollectionItemStatus
+{
+    public string ItemId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string? Game { get; set; }
+    public string? Category { get; set; }
+    public string? Rarity { get; set; }
+    public int State { get; set; }
+    public bool IsEnabled { get; set; }
+}
+
+public class CollectionQueryResponse
+{
+    public List<CollectionItemStatus> Items { get; set; } = new();
+}
+
+public class CollectionAcquireRequest
+{
+    public string ItemId { get; set; } = string.Empty;
+}
+
+public class CollectionAcquireResponse
+{
+    public string ItemId { get; set; } = string.Empty;
+    public int State { get; set; }
+    public bool AlreadyOwned { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class CollectionSkinEnableRequest
+{
+    public string ItemId { get; set; } = string.Empty;
+    public bool Enable { get; set; }
+}
+
+public class CollectionSkinEnableResponse
+{
+    public string ItemId { get; set; } = string.Empty;
+    public string Game { get; set; } = string.Empty;
+    public bool Enabled { get; set; }
+    public string Message { get; set; } = string.Empty;
+}

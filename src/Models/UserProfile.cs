@@ -1,3 +1,9 @@
+// 2026/03/09 edited by Zikai Lu
+// 新增内容：
+//   - 在用户 Profile 中增加 Collection 字典（收藏品拥有状态，0/1）。
+// 新增的作用：
+//   - 为收藏系统提供本地持久化数据源，记录皮肤等收藏品的拥有状态。
+// =============================================================
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 在用户 Profile 中增加 Inventory 字典，用于存储物品及其数量。
@@ -78,4 +84,49 @@ public class UserProfile
     /// 未包含的物品视为数量 0。
     /// </summary>
     public Dictionary<string, int> Inventory { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Collection 收藏品状态字典，key 为收藏品 id，value 为 0 或 1。
+    /// - 0: 未拥有
+    /// - 1: 已拥有
+    /// </summary>
+    public Dictionary<string, int> Collection { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 各游戏当前启用的皮肤，key 为 game（如 tetris/snake），value 为 itemId。
+    /// 若某游戏无记录，则表示使用默认皮肤。
+    /// </summary>
+    public Dictionary<string, string> ActiveSkinsByGame { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 当前激活宠物 id。
+    /// </summary>
+    public int ActivePetId { get; set; } = 3;
+
+    /// <summary>
+    /// 当前喂养中的宠物 id。
+    /// </summary>
+    public int FeedingPetId { get; set; } = 3;
+
+    /// <summary>
+    /// 已解锁宠物 id 列表。
+    /// </summary>
+    public List<int> UnlockedPetIds { get; set; } = new() { 3 };
+
+    /// <summary>
+/// Achievement counters (event-style), e.g.:
+/// - "food_draws_total": 3
+/// - "credits_earned_total": 120
+/// </summary>
+public Dictionary<string, int> AchievementCounters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+/// <summary>
+/// Unlocked achievement ids, e.g. "first_focus", "first_food_draw".
+/// </summary>
+public HashSet<string> UnlockedAchievements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+/// <summary>
+/// Unlock timestamps (UTC), keyed by achievement id.
+/// </summary>
+public Dictionary<string, DateTimeOffset> AchievementUnlockedAt { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

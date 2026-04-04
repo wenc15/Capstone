@@ -10,6 +10,10 @@
 //  - Own all sidebar navigation behavior in one place.
 //  - Ensure only one main view is visible at a time and UI state stays consistent.
 //  - Trigger per-view refresh hooks (e.g., renderStats) on navigation when needed.
+//
+// 2026/03/14 edited by JS
+// Changes:
+//  - Add Achievements view navigation + onEnter hook.
 // 11.19 edited by Claire (Qinquan) Wang
 // Changes:
 //  - Keep Timer/Stats navigation logic in one place.
@@ -19,55 +23,80 @@
 
 import { renderStats } from './stats.js';
 import { onEnterGacha } from './gacha.js';
+import { onEnterAchievements } from './achievements.js';
+import { mountMinigameHub, openMinigameHub } from './minigame_hub.js';
+import { mountTetris } from './minigame_tetris.js';
+import { mountSnake } from './minigame_snake.js';
 
 export function mountNav(els) {
   const {
     navTimer,
     navStats,
+    navAchievements,
     navPet,
-    navGacha,   
+    navGacha,
+    navMinigame,
     viewTimer,
     viewStats,
+    viewAchievements,
     viewPet,
-    viewGacha,   
+    viewGacha,
+    viewMinigame,
     statsEls,
-    gachaRoot,
     chartRef
   } = els;
 
   const btnTimer = navTimer;
   const btnStats = navStats;
+  const btnAchievements = navAchievements;
   const btnPet   = navPet;
   const btnGacha = navGacha; 
+  const btnMinigame = navMinigame;
 
  // Defensive check: log exactly what's missing
-const missing = {
-  navTimer: !navTimer,
-  navStats: !navStats,
-  navPet: !navPet,
-  navGacha: !navGacha,
-  viewTimer: !viewTimer,
-  viewStats: !viewStats,
-  viewPet: !viewPet,
-  viewGacha: !viewGacha,
-};
+  const missing = {
+    navTimer: !navTimer,
+    navStats: !navStats,
+    navAchievements: !navAchievements,
+    navPet: !navPet,
+    navGacha: !navGacha,
+    navMinigame: !navMinigame,
+    viewTimer: !viewTimer,
+    viewStats: !viewStats,
+    viewAchievements: !viewAchievements,
+    viewPet: !viewPet,
+    viewGacha: !viewGacha,
+    viewMinigame: !viewMinigame,
+  };
 
-const hasMissing = Object.values(missing).some(Boolean);
-if (hasMissing) {
-  console.warn('[Nav] Missing nav or view elements. Navigation not mounted.', missing, {
-    navTimer, navStats, navPet, navGacha,
-    viewTimer, viewStats, viewPet, viewGacha, gachaRoot
+ const hasMissing = Object.values(missing).some(Boolean);
+ if (hasMissing) {
+   console.warn('[Nav] Missing nav or view elements. Navigation not mounted.', missing, {
+      navTimer, navStats, navPet, navGacha, navMinigame,
+      viewTimer, viewStats, viewPet, viewGacha, viewMinigame
+    });
+    return;
+  }
+
+
+  const allBtns  = [btnTimer, btnStats, btnAchievements, btnPet, btnGacha, btnMinigame];
+  const allViews = [viewTimer, viewStats, viewAchievements, viewPet, viewGacha, viewMinigame];
+  let hasPlayedStatsEnterAnimation = false;
+
+  document.addEventListener('pointerdown', (ev) => {
+    const target = ev?.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('input, textarea, [contenteditable="true"], [contenteditable=""], .allow-text-select')) return;
+
+    const selection = window.getSelection?.();
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+      selection.removeAllRanges();
+    }
   });
-  return;
-}
-
-
-  const allBtns  = [btnTimer, btnStats, btnPet, btnGacha];
-  const allViews = [viewTimer, viewStats, viewPet, viewGacha];
 
   function setActive(btn, view) {
     allViews.forEach((v) => {
-      v.style.display = v === view ? 'block' : 'none';
+      v.style.display = v === view ? '' : 'none';
     });
 
     allBtns.forEach((b) => {
@@ -78,9 +107,27 @@ if (hasMissing) {
 
     if (view === viewStats) {
       try {
-        renderStats({ els: statsEls, chartRef });
+        const animateFirstEnter = !hasPlayedStatsEnterAnimation;
+        if (animateFirstEnter && chartRef?.periodCurrent) {
+          try { chartRef.periodCurrent.destroy(); } catch {}
+          chartRef.periodCurrent = null;
+        }
+        renderStats({
+          els: statsEls,
+          chartRef,
+          animateOnEnter: animateFirstEnter,
+        });
+        hasPlayedStatsEnterAnimation = true;
       } catch (err) {
         console.error('[Nav] Failed to render stats view:', err);
+      }
+    }
+
+    if (view === viewAchievements) {
+      try {
+        onEnterAchievements(els);
+      } catch (err) {
+        console.error('[Nav] Failed to render achievements view:', err);
       }
     }
 
@@ -91,12 +138,22 @@ if (hasMissing) {
         console.error('[Nav] Failed to render gacha view:', err);
       }
     }
+
   }
 
   btnTimer.addEventListener('click', () => setActive(btnTimer, viewTimer));
   btnStats.addEventListener('click', () => setActive(btnStats, viewStats));
+  btnAchievements.addEventListener('click', () => setActive(btnAchievements, viewAchievements));
   btnPet.addEventListener('click', () => setActive(btnPet, viewPet));
   btnGacha.addEventListener('click', () => setActive(btnGacha, viewGacha));
+  btnMinigame.addEventListener('click', () => {
+    try { openMinigameHub(els); } catch (err) { console.error('[Nav] Failed to open Minigame hub:', err); }
+  });
+
+  // Mount minigames
+  try { mountMinigameHub(els); } catch (err) { console.error('[Nav] Failed to mount Minigame hub:', err); }
+  try { mountTetris(els); } catch (err) { console.error('[Nav] Failed to mount Tetris:', err); }
+  try { mountSnake(els); } catch (err) { console.error('[Nav] Failed to mount Snake:', err); }
 
   setActive(btnTimer, viewTimer);
 }

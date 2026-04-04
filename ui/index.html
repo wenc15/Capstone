@@ -1,9 +1,164 @@
 <!DOCTYPE html>
+<!--
+  2026/03/25 edited by Zhecheng Xu
+  Changes:
+    - Iterative polish for music dock, widget controls, and Long-term Data iconography.
+    - Align visual behavior and theme synchronization across main UI and widget window.
+-->
+<!--
+  2026/03/25 edited by JS
+  Changes:
+    - Rename Dice & Build minigame UI label to Growin Town.
+-->
+<!--
+  2026/03/14 edited by JS
+  Changes:
+    - Default Pet view placeholder to pet3 phase-1 asset.
+    - Add a small +1000 token test button in topbar.
+    - Add a Pet view Backpack button.
+-->
+<!--
+  2026/03/19 edited by Zhecheng Xu
+  Changes:
+    - Add Settings entry button in topbar.
+    - Add Data Management modal for archive export/import.
+-->
+<!--
+  2026/03/22 edited by Zhecheng Xu
+  Changes:
+    - Refine minimal Gacha layout with edge arrows and info button.
+    - Restore food pool headline to "Feed Your Goals".
+    - Add 10x draw subtext: rare food guaranteed.
+-->
+<!--
+  2026/03/31 edited by Zikai Lu
+  Changes:
+    - Add website usage cleanup controls in Settings with customizable keep-days input.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Growin – Grow With Every Focus</title>
+  <script>
+    (function bootUiState() {
+      try {
+        const BOOT_TOKEN_KEY = 'growin:credits.cache.v1';
+        const BOOT_PET_KEY = 'growin:pet.boot.v1';
+        const BOOT_SUMMARY_KEY = 'growin.session.summary.v2';
+        const BOOT_COLLECTION_KEY = 'growin:collection.boot.v1';
+        const BOOT_MUSIC_DOCK_KEY = 'growin:music.dock.boot.v1';
+        const BOOT_WHITELIST_SELECTION_KEY = 'growin.whitelist.selection.v1';
+        const BOOT_CUSTOM_CATALOG_KEY = 'growin.custom_app_catalog.v1';
+        const settingsRaw = localStorage.getItem('growin:appBehaviorSettings');
+        if (settingsRaw) {
+          const settings = JSON.parse(settingsRaw);
+          if (String(settings?.uiTone || '').trim().toLowerCase() === 'sky') {
+            document.documentElement.setAttribute('data-ui-tone', 'sky');
+          }
+        }
+
+        const rawMs = localStorage.getItem('growin.timer.selectedDurationMs.v1');
+        const rawMins = localStorage.getItem('growin.timer.selectedMins.v1');
+        let selectedMs = Number(rawMs);
+        if (!Number.isFinite(selectedMs) || selectedMs <= 0) {
+          const mins = Number(rawMins);
+          if (Number.isFinite(mins) && mins > 0) selectedMs = mins * 60000;
+        }
+        if (Number.isFinite(selectedMs) && selectedMs > 0) {
+          const clamped = Math.max(1000, Math.min(90 * 60000, Math.round(selectedMs)));
+          window.__growinBootTimerMs = clamped;
+        }
+
+        const tokenRaw = localStorage.getItem(BOOT_TOKEN_KEY);
+        const tokenVal = Number(tokenRaw);
+        if (Number.isFinite(tokenVal) && tokenVal >= 0) {
+          window.__growinBootTokenValue = String(Math.round(tokenVal));
+        }
+
+        const petRaw = localStorage.getItem(BOOT_PET_KEY);
+        if (petRaw) {
+          const pet = JSON.parse(petRaw);
+          if (pet && typeof pet === 'object') {
+            if (typeof pet.previewSrc === 'string' && pet.previewSrc) {
+              window.__growinBootSidebarPetSrc = pet.previewSrc;
+            }
+            if (typeof pet.mediaSrc === 'string' && pet.mediaSrc) {
+              let mediaSrc = pet.mediaSrc;
+              let mediaKind = pet.mediaKind === 'video' ? 'video' : 'img';
+              if (/pet1-3\.gif$/i.test(mediaSrc)) {
+                mediaSrc = mediaSrc.replace(/pet1-3\.gif$/i, 'pet1-3.webm');
+                mediaKind = 'video';
+              }
+              window.__growinBootPetMediaSrc = mediaSrc;
+              window.__growinBootPetMediaKind = mediaKind;
+            }
+          }
+        }
+
+        const summaryRaw = localStorage.getItem(BOOT_SUMMARY_KEY);
+        if (summaryRaw) {
+          const summary = JSON.parse(summaryRaw);
+          const focusMinutes = Math.max(0, Math.round(Number(summary?.focusMinutes) || 0));
+          const h = Math.floor(focusMinutes / 60);
+          const m = focusMinutes % 60;
+          window.__growinBootSummaryFocus = `${h}h ${m}m`;
+          window.__growinBootSummaryDistraction = (typeof summary?.distractionApp === 'string' && summary.distractionApp.trim()) ? summary.distractionApp.trim() : '—';
+          window.__growinBootSummaryOutcome = (typeof summary?.lastOutcome === 'string' && summary.lastOutcome.trim()) ? summary.lastOutcome.trim() : '—';
+        }
+
+        const collectionRaw = localStorage.getItem(BOOT_COLLECTION_KEY);
+        if (collectionRaw) {
+          const collection = JSON.parse(collectionRaw);
+          if (typeof collection?.metaText === 'string' && collection.metaText) {
+            window.__growinBootCollectionMeta = collection.metaText;
+          }
+          if (typeof collection?.previewHtml === 'string' && collection.previewHtml) {
+            window.__growinBootCollectionHtml = collection.previewHtml;
+          }
+        }
+
+        const musicRaw = localStorage.getItem(BOOT_MUSIC_DOCK_KEY);
+        if (musicRaw) {
+          const music = JSON.parse(musicRaw);
+          if (typeof music?.track === 'string' && music.track) window.__growinBootMusicTrack = music.track;
+          if (typeof music?.meta === 'string' && music.meta) window.__growinBootMusicMeta = music.meta;
+          if (typeof music?.currentTime === 'string' && music.currentTime) window.__growinBootMusicCurrentTime = music.currentTime;
+          if (typeof music?.durationTime === 'string' && music.durationTime) window.__growinBootMusicDurationTime = music.durationTime;
+          const progressVal = Number(music?.progressValue);
+          if (Number.isFinite(progressVal)) window.__growinBootMusicProgress = Math.max(0, Math.min(1000, Math.round(progressVal)));
+          if (typeof music?.modeIcon === 'string' && music.modeIcon) window.__growinBootMusicModeIcon = music.modeIcon;
+          const volumePct = Number(music?.volumePct);
+          if (Number.isFinite(volumePct)) window.__growinBootMusicVolumePct = Math.max(0, Math.min(100, Math.round(volumePct)));
+          if (music?.isMuted === true) window.__growinBootMusicMuted = true;
+          if (music?.isLow === true) window.__growinBootMusicLow = true;
+        }
+
+        const wlRaw = localStorage.getItem(BOOT_WHITELIST_SELECTION_KEY);
+        const customRaw = localStorage.getItem(BOOT_CUSTOM_CATALOG_KEY);
+        const customList = customRaw ? JSON.parse(customRaw) : [];
+        const customMap = new Map(Array.isArray(customList)
+          ? customList.map((it) => [String(it?.id || ''), String(it?.label || '')])
+          : []);
+        const wl = wlRaw ? JSON.parse(wlRaw) : [];
+        if (Array.isArray(wl)) {
+          const selected = wl
+            .map((id) => String(id || '').trim())
+            .filter((id) => id && id.toLowerCase() !== 'electron')
+            .map((id) => {
+              const customLabel = customMap.get(id);
+              return {
+                id,
+                label: customLabel || id.replace(/^custom_/i, '').replace(/_/g, ' '),
+              };
+            });
+          if (selected.length) window.__growinBootWhitelistSelected = selected;
+        }
+      } catch {
+        // ignore boot state failures
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -11,32 +166,92 @@
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand">Growin</div>
-      <div class="weather-chip">☁️ <span>16°C</span></div>
-      <div class="token-chip">🪙 <span id="tokenValue">0</span></div>
+      <div class="weather-chip" id="weatherChip" title="Loading weather...">
+        <span id="weatherIcon" aria-hidden="true">☁️</span>
+        <span id="weatherTemp">--°C</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="settings-btn" id="settingsOpenBtn" type="button" aria-label="Open settings">⚙️ Settings</button>
+        <div class="token-chip" id="tokenChip">
+          <span aria-hidden="true">🪙</span>
+          <span id="tokenValue">0</span>
+          <script>
+            (function applyBootTokenValue() {
+              const el = document.getElementById('tokenValue');
+              const boot = window.__growinBootTokenValue;
+              if (el && typeof boot === 'string' && boot) el.textContent = boot;
+            })();
+          </script>
+          <!-- <button id="tokenAdd1000Btn" class="token-add" type="button" title="Test: +1000 tokens">+1000</button> -->
+        </div>
+      </div>
     </header>
 
     <section class="main">
       <aside class="sidebar">
         <button class="nav-btn" id="navTimer">🕑 <span>Timer</span></button>
         <button class="nav-btn" id="navStats">📊 <span>Statistics</span></button>
+        <button class="nav-btn" id="navAchievements">🏆 <span>Achievements</span></button>
         <button class="nav-btn" id="navPet">🌿 <span>Pet</span></button>
         <button class="nav-btn" id="navGacha">🎲 <span>Gacha</span></button>
+        <button class="nav-btn" id="navMinigame">🕹️ <span>Minigame</span></button>
         
-        <div class="pet-placeholder">
-          <img src="assets/pet.png" alt="Pet Preview" style="width: 200px;">
+        <div class="pet-placeholder" aria-label="Current Pet Preview">
+          <img id="sidebarPetPreview" class="sidebar-pet-preview is-booting" src="assets/pet.png" alt="Pet Preview" loading="lazy" />
+          <script>
+            (function applyBootSidebarPetPreview() {
+              const img = document.getElementById('sidebarPetPreview');
+              const src = window.__growinBootSidebarPetSrc;
+              if (img && typeof src === 'string' && src) {
+                img.src = src;
+                img.classList.remove('is-booting');
+              }
+            })();
+          </script>
         </div>
       </aside>
 
       <div class="content">
         <div id="view-timer">
-          <div class="timer" id="timerDisplay">25:00</div>
+          <div class="timer is-editable is-booting" id="timerDisplay">
+            <span id="timerMinPart" class="timer-part" title="Click to edit minutes">25</span><span class="timer-colon">:</span><span id="timerSecPart" class="timer-part" title="Click to edit seconds">00</span>
+          </div>
 
           <div class="time-control">
             <div class="control-row">
-              <input id="timeRange" type="range" min="1" max="60" step="1" value="25" />
+              <input id="timeRange" type="range" min="1" max="90" step="1" value="25" />
               <output id="timeValue" for="timeRange">25 min</output>
             </div>
           </div>
+          <script>
+            (function applyBootTimerPreview() {
+              try {
+                const ms = Number(window.__growinBootTimerMs);
+                const display = document.getElementById('timerDisplay');
+                const minPart = document.getElementById('timerMinPart');
+                const secPart = document.getElementById('timerSecPart');
+                const range = document.getElementById('timeRange');
+                const out = document.getElementById('timeValue');
+                if (Number.isFinite(ms) && ms > 0) {
+                  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+                  const mins = Math.floor(totalSec / 60);
+                  const secs = totalSec % 60;
+                  if (minPart) minPart.textContent = String(mins).padStart(2, '0');
+                  if (secPart) secPart.textContent = String(secs).padStart(2, '0');
+                  if (range) range.value = String(Math.max(1, Math.min(90, Math.ceil(ms / 60000))));
+                  if (out) {
+                    const label = secs > 0 ? `${mins}min${secs}s` : `${mins}min`;
+                    out.value = label;
+                    out.textContent = label;
+                  }
+                }
+                if (display) display.classList.remove('is-booting');
+              } catch {
+                const display = document.getElementById('timerDisplay');
+                if (display) display.classList.remove('is-booting');
+              }
+            })();
+          </script>
 
           <div class="actions" id="timerActions">
             <button class="primary" id="startBtn">Start</button>
@@ -54,86 +269,629 @@
             <div class="wl-selected-block">
               <div class="wl-selected-title">Selected apps</div>
               <ul id="wlSelectedList" class="wl-selected-list"></ul>
+              <script>
+                (function applyBootWhitelistSelection() {
+                  const list = document.getElementById('wlSelectedList');
+                  const selected = window.__growinBootWhitelistSelected;
+                  if (!list || !Array.isArray(selected) || !selected.length) return;
+                  const esc = (s) => String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                  list.innerHTML = selected
+                    .map((it) => {
+                      const id = esc(it?.id || '');
+                      const label = esc(it?.label || it?.id || '');
+                      return `<li class="wl-pill" data-app-id="${id}"><span class="wl-pill-label">${label}</span><button type="button" class="wl-pill-remove" data-app-id="${id}">×</button></li>`;
+                    })
+                    .join('');
+                })();
+              </script>
             </div>
           </div>
 
           <div class="grid">
-            <div class="card">
-              <h3>Your Cards</h3>
-              <div id="cardGalleryShort" style="display:flex; gap:5px;"></div>
-              <button class="placeholder-btn">Open Collection</button>
+            <div class="card collection-summary-card">
+              <h3>Your Collection</h3>
+              <div class="collection-short-meta" id="collectionOwnedMeta">Owned 0 / 0</div>
+              <div class="collection-short-list" id="collectionPreviewShort"></div>
+              <script>
+                (function applyBootCollectionSummary() {
+                  const meta = document.getElementById('collectionOwnedMeta');
+                  const list = document.getElementById('collectionPreviewShort');
+                  const metaText = window.__growinBootCollectionMeta;
+                  const listHtml = window.__growinBootCollectionHtml;
+                  if (meta && typeof metaText === 'string' && metaText) meta.textContent = metaText;
+                  if (list && typeof listHtml === 'string' && listHtml) list.innerHTML = listHtml;
+                })();
+              </script>
+              <button class="placeholder-btn" id="openCollectionBtn" type="button">Open Collection</button>
             </div>
-            <div class="card">
+            <div class="card session-summary-card">
               <h3>Session Summary</h3>
               <div>Focus Time: <span id="sumFocusTime">—</span></div>
               <div>Distractions: <span id="sumDistractions">0</span></div>
-              <div>Cards Collected: <span id="sumCards">0</span></div>
+              <div>Last Outcome: <span id="sumOutcome">—</span></div>
+              <script>
+                (function applyBootSessionSummary() {
+                  const focus = document.getElementById('sumFocusTime');
+                  const distract = document.getElementById('sumDistractions');
+                  const outcome = document.getElementById('sumOutcome');
+                  if (focus && typeof window.__growinBootSummaryFocus === 'string') focus.textContent = window.__growinBootSummaryFocus;
+                  if (distract && typeof window.__growinBootSummaryDistraction === 'string') distract.textContent = window.__growinBootSummaryDistraction;
+                  if (outcome && typeof window.__growinBootSummaryOutcome === 'string') outcome.textContent = window.__growinBootSummaryOutcome;
+                })();
+              </script>
+              <button class="placeholder-btn" id="sumSeeMoreBtn" type="button">See more</button>
             </div>
           </div>
         </div>
 
         <div id="view-stats" style="display:none;">
-          <h2 style="margin-bottom:20px;">Focus Statistics</h2>
-          <div class="grid">
-            <div class="card">
+          <h2 style="margin:0 0 16px; transform: translateY(-4px);">Focus Statistics (Last 7 Days)</h2>
+          <div class="grid stats-grid">
+            <div class="card stats-summary-card">
               <h3>Recent Sessions</h3>
               <div class="stat">Total Sessions: <span id="statCount">0</span></div>
+              <div class="stat">Completed Sessions: <span id="statCompletedCount">0</span></div>
               <div class="stat">Total Focus Time: <span id="statTotal">0 min</span></div>
+              <div class="stat">Avg Focus Time: <span id="statAvgSession">0 min</span></div>
+              <div class="stat">Weekly Best: <span id="statBestDay">0 min</span></div>
             </div>
-            <div class="card">
-              <h3>Daily Focus (Last 7 Days)</h3>
-              <canvas id="focusChart" width="400" height="220"></canvas>
+            <div class="card stats-period-card">
+              <h3>Preferred Focus Time</h3>
+              <div class="stats-period-wrap">
+                <canvas id="timePrefChart" width="180" height="140"></canvas>
+                <div id="timePrefLegend" class="stats-period-legend" aria-label="Preferred time legend"></div>
+              </div>
             </div>
+            <div class="card stats-daily-card">
+              <h3>Daily Focus</h3>
+              <canvas id="focusChart" width="400" height="170"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-achievements" style="display:none;">
+          <div class="achv-pane" role="region" aria-label="Achievements">
+            <div class="achv-head">
+              <div>
+                <div class="achv-kicker">Grow With Every Focus</div>
+                <h2 class="achv-title">Achievements</h2>
+              </div>
+
+              <div class="achv-head-right">
+                <div class="achv-meta" id="achvMeta">—</div>
+              </div>
+            </div>
+
+            <div class="achv-list" id="achvList" aria-live="polite"></div>
+            <div class="achv-empty" id="achvEmpty" style="display:none;">No achievements yet.</div>
+            <div class="achv-error" id="achvError" style="display:none;"></div>
           </div>
         </div>
 
         <div id="view-pet" style="display:none;">
           <div class="pet-container">
             <div class="pet-stage">
-              <img id="petImage" src="assets/pet1.gif" alt="Pet" class="pet-sprite" style="width: 200px">
+              <div id="petMedia" class="pet-media is-booting">
+                <img id="petImage" src="assets/pet3_1.png" alt="Pet" class="pet-sprite is-egg" style="width: 200px">
+                <script>
+                  (function applyBootPetMedia() {
+                    const host = document.getElementById('petMedia');
+                    const src = window.__growinBootPetMediaSrc;
+                    const kind = window.__growinBootPetMediaKind;
+                    if (!host || typeof src !== 'string' || !src) return;
+                    if (kind === 'video') {
+                      host.innerHTML = '<video id="petVideo" class="pet-sprite pet-video" muted autoplay loop playsinline preload="auto"><source src="' + src + '" type="video/webm" /></video>';
+                    } else {
+                      host.innerHTML = '<img id="petImage" src="' + src + '" alt="Pet" class="pet-sprite">';
+                    }
+                    host.classList.remove('is-booting');
+                  })();
+                </script>
+              </div>
               <div id="petSpeechBubble" class="speech-bubble" style="display:none;">Ready to focus?</div>
             </div>
             
             <div class="pet-info">
-              <h3>Level <span id="petLevel">1</span></h3>
+              <div class="pet-info-head">
+                <h3>Level <span id="petLevel">1</span></h3>
+                <div id="petExpText" class="pet-exp-text">0 / 100 EXP</div>
+              </div>
               <div class="exp-bar">
                 <div id="petExpFill" class="exp-fill"></div>
               </div>
+              <div id="petEvoHint" class="pet-evo-hint">Evolves at Lv 5 and Lv 20.</div>
             </div>
 
             <div class="pet-actions">
               <button class="action-btn" id="feedBtn">🍎 Feed</button>
-              <button class="action-btn" id="playBtn">🎾 Play</button>
+              <button class="action-btn" id="backpackBtn">🎒 Bag</button>
               <button class="action-btn" id="storeBtn">🛒 Store</button>
             </div>
           </div>
         </div>
 
         <div id="view-gacha" style="display:none;">
-          <div class="gacha-stage">
-            <div class="gacha-title">
-              <div class="gacha-title-main">Feed Your Goals</div>
-              <div class="gacha-title-sub">Pet foods</div>
+          <div class="gacha-min-stage">
+            <div class="gacha-min-bg-wrap" aria-hidden="true">
+              <div class="gacha-min-bg gacha-bg-food" data-bg-slot="active"></div>
+              <div class="gacha-min-bg" data-bg-slot="incoming"></div>
             </div>
 
-            <div class="gacha-actions">
-              <button class="gacha-btn primary" id="gachaSingleBtn" type="button">Single Draw</button>
+            <button id="gachaPoolPrevBtn" class="gacha-min-nav gacha-min-nav-edge gacha-min-nav-left" type="button" aria-label="Previous pool">&lt;</button>
+            <button id="gachaPoolNextBtn" class="gacha-min-nav gacha-min-nav-edge gacha-min-nav-right" type="button" aria-label="Next pool">&gt;</button>
+            <button id="gachaPoolInfoBtn" class="gacha-min-info" type="button" aria-label="Pool info">i</button>
 
-              <button class="gacha-btn primary gacha-ten" id="gachaTenBtn" type="button">
-                <div class="gacha-ten-title">10x Draw</div>
-                <div class="gacha-ten-sub">Adv. pet food guaranteed</div>
+            <div class="gacha-min-title" id="gachaTitleMain">Feed Your Goals</div>
+            <div class="gacha-min-sub" id="gachaTitleSub">Use food drops to support your pet journey.</div>
+            <div class="gacha-min-current" id="gachaPoolCurrentLabel" style="display:none;">Food Pool</div>
+
+            <div class="gacha-min-actions">
+              <button class="gacha-btn" id="gachaSingleBtn" type="button">Single Draw</button>
+              <button class="gacha-btn gacha-ten" id="gachaTenBtn" type="button">
+                <span class="gacha-min-ten-main">10x Draw</span>
+                <span class="gacha-min-ten-sub" id="gachaTenSubText">adv. food guaranteed</span>
               </button>
             </div>
+
+            <div id="gachaLastDraw" style="display:none;"><span class="gacha-last-draw-value">No draws yet.</span></div>
+            <div id="gachaCreditValue" style="display:none;">0</div>
           </div>
         </div>
 
+        <div id="view-minigame" style="display:none;">
+          <div class="mg-hub" id="mgHubView">
+            <div class="mg-hub-hero">
+              <div>
+                <div class="mg-hub-kicker">Break Time</div>
+                <h2 class="mg-hub-title">Choose a minigame</h2>
+                <p class="mg-hub-copy">Take a short break with Growin Town, Tetris, or Snake.</p>
+              </div>
+            </div>
 
+            <div class="mg-hub-grid">
+              <button class="mg-hub-card" id="mgOpenDicebuildBtn" type="button">
+                <div class="mg-hub-icon">🎲</div>
+                <div class="mg-hub-name">Growin Town</div>
+                <div class="mg-hub-desc">Roll dice, earn coins, and grow your board.</div>
+              </button>
 
+              <button class="mg-hub-card" id="mgOpenTetrisBtn" type="button">
+                <div class="mg-hub-icon">🧱</div>
+                <div class="mg-hub-name">Tetris</div>
+                <div class="mg-hub-desc">Stack pieces, clear lines, and survive the speed-up.</div>
+              </button>
+
+              <button class="mg-hub-card" id="mgOpenSnakeBtn" type="button">
+                <div class="mg-hub-icon">🐍</div>
+                <div class="mg-hub-name">Snake</div>
+                <div class="mg-hub-desc">Eat food, grow longer, and avoid crashing.</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="mg-shell" id="mgRoot" aria-label="Growin Town minigame" style="display:none;">
+            <header class="mg-topbar" aria-label="Status bar">
+              <button class="mg-menu" id="mgMenuBtn" type="button" aria-label="Menu">☰</button>
+              <div class="mg-topbar-mid">
+                <div class="mg-cash"><span class="mg-cash-ico">💵</span><span id="mgCash">0</span></div>
+                <div class="mg-stage" id="mgStage">Stage 1/6</div>
+                <div class="mg-goal">
+                  <div class="mg-goal-row"><span id="mgGoal">0/15</span></div>
+                  <div class="mg-goalbar" aria-hidden="true"><div id="mgGoalFill" class="mg-goalbar-fill"></div></div>
+                </div>
+              </div>
+              <div class="mg-topbar-right" id="mgRolls">🎲 4 left | 0/24</div>
+              <button class="mg-exit" id="mgExitBtn" type="button" aria-label="Return to minigame hub">↩</button>
+            </header>
+
+            <div class="mg-settings-panel mg-hidden" id="mgSettingsPanel" aria-label="Growin Town settings">
+              <div class="mg-settings-title">Settings</div>
+              <label class="mg-settings-row" for="mgSpeedModeToggle">
+                <input id="mgSpeedModeToggle" type="checkbox">
+                <span>Speed Mode (1x)</span>
+              </label>
+              <div class="mg-settings-note">Off = 0.5x speed</div>
+            </div>
+
+            <main class="mg-body">
+              <section class="mg-center" aria-label="Board">
+                <div class="mg-board-wrap">
+                  <div class="mg-board-grid" id="mgBoard"></div>
+                </div>
+                <div class="mg-float" id="mgFloat" aria-live="polite"></div>
+              </section>
+
+              <aside class="mg-backpack" aria-label="Backpack">
+                <div class="mg-backpack-title">BACKPACK</div>
+                <div class="mg-backpack-grid" id="mgBackpack"></div>
+                <div class="mg-actionbar" aria-label="Dice actions">
+                  <div class="mg-actionbar-right">
+                    <div class="mg-last" id="mgLastRoll">—</div>
+                    <button class="mg-roll" id="mgRollBtn" type="button">🎲 Roll!!</button>
+                    <button class="mg-buyblock" id="mgBuyBlockBtn" type="button">🔑 Unlock <span id="mgBuyBlockCost">(10)</span></button>
+                  </div>
+                </div>
+              </aside>
+            </main>
+
+            <footer class="mg-storebar" id="mgStorebar" aria-label="Store">
+              <div class="mg-storebar-head">
+                <div class="mg-storebar-title">Store</div>
+                <div class="mg-storebar-actions">
+                  <button class="mg-refresh" id="mgRefreshBtn" type="button">Refresh <span id="mgRefreshCost">(5)</span></button>
+                </div>
+              </div>
+              <div class="mg-store-grid" id="mgStore"></div>
+              <div class="mg-hint" id="mgHint"></div>
+            </footer>
+
+            <div class="mg-modal mg-hidden" id="mgResult" role="dialog" aria-modal="true" aria-label="Minigame result">
+              <div class="mg-modal-card">
+                <div class="mg-modal-title" id="mgResultTitle">Result</div>
+                <div class="mg-modal-meta" id="mgResultMeta">—</div>
+                <div class="mg-modal-actions">
+                  <button class="mg-modal-btn primary" id="mgResultExit" type="button">Exit</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mg-modal mg-hidden" id="mgDetail" role="dialog" aria-modal="true" aria-label="Building details">
+              <div class="mg-detail-card">
+                <div class="mg-detail-ico" id="mgDetailIcon">🏗️</div>
+                <div class="mg-detail-title" id="mgDetailName">Building</div>
+                <div class="mg-detail-badges">
+                  <span class="mg-badge" id="mgDetailRarity">Common</span>
+                  <span class="mg-badge" id="mgDetailTag">Coin</span>
+                </div>
+                <div class="mg-detail-bars">
+                  <div class="mg-detail-bars-row">
+                    <div id="mgDetailLevel">Level 1/4</div>
+                    <div id="mgDetailExp">0/6 EXP</div>
+                  </div>
+                  <div class="mg-expbar"><div class="mg-expbar-fill" id="mgDetailExpFill"></div></div>
+                </div>
+                <div class="mg-detail-effect" id="mgDetailEffect">—</div>
+                <div class="mg-detail-actions">
+                  <button class="mg-detail-sell" id="mgDetailSell" type="button">Sell</button>
+                  <button class="mg-detail-close" id="mgDetailClose" type="button">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tetris-root" id="tetrisRoot" style="display:none;">
+            <header class="tetris-header">
+              <div class="tetris-header-actions">
+              </div>
+              <div class="tetris-title">Tetris</div>
+              <div class="tetris-header-actions right">
+                <div class="tetris-status" id="tetStatus"></div>
+                <button class="tetris-exit" id="tetExitBtn" type="button">↩</button>
+              </div>
+            </header>
+            <div class="tetris-main">
+              <div class="tetris-board-wrap">
+                <div class="tetris-board" id="tetBoard"></div>
+                <div class="game-screen" id="tetScreen">
+                  <div class="game-screen-title" id="tetScreenTitle"></div>
+                  <button class="game-screen-btn" id="tetScreenBtn" type="button">Start</button>
+                </div>
+              </div>
+              <aside class="tetris-sidebar">
+                <div class="tetris-stat">
+                  <div class="tetris-stat-label">Score</div>
+                  <div class="tetris-stat-value" id="tetScore">0</div>
+                </div>
+                <div class="tetris-stat">
+                  <div class="tetris-stat-label">Level</div>
+                  <div class="tetris-stat-value" id="tetLevel">1</div>
+                </div>
+                <div class="tetris-stat">
+                  <div class="tetris-stat-label">Lines</div>
+                  <div class="tetris-stat-value" id="tetLines">0</div>
+                </div>
+                <div class="tetris-next">
+                  <div class="tetris-next-label">Next</div>
+                  <div class="tetris-next-piece" id="tetNext"></div>
+                </div>
+                <div class="tetris-controls-info">
+                  <div>← → Move</div>
+                  <div>↑ Rotate</div>
+                  <div>↓ Soft Drop</div>
+                  <div>Space Hard Drop</div>
+                </div>
+                <div class="tetris-buttons">
+                  <button class="tetris-btn primary" id="tetStartBtn" type="button">Start</button>
+                  <button class="tetris-btn" id="tetPauseBtn" type="button">Pause</button>
+                </div>
+              </aside>
+            </div>
+            <div class="tetris-hint" id="tetHint"></div>
+          </div>
+
+          <div class="snake-root" id="snakeRoot" style="display:none;">
+            <header class="snake-header">
+              <div class="snake-header-actions">
+              </div>
+              <div class="snake-title">Snake</div>
+              <div class="snake-header-actions right">
+                <div class="snake-status" id="snakeStatus"></div>
+                <button class="snake-exit" id="snakeExitBtn" type="button">↩</button>
+              </div>
+            </header>
+            <div class="snake-main">
+              <div class="snake-board-wrap">
+                <div class="snake-board" id="snakeBoard"></div>
+                <div class="game-screen" id="snakeScreen">
+                  <div class="game-screen-title" id="snakeScreenTitle"></div>
+                  <button class="game-screen-btn" id="snakeScreenBtn" type="button">Start</button>
+                </div>
+              </div>
+              <aside class="snake-sidebar">
+                <div class="snake-stat">
+                  <div class="snake-stat-label">Score</div>
+                  <div class="snake-stat-value" id="snakeScore">0</div>
+                </div>
+                <div class="snake-stat">
+                  <div class="snake-stat-label">High Score</div>
+                  <div class="snake-stat-value" id="snakeHighScore">0</div>
+                </div>
+                <div class="snake-buttons">
+                  <button class="snake-btn primary" id="snakeStartBtn" type="button">Start</button>
+                  <button class="snake-btn" id="snakePauseBtn" type="button">Pause</button>
+                </div>
+                <div class="snake-controls-info">
+                  <div>Arrow Keys to Move</div>
+                </div>
+              </aside>
+            </div>
+            <div class="snake-hint" id="snakeHint"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <footer class="music-dock" id="musicDock" aria-label="Music player">
+      <div class="music-dock-left">
+        <div class="music-dock-text">
+          <div class="music-dock-track" id="musicDockTrack">No track selected</div>
+          <div class="music-dock-meta" id="musicDockMeta">Open Music Folder to add songs</div>
+        </div>
+        <div class="music-volume-wrap" id="musicVolumeWrap">
+          <button class="music-volume-btn" id="musicVolumeBtn" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">
+            <svg class="music-volume-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path class="icon-speaker" d="M4 10h4l5-4v12l-5-4H4z"></path>
+              <path class="icon-wave1" d="M16 9c1.6 1.8 1.6 4.2 0 6"></path>
+              <path class="icon-wave2" d="M18.8 6.6c3 3 3 7.8 0 10.8"></path>
+              <path class="icon-mute-x1" d="M16.8 9.2l4.8 4.8"></path>
+              <path class="icon-mute-x2" d="M21.6 9.2l-4.8 4.8"></path>
+            </svg>
+          </button>
+          <div class="music-volume-pop" id="musicVolumePop" aria-label="Volume control">
+            <input class="music-volume-slider" id="musicVolumeSlider" type="range" min="0" max="100" step="1" value="35" orient="vertical" />
+            <div class="music-volume-value" id="musicVolumeValue">35%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="music-dock-progress" aria-label="Playback progress">
+        <span class="music-time" id="musicCurrentTime">0:00</span>
+        <input class="music-progress" id="musicProgress" type="range" min="0" max="1000" step="1" value="0" />
+        <span class="music-time" id="musicDurationTime">0:00</span>
+      </div>
+
+      <div class="music-dock-controls" aria-label="Playback controls">
+        <button class="music-dock-btn" id="musicModeBtn" type="button" title="Playback mode">↺</button>
+        <button class="music-dock-btn music-dock-nav" id="musicPrevBtn" type="button" title="Previous track" aria-label="Previous track">
+          <svg class="music-dock-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M8 6h2v12H8z"></path>
+            <path d="M17 6l-7 6 7 6z"></path>
+          </svg>
+        </button>
+        <button class="music-dock-btn music-dock-btn-main" id="musicPlayPauseBtn" type="button" title="Play / Pause">▶</button>
+        <button class="music-dock-btn music-dock-nav" id="musicNextBtn" type="button" title="Next track" aria-label="Next track">
+          <svg class="music-dock-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M14 6h2v12h-2z"></path>
+            <path d="M7 6l7 6-7 6z"></path>
+          </svg>
+        </button>
+        <button class="music-dock-btn" id="musicQueueBtn" type="button" title="Queue" aria-expanded="false" aria-controls="musicQueuePanel">☰</button>
+      </div>
+      <script>
+        (function applyBootMusicDock() {
+          const track = document.getElementById('musicDockTrack');
+          const meta = document.getElementById('musicDockMeta');
+          const cur = document.getElementById('musicCurrentTime');
+          const dur = document.getElementById('musicDurationTime');
+          const progress = document.getElementById('musicProgress');
+          const mode = document.getElementById('musicModeBtn');
+          const volumeBtn = document.getElementById('musicVolumeBtn');
+          const volumeValue = document.getElementById('musicVolumeValue');
+          const volumeSlider = document.getElementById('musicVolumeSlider');
+          if (track && typeof window.__growinBootMusicTrack === 'string') track.textContent = window.__growinBootMusicTrack;
+          if (meta && typeof window.__growinBootMusicMeta === 'string') meta.textContent = window.__growinBootMusicMeta;
+          if (cur && typeof window.__growinBootMusicCurrentTime === 'string') cur.textContent = window.__growinBootMusicCurrentTime;
+          if (dur && typeof window.__growinBootMusicDurationTime === 'string') dur.textContent = window.__growinBootMusicDurationTime;
+          if (progress && Number.isFinite(Number(window.__growinBootMusicProgress))) {
+            const val = Math.max(0, Math.min(1000, Number(window.__growinBootMusicProgress)));
+            progress.value = String(Math.round(val));
+            progress.style.setProperty('--music-progress-pct', `${(val / 1000) * 100}%`);
+          }
+          if (mode && typeof window.__growinBootMusicModeIcon === 'string') mode.textContent = window.__growinBootMusicModeIcon;
+          if (Number.isFinite(Number(window.__growinBootMusicVolumePct))) {
+            const vol = Math.max(0, Math.min(100, Number(window.__growinBootMusicVolumePct)));
+            if (volumeValue) volumeValue.textContent = `${Math.round(vol)}%`;
+            if (volumeSlider) {
+              volumeSlider.value = String(Math.round(vol));
+              volumeSlider.style.setProperty('--music-volume-pct', `${vol}%`);
+            }
+          }
+          if (volumeBtn) {
+            const hasVol = Number.isFinite(Number(window.__growinBootMusicVolumePct));
+            const vol = hasVol ? Math.max(0, Math.min(100, Number(window.__growinBootMusicVolumePct))) : null;
+            const isMuted = hasVol ? vol <= 0.0001 : (window.__growinBootMusicMuted === true);
+            const isLow = hasVol ? (vol > 0 && vol < 45) : (window.__growinBootMusicLow === true);
+            volumeBtn.classList.toggle('is-muted', isMuted);
+            volumeBtn.classList.toggle('is-low', !isMuted && isLow);
+            volumeBtn.title = isMuted ? 'Unmute' : 'Mute';
+            volumeBtn.setAttribute('aria-label', isMuted ? 'Unmute' : 'Mute');
+          }
+        })();
+      </script>
+
+      <aside class="music-queue" id="musicQueuePanel" aria-label="Music queue" hidden>
+        <div class="music-queue-head">
+          <h3>Queue</h3>
+        </div>
+        <div class="music-queue-list" id="musicQueueList">
+          <div class="music-queue-empty">No songs loaded yet.</div>
+        </div>
+      </aside>
+    </footer>
+  </div>
+
+  <div id="doneToast" class="toast" aria-live="polite"></div>
+
+  <div class="relax mg-hidden" id="relaxPrompt" role="dialog" aria-modal="true" aria-label="Relax prompt">
+    <div class="relax-card">
+      <div class="relax-kicker">Focus Complete</div>
+      <div class="relax-title">Great work. You finished this session!</div>
+      <div class="relax-reward" id="relaxRewardMeta">Token reward synced.</div>
+      <div class="relax-sub">Want a short break? Pick one minigame to play.</div>
+      <div class="relax-actions">
+        <button class="relax-btn primary" id="relaxPlayBtn" type="button">Play</button>
+        <button class="relax-btn" id="relaxLaterBtn" type="button">Not Now</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-overlay mg-hidden" id="settingsOverlay" aria-hidden="true">
+    <section class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings">
+      <div class="settings-head">
+        <h2 class="settings-title">Settings</h2>
+        <button class="settings-close" id="settingsCloseBtn" type="button" aria-label="Close settings">×</button>
+      </div>
+
+      <div class="settings-grid">
+        <article class="settings-card">
+          <h3>App Behavior</h3>
+          <p class="settings-note">Choose widget visibility and window close behavior.</p>
+
+          <label class="settings-field-row settings-switch-row" for="settingShowWidget">
+            <span>Show Widget</span>
+            <span class="settings-switch">
+              <input id="settingShowWidget" type="checkbox" checked />
+              <span class="settings-switch-bar"></span>
+            </span>
+          </label>
+
+          <label class="settings-field-col" for="settingCloseBehavior">
+            <span>When Clicking Window Close (X)</span>
+            <select id="settingCloseBehavior" class="settings-select">
+              <option value="minimize">Minimize To Tray</option>
+              <option value="exit">Exit App</option>
+            </select>
+          </label>
+
+          <label class="settings-field-col" for="settingUiTone">
+            <span>UI Color Tone</span>
+            <select id="settingUiTone" class="settings-select">
+              <option value="default">Default (Green)</option>
+              <option value="sky">Light Blue</option>
+            </select>
+          </label>
+
+          <label class="settings-field-row settings-switch-row" for="settingMusicAutoPlay">
+            <span>Auto-play Music On Focus Start</span>
+            <span class="settings-switch">
+              <input id="settingMusicAutoPlay" type="checkbox" checked />
+              <span class="settings-switch-bar"></span>
+            </span>
+          </label>
+
+          <button class="settings-action settings-action-spaced" id="openMusicFolderBtn" type="button">Open Music Folder</button>
+
+          <div class="settings-meta" id="settingsBehaviorMeta"></div>
+        </article>
+
+        <article class="settings-card">
+          <h3>Import / Export Your Data</h3>
+          <ul>
+            <li>Focus history</li>
+            <li>Profile statistics</li>
+            <li>Whitelist presets</li>
+          </ul>
+          <div class="settings-action-stack">
+            <button class="settings-action" id="archiveExportBtn" type="button">Export Data</button>
+            <button class="settings-action" id="archiveImportBtn" type="button">Import Data</button>
+          </div>
+          <p class="settings-note" style="margin-top:10px;">This will overwrite your current data.</p>
+          <input id="archiveImportFile" type="file" accept=".json,application/json" hidden />
+          <div class="settings-meta-row">
+            <div class="settings-meta" id="archiveImportMeta"></div>
+            <button class="settings-link-btn" id="archiveReselectBtn" type="button" hidden>Reselect</button>
+          </div>
+        </article>
+
+        <article class="settings-card settings-danger-card">
+          <h3>Delete Local Data</h3>
+          <p class="settings-note">This action is irreversible. All local focus history, profile statistics, and whitelist presets will be removed.</p>
+          <button class="settings-action settings-action-danger" id="archiveDeleteBtn" type="button">Delete Data</button>
+          <div class="settings-divider"></div>
+          <h3>Clean Website Usage History</h3>
+          <p class="settings-note">Keep the latest N days of website usage records and remove older records.</p>
+          <div class="settings-inline-row">
+            <label class="settings-field-col settings-field-inline" for="usageCleanupDaysInput">
+              <span>Keep Days</span>
+              <input id="usageCleanupDaysInput" class="settings-number" type="number" min="1" step="1" value="90" />
+            </label>
+            <button class="settings-action settings-action-subtle" id="usageCleanupBtn" type="button">Cleanup Usage Data</button>
+          </div>
+          <div class="settings-meta" id="usageCleanupMeta"></div>
+        </article>
       </div>
     </section>
   </div>
 
-  <div id="doneToast" class="toast" aria-live="polite"></div>
+  <div class="ltd-overlay mg-hidden" id="ltdOverlay" aria-hidden="true">
+    <section class="ltd-panel" role="dialog" aria-modal="true" aria-label="Long-term Data">
+      <div class="ltd-head">
+        <h3 class="ltd-title"><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18h16"></path><path d="M6 15l4-4 3 2 5-6"></path><path d="M16 7h2v2"></path></svg></span><span>Long-term Data</span></h3>
+        <button class="ltd-close" id="ltdCloseBtn" type="button" aria-label="Close long-term data">×</button>
+      </div>
+
+      <div class="ltd-kpis">
+        <article class="ltd-kpi"><div class="ltd-kpi-label"><span class="ltd-label-icon ltd-label-icon-kpi" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg></span><span>Total Focus Time</span></div><div class="ltd-kpi-value" id="ltdTotalFocus">0 hrs</div></article>
+        <article class="ltd-kpi"><div class="ltd-kpi-label"><span class="ltd-label-icon ltd-label-icon-kpi" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 18V10"></path><path d="M10 18V6"></path><path d="M15 18v-4"></path><path d="M20 18V8"></path></svg></span><span>Focus Sessions</span></div><div class="ltd-kpi-value" id="ltdSessionCount">0</div></article>
+        <article class="ltd-kpi"><div class="ltd-kpi-label"><span class="ltd-label-icon ltd-label-icon-kpi" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3c2.6 3 4.5 5.4 4.5 8a4.5 4.5 0 1 1-9 0c0-2.6 1.9-5 4.5-8Z"></path><path d="M12 10.5c-1.2 1.1-1.8 2-1.8 2.9a1.8 1.8 0 0 0 3.6 0c0-.9-.6-1.8-1.8-2.9Z"></path></svg></span><span>Longest Streak</span></div><div class="ltd-kpi-value" id="ltdLongestStreak">0 days</div></article>
+      </div>
+
+      <div class="ltd-tabs">
+        <button class="ltd-tab is-active" id="ltdTabWeekly" type="button"><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="14" rx="2"></rect><path d="M8 4v4"></path><path d="M16 4v4"></path><path d="M4 10h16"></path></svg></span><span>Weekly Focus Hours</span></button>
+        <button class="ltd-tab" id="ltdTabHistory" type="button"><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4h10l2 2v14H5V4h2z"></path><path d="M8 10h8"></path><path d="M8 14h8"></path><path d="M8 18h5"></path></svg></span><span>Focus Session History</span></button>
+      </div>
+
+      <div class="ltd-content" id="ltdWeeklyPanel">
+        <div class="ltd-chart-wrap"><canvas id="ltdWeeklyChart" width="620" height="260"></canvas></div>
+        <aside class="ltd-breakdown">
+          <h4><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path><circle cx="8" cy="6" r="1.5"></circle><circle cx="14" cy="12" r="1.5"></circle><circle cx="18" cy="18" r="1.5"></circle></svg></span><span>Focus Session Breakdown</span></h4>
+          <div class="ltd-break-row"><span class="ltd-break-label"><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12.5l2.3 2.3 4.7-5.1"></path></svg></span><span>Successful Sessions</span></span><strong id="ltdSuccessful">0</strong></div>
+          <div class="ltd-break-row"><span class="ltd-break-label"><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7.8v5"></path><circle cx="12" cy="15.9" r="0.9"></circle></svg></span><span>Failed Sessions</span></span><strong id="ltdFailed">0</strong></div>
+          <div class="ltd-break-row"><span class="ltd-break-label"><span class="ltd-label-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M9.2 8.7v6.6"></path><path d="M14.8 8.7v6.6"></path></svg></span><span>Aborted Sessions</span></span><strong id="ltdAborted">0</strong></div>
+        </aside>
+      </div>
+
+      <div class="ltd-content mg-hidden" id="ltdHistoryPanel">
+        <div class="ltd-history-list" id="ltdHistoryList"></div>
+      </div>
+    </section>
+
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   

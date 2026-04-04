@@ -40,7 +40,10 @@
 
 using CapstoneBackend.Services;
 using CapstoneBackend.Data;
+using CapstoneBackend.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,11 +65,28 @@ builder.Services.AddSingleton<LocalDataService>();
 // 作为 Singleton，确保整个应用只有一个会话状态源。
 builder.Services.AddSingleton<FocusSessionService>();
 
+// 注册抽卡服务（Food Gacha System）
+// Scoped：每个 HTTP 请求一个实例，适合依赖 DbContext 的服务
+builder.Services.AddScoped<IFoodGachaService, FoodGachaService>();
+
 // 注册 EF Core + SQLite 数据库上下文（用于存储网站使用记录等）
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlite("Data Source=growin.db");
 });
+
+// 注册成就系统服务（Achievements）
+// 作为 Singleton：
+//   - 成就定义（achievements.json）可以被缓存，避免每次请求都读文件
+//   - 成就状态依赖 LocalDataService（同为 Singleton），保持一致的本地数据读写与线程安全
+builder.Services.AddSingleton<AchievementService>();
+
+// 注册皮肤目录服务（从 skins.json 读取并缓存）
+builder.Services.AddSingleton<SkinCatalogService>();
+
+// 注册 Skin Pool 抽卡服务
+builder.Services.AddScoped<ISkinGachaService, SkinGachaService>();
+
 
 // 配置 CORS：开发阶段允许本地前端自由访问
 // 注意：这是开发环境用的“全开放”策略，后期如果要上线可以收紧域名。
@@ -90,6 +110,78 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // -------------------------------------------------------------
+    // Seed/Sync FoodDefinitions from Data/foods.json (dev-friendly, no hardcode)
+    // -------------------------------------------------------------
+    var foodsPath = Path.Combine(app.Environment.ContentRootPath, "Data", "foods.json");
+
+    if (File.Exists(foodsPath))
+    {
+        var json = File.ReadAllText(foodsPath);
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        var foods = JsonSerializer.Deserialize<List<FoodDefinition>>(json, options) ?? new();
+
+        // remove empty ids + dedupe by FoodId (case-insensitive)
+        var normalized = foods
+            .Where(f => !string.IsNullOrWhiteSpace(f.FoodId))
+            .GroupBy(f => f.FoodId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        // Upsert by FoodId
+        var existing = await db.FoodDefinitions
+            .ToDictionaryAsync(f => f.FoodId, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var f in normalized)
+        {
+            var key = f.FoodId.Trim();
+
+            if (existing.TryGetValue(key, out var row))
+            {
+                row.Name = f.Name ?? "";
+                row.Rarity = f.Rarity;
+                row.ExpValue = f.ExpValue;
+                row.ImageKey = f.ImageKey;
+                row.IsEnabled = f.IsEnabled;
+            }
+            else
+            {
+                db.FoodDefinitions.Add(new FoodDefinition
+                {
+                    FoodId = key,
+                    Name = f.Name ?? "",
+                    Rarity = f.Rarity,
+                    ExpValue = f.ExpValue,
+                    ImageKey = f.ImageKey,
+                    IsEnabled = f.IsEnabled
+                });
+            }
+        }
+
+        var normalizedIds = normalized
+            .Select(f => f.FoodId.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in existing.Values)
+        {
+            if (!normalizedIds.Contains(row.FoodId))
+            {
+                row.IsEnabled = false;
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+    else
+    {
+        Console.WriteLine($"[FoodGacha] foods.json not found at: {foodsPath}");
+    }
 }
 
 // -------------------------------------------------------------

@@ -1,0 +1,5 @@
+[
+  { "foodId": "basic_food", "name": "Basic Food", "rarity": "Common", "expValue": 5, "imageKey": "basic_food", "isEnabled": true },
+  { "foodId": "meat_snack", "name": "Meat Snack", "rarity": "Rare", "expValue": 15, "imageKey": "meat_snack", "isEnabled": true },
+  { "foodId": "adv_food", "name": "Adv. Food", "rarity": "Epic", "expValue": 45, "imageKey": "adv_food", "isEnabled": true }
+]

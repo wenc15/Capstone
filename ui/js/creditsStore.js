@@ -22,13 +22,35 @@
 
 import { getCredits, addCredits as apiAddCredits, consumeCredits as apiConsumeCredits } from "./creditsApi.js";
 
-let credits = 0;
+const CREDITS_CACHE_KEY = 'growin:credits.cache.v1';
+
+function loadCachedCredits() {
+  try {
+    const raw = localStorage.getItem(CREDITS_CACHE_KEY);
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.round(n));
+  } catch {
+    return 0;
+  }
+}
+
+function saveCachedCredits(value) {
+  try {
+    localStorage.setItem(CREDITS_CACHE_KEY, String(Math.max(0, Math.round(Number(value) || 0))));
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
+let credits = loadCachedCredits();
 const listeners = [];
 
 // Prevent overlapping refresh calls (optional but helpful)
 let refreshPromise = null;
 
 function notify() {
+  saveCachedCredits(credits);
   listeners.forEach((fn) => {
     try {
       fn(credits);

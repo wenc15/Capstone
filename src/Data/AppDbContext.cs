@@ -15,6 +15,13 @@
 //   - 典型用法：在 Controller 中通过构造函数注入 AppDbContext，然后使用 _db.WebsiteUsages 增删改查。
 // =============================================================
 
+// 2026/03/31 edited by Zikai Lu
+// 新增内容：
+//   - 为 WebsiteUsage 增加时间与域名索引配置。
+// 新增的作用：
+//   - 优化按日期和按域名聚合查询在数据量增长后的性能。
+// =============================================================
+
 using CapstoneBackend.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,4 +39,21 @@ public class AppDbContext : DbContext
     /// 通过 _db.WebsiteUsages 进行增删改查。
     /// </summary>
     public DbSet<WebsiteUsage> WebsiteUsages { get; set; } = null!;
+  
+
+    public DbSet<FoodDefinition> FoodDefinitions { get; set; } = null!;
+    public DbSet<UserFood> UserFoods { get; set; } = null!;
+    public DbSet<CardDefinition> CardDefinitions { get; set; } = null!;
+    public DbSet<UserCard> UserCards { get; set; } = null!;
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<WebsiteUsage>()
+            .HasIndex(x => x.StartTimeUtc);
+
+        modelBuilder.Entity<WebsiteUsage>()
+            .HasIndex(x => x.Domain);
+    }
 }

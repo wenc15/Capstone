@@ -1,0 +1,6 @@
+[
+  { "itemId": "skin_tetris_jelly", "displayName": "Jelly Tetris Skin", "rarity": "Epic", "category": "minigame", "game": "tetris" },
+  { "itemId": "skin_tetris_starlit", "displayName": "Starlit Tetris Skin", "rarity": "Epic", "category": "minigame", "game": "tetris" },
+  { "itemId": "skin_snake_nebula", "displayName": "Nebula Snake Skin", "rarity": "Epic", "category": "minigame", "game": "snake" },
+  { "itemId": "skin_dicebuild_petstand", "displayName": "Pet Standee Growin Town Skin", "rarity": "Epic", "category": "minigame", "game": "dicebuild" }
+]
