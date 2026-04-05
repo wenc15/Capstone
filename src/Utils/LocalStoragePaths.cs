@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add FocusDefaultsFilePath for backend default whitelist/grace persistence.
+
 // 2025/11/19 edited by 京华昼梦
 // 新增内容：
 //   - 增加 SessionHistoryFilePath，用于存储所有专注会话的详细历史记录。
@@ -49,6 +53,10 @@ public static class LocalStoragePaths
     /// <summary>专注会话历史文件路径：session_history.json</summary>
     public static string SessionHistoryFilePath =>
         Path.Combine(BaseDirectory, "session_history.json");
+
+    /// <summary>专注默认配置文件路径：focus_defaults.json</summary>
+    public static string FocusDefaultsFilePath =>
+        Path.Combine(BaseDirectory, "focus_defaults.json");
 
 
     /// <summary>

@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add violation grace seconds setting (5-60) and broadcast updates for defaults sync.
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Add focus music autoplay preference and broadcast to music module.
@@ -24,12 +28,17 @@ import { openOverlayWithMotion, closeOverlayWithMotion, CLEANUP_MS } from './ove
 const API_BASE = 'http://localhost:5024';
 const APP_SETTINGS_LOCAL_KEY = LOCAL_STORAGE_KEYS.appSettings;
 const MUSIC_VOLUME_LOCAL_KEY = LOCAL_STORAGE_KEYS.musicVolume;
+const MUSIC_MUTED_LOCAL_KEY = LOCAL_STORAGE_KEYS.musicMuted;
 const MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY = LOCAL_STORAGE_KEYS.musicAutoplayOnFocus;
+const FOCUS_GRACE_SECONDS_LOCAL_KEY = LOCAL_STORAGE_KEYS.focusGraceSeconds;
 const DEFAULT_APP_SETTINGS = {
   showWidget: true,
   closeBehavior: 'minimize',
   uiTone: 'default',
 };
+const DEFAULT_FOCUS_GRACE_SECONDS = 10;
+const MIN_FOCUS_GRACE_SECONDS = 5;
+const MAX_FOCUS_GRACE_SECONDS = 60;
 
 function clampMusicVolume01(v) {
   const n = Number(v);
@@ -41,7 +50,12 @@ function loadMusicVolume01() {
   try {
     const raw = localStorage.getItem(MUSIC_VOLUME_LOCAL_KEY);
     if (raw == null) return 0.35;
-    return clampMusicVolume01(raw);
+    if (String(raw).trim() === '') return 0.35;
+    const vol = clampMusicVolume01(raw);
+    const mutedRaw = localStorage.getItem(MUSIC_MUTED_LOCAL_KEY);
+    const isMuted = mutedRaw === '1' || mutedRaw === 'true';
+    if (!isMuted && vol <= 0.0001) return 0.35;
+    return vol;
   } catch {
     return 0.35;
   }
@@ -105,6 +119,32 @@ async function parseJsonSafe(res) {
 function closeSettings(els) {
   if (!els?.settingsOverlay) return;
   closeOverlayWithMotion(els.settingsOverlay, { closeDurationMs: CLEANUP_MS });
+}
+
+function clampFocusGraceSeconds(v) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return DEFAULT_FOCUS_GRACE_SECONDS;
+  return Math.max(MIN_FOCUS_GRACE_SECONDS, Math.min(MAX_FOCUS_GRACE_SECONDS, n));
+}
+
+function loadFocusGraceSeconds() {
+  try {
+    const raw = localStorage.getItem(FOCUS_GRACE_SECONDS_LOCAL_KEY);
+    if (raw == null) return DEFAULT_FOCUS_GRACE_SECONDS;
+    return clampFocusGraceSeconds(raw);
+  } catch {
+    return DEFAULT_FOCUS_GRACE_SECONDS;
+  }
+}
+
+function saveFocusGraceSeconds(value) {
+  const safe = clampFocusGraceSeconds(value);
+  try {
+    localStorage.setItem(FOCUS_GRACE_SECONDS_LOCAL_KEY, String(safe));
+  } catch {
+    // ignore local storage failures
+  }
+  return safe;
 }
 
 function openSettings(els) {
@@ -492,6 +532,7 @@ export function mountSettings(els) {
     settingCloseBehavior,
     settingUiTone,
     settingMusicAutoPlay,
+    settingFocusGraceSeconds,
     openMusicFolderBtn,
     settingsBehaviorMeta,
     archiveExportBtn,
@@ -504,7 +545,7 @@ export function mountSettings(els) {
     usageCleanupMeta,
   } = els || {};
 
-  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !archiveReselectBtn || !archiveDeleteBtn || !usageCleanupDaysInput || !usageCleanupBtn || !usageCleanupMeta || !settingShowWidget || !settingCloseBehavior || !settingUiTone || !settingsBehaviorMeta || !openMusicFolderBtn) {
+  if (!settingsOpenBtn || !settingsOverlay || !settingsCloseBtn || !archiveExportBtn || !archiveImportFile || !archiveImportBtn || !archiveReselectBtn || !archiveDeleteBtn || !usageCleanupDaysInput || !usageCleanupBtn || !usageCleanupMeta || !settingShowWidget || !settingCloseBehavior || !settingUiTone || !settingsBehaviorMeta || !openMusicFolderBtn || !settingFocusGraceSeconds) {
     return;
   }
 
@@ -514,9 +555,11 @@ export function mountSettings(els) {
 
   const bootMusicVol = loadMusicVolume01();
   const bootAutoPlay = loadMusicAutoplayOnFocus();
+  const bootGraceSeconds = loadFocusGraceSeconds();
   if (settingMusicAutoPlay) {
     settingMusicAutoPlay.checked = bootAutoPlay;
   }
+  settingFocusGraceSeconds.value = String(bootGraceSeconds);
   emitMusicVolume(bootMusicVol);
   emitMusicAutoplayOnFocus(bootAutoPlay);
 
@@ -612,6 +655,15 @@ export function mountSettings(els) {
         : 'Focus auto-play music: Off.';
     });
   }
+
+  settingFocusGraceSeconds.addEventListener('change', () => {
+    const saved = saveFocusGraceSeconds(settingFocusGraceSeconds.value);
+    settingFocusGraceSeconds.value = String(saved);
+    window.dispatchEvent(new CustomEvent('growin:focus-grace-seconds', {
+      detail: { value: saved },
+    }));
+    if (settingsBehaviorMeta) settingsBehaviorMeta.textContent = `Violation grace set to ${saved}s.`;
+  });
 
   refreshImportCta(els);
 }

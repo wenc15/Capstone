@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Register localStorage keys for music muted state and focus grace seconds.
+
 // 2026/03/31 edited by Zikai Lu
 // Changes:
 //  - Centralize localStorage key registration for consistent cleanup.
@@ -7,8 +11,10 @@
 export const LOCAL_STORAGE_KEYS = Object.freeze({
   appSettings: 'growin:appBehaviorSettings',
   musicVolume: 'growin:music.volume.v1',
+  musicMuted: 'growin:music.muted.v1',
   musicMode: 'growin:music.mode.v1',
   musicAutoplayOnFocus: 'growin:music.autoplayOnFocus.v1',
+  focusGraceSeconds: 'growin:focus.graceSeconds.v1',
   timerSelectedMins: 'growin.timer.selectedMins.v1',
   sessionSummary: 'growin.session.summary.v2',
   focusSessions: 'focusSessions',

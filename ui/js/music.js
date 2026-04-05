@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Persist and restore explicit muted state to prevent occasional mute-on-restart issues.
+
 // 2026/03/29 edited by JS
 // Changes:
 //  - Stop focus autoplay when focus session ends (remove keep-playing latch).
@@ -10,6 +14,7 @@
 import { subscribeFocusStatus } from './focusStatusStore.js';
 
 const MUSIC_VOLUME_LOCAL_KEY = 'growin:music.volume.v1';
+const MUSIC_MUTED_LOCAL_KEY = 'growin:music.muted.v1';
 const MUSIC_MODE_LOCAL_KEY = 'growin:music.mode.v1';
 const MUSIC_AUTOPLAY_ON_FOCUS_LOCAL_KEY = 'growin:music.autoplayOnFocus.v1';
 const MUSIC_DOCK_BOOT_CACHE_KEY = 'growin:music.dock.boot.v1';
@@ -32,6 +37,7 @@ function loadSavedVolume01(defaultValue) {
   try {
     const raw = localStorage.getItem(MUSIC_VOLUME_LOCAL_KEY);
     if (raw == null) return clamp01(defaultValue, 0.35);
+    if (String(raw).trim() === '') return clamp01(defaultValue, 0.35);
     return clamp01(raw, clamp01(defaultValue, 0.35));
   } catch {
     return clamp01(defaultValue, 0.35);
@@ -41,6 +47,24 @@ function loadSavedVolume01(defaultValue) {
 function saveVolume01(v) {
   try {
     localStorage.setItem(MUSIC_VOLUME_LOCAL_KEY, String(clamp01(v, 0.35)));
+  } catch {
+    // ignore local storage failures
+  }
+}
+
+function loadSavedMuted() {
+  try {
+    const raw = localStorage.getItem(MUSIC_MUTED_LOCAL_KEY);
+    if (raw == null) return false;
+    return raw === '1' || raw === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function saveMuted(v) {
+  try {
+    localStorage.setItem(MUSIC_MUTED_LOCAL_KEY, v ? '1' : '0');
   } catch {
     // ignore local storage failures
   }
@@ -207,12 +231,15 @@ export function mountMusic(opts = {}) {
   const queueOrder = trackItems.map((_, i) => i);
   const els = opts.els || null;
 
-  const volume = loadSavedVolume01(typeof opts.volume === 'number' ? opts.volume : 0.35);
+  const savedVolume = loadSavedVolume01(typeof opts.volume === 'number' ? opts.volume : 0.35);
+  const savedMuted = loadSavedMuted();
+  const volume = (!savedMuted && savedVolume <= 0.0001) ? 0.35 : savedVolume;
 
   const audio = new Audio();
   audio.preload = 'auto';
   audio.loop = false;
   audio.volume = Math.max(0, Math.min(1, volume));
+  audio.muted = !!savedMuted;
 
   let disposed = false;
   let isFocusRunning = false;
@@ -709,6 +736,11 @@ export function mountMusic(opts = {}) {
     if (v > 0) {
       audio.muted = false;
       lastNonZeroVolume = v;
+      saveMuted(false);
+    }
+    if (v <= 0.0001) {
+      audio.muted = true;
+      saveMuted(true);
     }
     saveVolume01(v);
     renderDock();
@@ -733,11 +765,13 @@ export function mountMusic(opts = {}) {
       const v = lastNonZeroVolume > 0 ? lastNonZeroVolume : 0.35;
       audio.volume = clamp01(v, 0.35);
       saveVolume01(audio.volume);
+      saveMuted(false);
       renderDock();
       return;
     }
     if (audio.volume > 0) lastNonZeroVolume = audio.volume;
     audio.muted = true;
+    saveMuted(true);
     renderDock();
   }
 
@@ -748,8 +782,10 @@ export function mountMusic(opts = {}) {
     if (v > 0) {
       audio.muted = false;
       lastNonZeroVolume = v;
+      saveMuted(false);
     } else {
       audio.muted = true;
+      saveMuted(true);
     }
     saveVolume01(v);
     renderDock();
@@ -888,6 +924,8 @@ export function mountMusic(opts = {}) {
     setVolume(v) {
       const next = clamp01(v, audio.volume);
       audio.volume = next;
+      audio.muted = next <= 0.0001;
+      saveMuted(audio.muted);
       saveVolume01(next);
       renderDock();
     },

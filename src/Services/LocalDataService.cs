@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Persist focus defaults (allowed apps/websites + grace seconds) to local JSON storage.
+
 // 2026/03/16 edited by Zikai Lu
 // 新增内容：
 //   - 增加 SessionHistory 可读时间明细与按日期汇总查询方法。
@@ -1097,10 +1101,12 @@ public class LocalDataService
         BackupIfExists(LocalStoragePaths.UserProfileFilePath, Path.Combine(backupDir, $"user_profile.{suffix}.bak.json"));
         BackupIfExists(LocalStoragePaths.SessionHistoryFilePath, Path.Combine(backupDir, $"session_history.{suffix}.bak.json"));
         BackupIfExists(LocalStoragePaths.WhitelistPresetsFilePath, Path.Combine(backupDir, $"whitelist_presets.{suffix}.bak.json"));
+        BackupIfExists(LocalStoragePaths.FocusDefaultsFilePath, Path.Combine(backupDir, $"focus_defaults.{suffix}.bak.json"));
 
         TrimBackups(backupDir, "user_profile.*.bak.json");
         TrimBackups(backupDir, "session_history.*.bak.json");
         TrimBackups(backupDir, "whitelist_presets.*.bak.json");
+        TrimBackups(backupDir, "focus_defaults.*.bak.json");
     }
 
     private static void BackupIfExists(string sourcePath, string targetPath)
@@ -1128,6 +1134,78 @@ public class LocalDataService
         catch
         {
             // ignore backup trimming failures
+        }
+    }
+
+    #endregion
+
+    #region Focus 默认配置
+
+    private static FocusDefaultsDto NormalizeFocusDefaults(FocusDefaultsDto? value)
+    {
+        var allowedProcesses = (value?.AllowedProcesses ?? new List<string>())
+            .Select(x => (x ?? string.Empty).Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (allowedProcesses.Count == 0)
+        {
+            allowedProcesses.Add("chrome.exe");
+        }
+
+        var allowedWebsites = (value?.AllowedWebsites ?? new List<string>())
+            .Select(x => (x ?? string.Empty).Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var graceSeconds = value?.GraceSeconds ?? 10;
+        graceSeconds = Math.Max(5, Math.Min(60, graceSeconds));
+
+        return new FocusDefaultsDto
+        {
+            AllowedProcesses = allowedProcesses,
+            AllowedWebsites = allowedWebsites,
+            GraceSeconds = graceSeconds,
+        };
+    }
+
+    public FocusDefaultsDto GetFocusDefaults()
+    {
+        lock (_fileLock)
+        {
+            var path = LocalStoragePaths.FocusDefaultsFilePath;
+            if (!File.Exists(path))
+            {
+                var defaults = NormalizeFocusDefaults(null);
+                File.WriteAllText(path, JsonSerializer.Serialize(defaults, JsonOptions));
+                return defaults;
+            }
+
+            try
+            {
+                var json = File.ReadAllText(path);
+                var parsed = JsonSerializer.Deserialize<FocusDefaultsDto>(json, JsonOptions);
+                var normalized = NormalizeFocusDefaults(parsed);
+                return normalized;
+            }
+            catch
+            {
+                return NormalizeFocusDefaults(null);
+            }
+        }
+    }
+
+    public FocusDefaultsDto SaveFocusDefaults(FocusDefaultsDto request)
+    {
+        lock (_fileLock)
+        {
+            var normalized = NormalizeFocusDefaults(request);
+            var path = LocalStoragePaths.FocusDefaultsFilePath;
+            var json = JsonSerializer.Serialize(normalized, JsonOptions);
+            File.WriteAllText(path, json);
+            return normalized;
         }
     }
 

@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Collect new settings DOM nodes, including violation grace seconds input.
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Extend DOM collection for music dock controls and settings toggles.
@@ -165,6 +169,7 @@ export function collectDom() {
   const settingCloseBehavior = document.getElementById('settingCloseBehavior');
   const settingUiTone = document.getElementById('settingUiTone');
   const settingMusicAutoPlay = document.getElementById('settingMusicAutoPlay');
+  const settingFocusGraceSeconds = document.getElementById('settingFocusGraceSeconds');
   const openMusicFolderBtn = document.getElementById('openMusicFolderBtn');
   const settingsBehaviorMeta = document.getElementById('settingsBehaviorMeta');
   const archiveExportBtn = document.getElementById('archiveExportBtn');
@@ -314,6 +319,7 @@ export function collectDom() {
     settingCloseBehavior,
     settingUiTone,
     settingMusicAutoPlay,
+    settingFocusGraceSeconds,
     openMusicFolderBtn,
     settingsBehaviorMeta,
     archiveExportBtn,

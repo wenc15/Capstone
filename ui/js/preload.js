@@ -1,3 +1,8 @@
+/* 2026/04/05 edited by zhechengxu
+ * Changes:
+ *  - Expose whitelist app picker IPC bridge to renderer.
+ */
+
 /* 11.27 created by Jingyao Sun:
     前后端之间的bridge,允许我们在前端 JavaScript中安全地调用 Electron 提供的原生功能
     
@@ -29,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   openMusicFolder: () => ipcRenderer.invoke('music:openFolder'),
   listMusicTracks: () => ipcRenderer.invoke('music:listTracks'),
+  pickWhitelistAppFile: () => ipcRenderer.invoke('whitelist:pickAppFile'),
 
   // status: already have
   emitFocusStatus: (st) => ipcRenderer.send('focus:status', st),

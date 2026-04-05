@@ -1,3 +1,8 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Unify app/website violation timing into one continuous timer.
+//  - Improve cross-channel transition handling to avoid violation reset when switching sources.
+
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 增加网站白名单与违规累计逻辑。
@@ -102,7 +107,6 @@ public class FocusSessionService
     private HashSet<string> _websiteWhitelist = new(StringComparer.OrdinalIgnoreCase);
 
     private TimeSpan _grace = TimeSpan.FromSeconds(10); // 宽限时间
-    private DateTimeOffset? _violationStart;
     private bool _failed;
     private string? _failReason;
 
@@ -114,11 +118,12 @@ public class FocusSessionService
     private string? _sessionId;       // 新：用于调试/日志（可选）
     private DateTimeOffset? _startedAt; // 新：用于会话元信息（可选）
     private int _websiteViolationSeconds;
-    private int _websiteviolationseconds
-    {
-        get => _websiteViolationSeconds;
-        set => _websiteViolationSeconds = value;
-    }
+    private bool _websiteIsViolating;
+    private DateTimeOffset? _lastWebsiteReportAt;
+    private string? _lastWebsiteViolationDomain;
+    private bool _isCurrentlyViolating;
+    private DateTimeOffset? _lastNonBrowserProcessViolationAt;
+    private DateTimeOffset? _crossChannelViolationBridgeUntil;
 
     private const int AutoTrustMaxParentDepth = 6;
     private const int AutoTrustMaxPerSession = 32;
@@ -131,6 +136,19 @@ public class FocusSessionService
         "launcher",
         "bootstrapper",
     };
+
+    private static readonly HashSet<string> BrowserProcessNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "chrome",
+        "msedge",
+        "firefox",
+        "brave",
+        "opera",
+        "iexplore",
+    };
+
+    private static readonly TimeSpan WebsiteViolationStateTtl = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan CrossChannelViolationBridgeWindow = TimeSpan.FromSeconds(2);
 
 
     public FocusSessionService(LocalDataService dataService)
@@ -161,11 +179,16 @@ public class FocusSessionService
 
             _failed = false;
             _failReason = null;
-            _violationStart = null;
             _violationSeconds = 0;
             _violationElapsedMs = 0;
             _sessionTrustedProcesses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _websiteViolationSeconds = 0;
+            _websiteIsViolating = false;
+            _lastWebsiteReportAt = null;
+            _lastWebsiteViolationDomain = null;
+            _isCurrentlyViolating = false;
+            _lastNonBrowserProcessViolationAt = null;
+            _crossChannelViolationBridgeUntil = null;
             _sessionStopwatch.Reset();
             _sessionStopwatch.Start();
             _lastTickElapsedMs = 0;
@@ -246,49 +269,82 @@ public class FocusSessionService
 
             var active = ActiveWindowHelper.GetActiveProcessInfo();
             _currentProcess = active?.ProcessName;
+            var normalized = NormalizeProcessName(active?.ProcessName ?? string.Empty);
+            var browserActive = BrowserProcessNames.Contains(normalized);
+            bool processIsViolating = false;
 
-            if (active is null || string.IsNullOrEmpty(active.ProcessName))
+            if (!string.IsNullOrWhiteSpace(normalized))
             {
-                _violationStart = null;
-                _violationSeconds = 0;
-                _violationElapsedMs = 0;
-                return;
-            }
+                bool isAllowed = _whitelist.Contains(normalized) || _sessionTrustedProcesses.Contains(normalized);
 
-            var normalized = NormalizeProcessName(active.ProcessName);
-            bool isAllowed = _whitelist.Contains(normalized) || _sessionTrustedProcesses.Contains(normalized);
-
-            if (!isAllowed && TryAutoTrustByParent(active, normalized))
-            {
-                isAllowed = true;
-            }
-
-            if (isAllowed)
-            {
-                _violationStart = null;
-                _violationSeconds = 0;
-                _violationElapsedMs = 0;
-                return;
-            }
-
-            // 非白名单软件
-            if (_violationStart is null)
-            {
-                _violationStart = now;
-                _violationSeconds = 0;
-                _violationElapsedMs = 0;
-            }
-            else
-            {
-                _violationElapsedMs += deltaMs;
-                _violationSeconds = (int)(_violationElapsedMs / 1000L);
-
-                if (_violationElapsedMs >= _grace.TotalMilliseconds)
+                if (!isAllowed && active is not null && TryAutoTrustByParent(active, normalized))
                 {
-                    _failed = true;
-                    _failReason = $"Used non-whitelisted program：{_currentProcess}";
-                    EndSession(SessionOutcome.Failed);
+                    isAllowed = true;
                 }
+
+                processIsViolating = !isAllowed;
+            }
+
+            if (processIsViolating && !browserActive)
+            {
+                _lastNonBrowserProcessViolationAt = now;
+            }
+
+            RefreshWebsiteViolationState(now, normalized);
+
+            var combinedViolating = processIsViolating || _websiteIsViolating;
+
+            if (!combinedViolating
+                && browserActive
+                && _websiteWhitelist.Count > 0
+                && _violationElapsedMs > 0
+                && _lastNonBrowserProcessViolationAt.HasValue
+                && now - _lastNonBrowserProcessViolationAt.Value <= CrossChannelViolationBridgeWindow)
+            {
+                _crossChannelViolationBridgeUntil ??= now.Add(CrossChannelViolationBridgeWindow);
+            }
+
+            if (!combinedViolating
+                && _crossChannelViolationBridgeUntil.HasValue
+                && now < _crossChannelViolationBridgeUntil.Value)
+            {
+                combinedViolating = true;
+            }
+
+            if (processIsViolating || _websiteIsViolating)
+            {
+                _crossChannelViolationBridgeUntil = null;
+            }
+
+            _isCurrentlyViolating = combinedViolating;
+
+            if (!combinedViolating)
+            {
+                _violationSeconds = 0;
+                _violationElapsedMs = 0;
+                _crossChannelViolationBridgeUntil = null;
+                return;
+            }
+
+            _violationElapsedMs += deltaMs;
+            _violationSeconds = (int)(_violationElapsedMs / 1000L);
+
+            if (_violationElapsedMs >= _grace.TotalMilliseconds)
+            {
+                _failed = true;
+                if (_websiteIsViolating && !processIsViolating)
+                {
+                    _failReason = $"Used non-whitelisted website: {_lastWebsiteViolationDomain ?? "unknown"}";
+                }
+                else if (!processIsViolating)
+                {
+                    _failReason = "Used non-whitelisted app/website";
+                }
+                else
+                {
+                    _failReason = $"Used non-whitelisted program: {_currentProcess}";
+                }
+                EndSession(SessionOutcome.Failed);
             }
         }
     }
@@ -330,6 +386,33 @@ public class FocusSessionService
             Note = note,
             Outcome = outcome.ToString().ToLower(), // success / failed / aborted
         });
+    }
+
+    private void RefreshWebsiteViolationState(DateTimeOffset now, string currentProcessNormalized)
+    {
+        if (_websiteWhitelist.Count == 0)
+        {
+            _websiteIsViolating = false;
+            _websiteViolationSeconds = 0;
+            _lastWebsiteViolationDomain = null;
+            return;
+        }
+
+        if (!BrowserProcessNames.Contains(currentProcessNormalized))
+        {
+            _websiteIsViolating = false;
+            _websiteViolationSeconds = 0;
+            _lastWebsiteViolationDomain = null;
+            return;
+        }
+
+        if (_lastWebsiteReportAt.HasValue
+            && now - _lastWebsiteReportAt.Value > WebsiteViolationStateTtl)
+        {
+            _websiteIsViolating = false;
+            _websiteViolationSeconds = 0;
+            _lastWebsiteViolationDomain = null;
+        }
     }
 
 
@@ -475,8 +558,8 @@ public class FocusSessionService
                 RemainingSeconds = _remainingSeconds,
                 IsFailed = _failed,
                 FailReason = _failReason,
-                IsViolating = _violationSeconds > 0 && !_failed && _isRunning,
-                ViolationSeconds = _violationSeconds,
+                IsViolating = _isCurrentlyViolating && !_failed && _isRunning,
+                ViolationSeconds = Math.Max(0, _violationSeconds),
                 CurrentProcess = _currentProcess
             };
         }
@@ -490,25 +573,31 @@ public class FocusSessionService
                 return;
 
             if (_websiteWhitelist.Count == 0)
+            {
+                _websiteIsViolating = false;
+                _websiteViolationSeconds = 0;
+                _lastWebsiteViolationDomain = null;
                 return;
+            }
 
             var normalized = NormalizeDomain(!string.IsNullOrWhiteSpace(domain) ? domain : url);
             if (string.IsNullOrWhiteSpace(normalized))
                 return;
 
+            _lastWebsiteReportAt = DateTimeOffset.Now;
+
             if (IsDomainAllowed(normalized))
             {
+                _websiteIsViolating = false;
                 _websiteViolationSeconds = 0;
+                _lastWebsiteViolationDomain = null;
                 return;
             }
 
+            _websiteIsViolating = true;
             _websiteViolationSeconds += durationSeconds;
-            if (_websiteViolationSeconds >= _grace.TotalSeconds)
-            {
-                _failed = true;
-                _failReason = $"Used non-whitelisted website: {normalized}";
-                EndSession(SessionOutcome.Failed);
-            }
+            _lastWebsiteViolationDomain = normalized;
+            _isCurrentlyViolating = true;
         }
     }
 

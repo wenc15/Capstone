@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Improve violating-state rendering and guard against duplicate start toggles.
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Add widget music prev/next controls and SVG icon controls.
@@ -33,6 +37,17 @@ import { subscribeFocusStatus, getFocusStatus } from './focusStatusStore.js';
 
 const APP_SETTINGS_LOCAL_KEY = 'growin:appBehaviorSettings';
 const DEFAULT_GRACE_SECONDS = 10;
+
+function shouldShowViolationState(st) {
+  if (!st?.isRunning) return false;
+  if (st?.isViolating) return true;
+  if (Number(st?.violationSeconds ?? 0) > 0) return true;
+
+  // Keep warning visual when session already failed due whitelist violations.
+  const reason = String(st?.failReason || '').toLowerCase();
+  if (!st?.isFailed || !reason) return false;
+  return reason.includes('non-whitelisted website') || reason.includes('non-whitelisted program');
+}
 
 function normalizeUiTone(v) {
   return String(v || '').trim().toLowerCase() === 'sky' ? 'sky' : 'default';
@@ -100,7 +115,7 @@ export function mountWidget() {
 
   function getWidgetDisplaySeconds(st) {
     const base = Math.max(0, Number(st?.remainingSeconds ?? 0) || 0);
-    if (!st?.isRunning || !st?.isViolating) return base;
+    if (!st?.isRunning || !shouldShowViolationState(st)) return base;
 
     const violatingFor = Math.max(0, Number(st?.violationSeconds ?? 0) || 0);
     return Math.max(0, DEFAULT_GRACE_SECONDS - violatingFor);
@@ -115,7 +130,7 @@ export function mountWidget() {
 
     root.classList.toggle('wg-running', !!st.isRunning);
     root.classList.toggle('wg-failed', !!st.isFailed);
-    root.classList.toggle('wg-violating', !!st.isViolating);
+    root.classList.toggle('wg-violating', shouldShowViolationState(st));
   }
 
   // 初始化：用当前状态先画一次（比如 00:00、▶️）
@@ -133,7 +148,7 @@ export function mountWidget() {
     e?.stopPropagation?.();
 
     const now = Date.now();
-    if (now - lastFocusToggleAt < 180) return;
+    if (now - lastFocusToggleAt < 450) return;
     lastFocusToggleAt = now;
 
     // Independent widget window can see slightly stale focus status.
@@ -159,7 +174,6 @@ export function mountWidget() {
 
   // pointerdown is more reliable than click inside draggable widget window.
   btnPlay.addEventListener('pointerdown', triggerFocusToggle);
-  btnPlay.addEventListener('click', triggerFocusToggle);
 
   function triggerMusicCommand(cmd) {
     if (cmd !== 'prev' && cmd !== 'next') return;

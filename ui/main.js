@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add whitelist picker IPC with exe/lnk support and shortcut target resolution.
+
 // Capstone/ui/main.js
 // 2025/11/28 edited by Jingyao: 新增 ballwin 使悬浮球为独立窗口
 
@@ -19,7 +23,7 @@
 //   - Widget 支持从托盘随时显示/隐藏，避免 close 后无法恢复的问题。
 // =============================================================
 
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, session, shell, dialog } = require('electron');
 
 const { placeBallAtOldWidgetSpot } = require('./js/ballPositioner');
 
@@ -559,6 +563,102 @@ ipcMain.handle('music:listTracks', async () => {
     return { ok: true, folder, tracks };
   } catch (e) {
     return { ok: false, error: e?.message || String(e), tracks: [] };
+  }
+});
+
+function extractFirstExeToken(rawValue) {
+  const text = String(rawValue || '').trim();
+  if (!text) return '';
+
+  const quoted = text.match(/"([^"\r\n]*?\.exe)"/i);
+  if (quoted?.[1]) {
+    const fromQuoted = path.basename(quoted[1]);
+    if (/\.exe$/i.test(fromQuoted)) return fromQuoted;
+  }
+
+  const plain = text.match(/([^\s"'`<>|]+?\.exe)/i);
+  if (plain?.[1]) {
+    const fromPlain = path.basename(plain[1]);
+    if (/\.exe$/i.test(fromPlain)) return fromPlain;
+  }
+
+  return '';
+}
+
+function getWhitelistBrowseDefaultPath() {
+  let userDesktop = '';
+  try {
+    userDesktop = app.getPath('desktop');
+  } catch {
+    userDesktop = '';
+  }
+
+  const publicDesktop = path.join('C:\\Users', 'Public', 'Desktop');
+  const hasUserDesktop = !!userDesktop && fs.existsSync(userDesktop);
+  const hasPublicDesktop = fs.existsSync(publicDesktop);
+
+  if (hasUserDesktop && hasPublicDesktop) {
+    const userChrome = fs.existsSync(path.join(userDesktop, 'Google Chrome.lnk'));
+    const publicChrome = fs.existsSync(path.join(publicDesktop, 'Google Chrome.lnk'));
+    if (!userChrome && publicChrome) {
+      return publicDesktop;
+    }
+    return userDesktop;
+  }
+
+  if (hasUserDesktop) return userDesktop;
+  if (hasPublicDesktop) return publicDesktop;
+  return undefined;
+}
+
+ipcMain.handle('whitelist:pickAppFile', async () => {
+  try {
+    const owner = mainWin && !mainWin.isDestroyed() ? mainWin : null;
+    const pick = await dialog.showOpenDialog(owner, {
+      title: 'Select application or shortcut',
+      defaultPath: getWhitelistBrowseDefaultPath(),
+      properties: ['openFile'],
+      filters: [
+        { name: 'Applications and shortcuts', extensions: ['exe', 'lnk'] },
+        { name: 'Applications', extensions: ['exe'] },
+        { name: 'Shortcuts', extensions: ['lnk'] },
+      ],
+    });
+
+    if (pick.canceled || !Array.isArray(pick.filePaths) || pick.filePaths.length === 0) {
+      return { canceled: true };
+    }
+
+    const selectedPath = String(pick.filePaths[0] || '');
+    const selectedName = path.basename(selectedPath);
+    const ext = path.extname(selectedPath).toLowerCase();
+
+    let targetPath = '';
+    if (ext === '.lnk') {
+      try {
+        const shortcut = shell.readShortcutLink(selectedPath);
+        targetPath = String(shortcut?.target || '');
+      } catch {
+        targetPath = '';
+      }
+    }
+
+    const resolvedPath = targetPath || selectedPath;
+    const resolvedExeName = extractFirstExeToken(resolvedPath || selectedName);
+
+    return {
+      canceled: false,
+      selectedPath,
+      selectedName,
+      selectedExt: ext,
+      targetPath: targetPath || null,
+      resolvedExeName: resolvedExeName || null,
+    };
+  } catch (e) {
+    return {
+      canceled: false,
+      error: e?.message || String(e),
+    };
   }
 });
 

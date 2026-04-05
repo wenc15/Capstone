@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add realtime website usage endpoint for low-latency focus violation detection.
+
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - 在 POST /api/usage 中联动 FocusSessionService。
@@ -112,6 +116,29 @@ public class UsageController : ControllerBase
     }
 
     // ---------------------------------------------------------
+    // POST /api/usage/realtime
+    // 用途：
+    //   - 由 Chrome 扩展按秒上报“当前活跃网站切片”，仅用于专注违规实时判定。
+    //   - 不写入数据库，避免高频写入导致数据膨胀。
+    // ---------------------------------------------------------
+    [HttpPost("realtime")]
+    public IActionResult ReportRealtime([FromBody] List<UsageRealtimeItemDto> items)
+    {
+        if (items == null || items.Count == 0)
+            return BadRequest(new { error = "Realtime usage list cannot be empty" });
+
+        foreach (var item in items)
+        {
+            if (item == null || item.Duration <= 0)
+                continue;
+
+            _focusService.ReportWebsiteUsage(item.Domain, item.Url, item.Duration);
+        }
+
+        return Ok();
+    }
+
+    // ---------------------------------------------------------
     // GET /api/usage/today
     // 用途：
     //   - 前端查询「今日各网站累计使用时长」（按域名聚合）。
@@ -208,4 +235,11 @@ public class UsageSummaryDto
 
     // 总时长（秒），前端可以再转换为分钟 / 小时显示
     public int TotalSeconds { get; set; }
+}
+
+public class UsageRealtimeItemDto
+{
+    public string Url { get; set; } = "";
+    public string Domain { get; set; } = "";
+    public int Duration { get; set; }
 }

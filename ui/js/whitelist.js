@@ -1,3 +1,8 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Extend whitelist to apps + websites and sync defaults to backend.
+//  - Add website input warning hints (validation hint only, no normalization).
+
 // js/whitelist.js
 // 2026/01/29 edited by Zhecheng Xu
 // 新增内容：
@@ -34,6 +39,8 @@
 //
 //   initWhitelist(whitelistGroup);
 //   const processes = getAllowedProcesses(); // -> ["chrome.exe", "Code.exe", ...]
+
+import { LOCAL_STORAGE_KEYS } from './local_storage.js';
 
 
 // 预置应用“库”，类似 Windows 搜索到的常见应用列表。
@@ -95,7 +102,13 @@ export const BASE_APP_CATALOG = [
 
 const CUSTOM_CATALOG_KEY = 'growin.custom_app_catalog.v1';
 const WHITELIST_SELECTION_KEY = 'growin.whitelist.selection.v1';
+const API_BASE = 'http://localhost:5024';
+const DEFAULT_FOCUS_GRACE_SECONDS = 10;
+const MIN_FOCUS_GRACE_SECONDS = 5;
+const MAX_FOCUS_GRACE_SECONDS = 60;
 let customCatalog = loadCustomCatalog();
+let focusDefaultsSyncTimer = null;
+let focusDefaultsSyncBound = false;
 
 function loadCustomCatalog() {
   try {
@@ -163,8 +176,93 @@ function upsertCustomApp(exeName) {
 
 function getExeNameFromPath(filePath) {
   if (!filePath) return '';
-  const parts = filePath.split(/[/\\]+/);
+  const normalized = String(filePath || '').replace(/^"+|"+$/g, '').trim();
+  if (!normalized) return '';
+  const parts = normalized.split(/[/\\]+/);
   return parts[parts.length - 1] || '';
+}
+
+function extractFirstExeToken(rawValue) {
+  const text = String(rawValue || '').trim();
+  if (!text) return '';
+
+  const quoted = text.match(/"([^"\r\n]*?\.exe)"/i);
+  if (quoted?.[1]) {
+    const fromQuoted = getExeNameFromPath(quoted[1]);
+    if (/\.exe$/i.test(fromQuoted)) return fromQuoted;
+  }
+
+  const plain = text.match(/([^\s"'`<>|]+?\.exe)/i);
+  if (plain?.[1]) {
+    const fromPlain = getExeNameFromPath(plain[1]);
+    if (/\.exe$/i.test(fromPlain)) return fromPlain;
+  }
+
+  return '';
+}
+
+function inferExeNameFromShortcutName(fileName) {
+  const raw = String(fileName || '').trim().toLowerCase();
+  if (!raw) return '';
+  const stem = raw
+    .replace(/\.lnk$/i, '')
+    .replace(/\s*-\s*shortcut$/i, '')
+    .replace(/\s*-\s*快捷方式$/i, '')
+    .trim();
+
+  if (stem.includes('chrome')) return 'chrome.exe';
+  if (stem.includes('edge')) return 'msedge.exe';
+  if (stem.includes('firefox')) return 'firefox.exe';
+  if (stem.includes('brave')) return 'brave.exe';
+  if (stem.includes('opera')) return 'opera.exe';
+  return '';
+}
+
+function resolvePickedExeName(picked) {
+  const candidateList = [
+    picked?.resolvedExeName,
+    picked?.targetPath,
+    picked?.selectedPath,
+    picked?.selectedName,
+  ];
+
+  for (const candidate of candidateList) {
+    const resolved = extractFirstExeToken(candidate);
+    if (resolved) return resolved;
+  }
+
+  const inferred = inferExeNameFromShortcutName(picked?.selectedName || picked?.selectedPath || '');
+  return inferred;
+}
+
+function addPickedFileToWhitelist(picked, groupEl, inputEl, browseFile) {
+  if (!picked || picked.canceled) return;
+  if (picked.error) {
+    console.warn('[Whitelist] Browse failed:', picked.error);
+    if (browseFile) browseFile.value = '';
+    return;
+  }
+
+  const exeName = resolvePickedExeName(picked);
+  if (!/\.exe$/i.test(exeName)) {
+    console.warn('[Whitelist] Could not resolve executable from selection:', picked);
+    if (browseFile) browseFile.value = '';
+    return;
+  }
+
+  const matched = findAppByExe(exeName);
+  const custom = matched ? null : upsertCustomApp?.(exeName);
+  const appId = matched?.id || custom?.id;
+
+  if (appId) {
+    addAppToSelection(appId);
+    renderSelected(groupEl);
+  }
+
+  inputEl.value = '';
+  renderResults(groupEl, '');
+
+  if (browseFile) browseFile.value = '';
 }
 
 function findAppByExe(exeName) {
@@ -174,37 +272,121 @@ function findAppByExe(exeName) {
   ) || null;
 }
 
-// 当前选中的应用，用 id 表示（例如 ["chrome", "code"]）
-let currentWhitelistApps = ['electron'];  // 默认至少包含 Electron，避免白名单为空
+// 当前白名单选择（应用 + 网站）
+let currentWhitelistSelection = {
+  appIds: ['electron'],
+  websites: [],
+};
 const ALWAYS_ALLOWED_APP_IDS = ['electron'];
 
 function isAlwaysAllowedId(id) {
   return ALWAYS_ALLOWED_APP_IDS.includes(String(id || '').toLowerCase());
 }
 
-function normalizeSelection(ids) {
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeAppIds(ids) {
   const set = new Set((Array.isArray(ids) ? ids : []).filter(Boolean));
   ALWAYS_ALLOWED_APP_IDS.forEach((id) => set.add(id));
   return Array.from(set);
 }
 
+function normalizeWebsites(websites) {
+  const normalized = [];
+  const seen = new Set();
+  (Array.isArray(websites) ? websites : []).forEach((site) => {
+    const value = String(site || '').trim();
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    normalized.push(value);
+  });
+  return normalized;
+}
+
+function normalizeSelection(selection) {
+  // backward compatible: old shape is an array of app ids
+  if (Array.isArray(selection)) {
+    return {
+      appIds: normalizeAppIds(selection.map(String)),
+      websites: [],
+    };
+  }
+
+  const appIds = normalizeAppIds((selection?.appIds || []).map(String));
+  const websites = normalizeWebsites(selection?.websites || []);
+  return { appIds, websites };
+}
+
 function loadSelection() {
   try {
     const raw = localStorage.getItem(WHITELIST_SELECTION_KEY);
-    const list = raw ? JSON.parse(raw) : null;
-    if (!Array.isArray(list)) return normalizeSelection(currentWhitelistApps);
-    return normalizeSelection(list.map(String));
+    const parsed = raw ? JSON.parse(raw) : null;
+    return normalizeSelection(parsed);
   } catch {
-    return normalizeSelection(currentWhitelistApps);
+    return normalizeSelection(currentWhitelistSelection);
   }
 }
 
 function saveSelection() {
   try {
-    localStorage.setItem(WHITELIST_SELECTION_KEY, JSON.stringify(normalizeSelection(currentWhitelistApps)));
+    localStorage.setItem(WHITELIST_SELECTION_KEY, JSON.stringify(normalizeSelection(currentWhitelistSelection)));
   } catch {
     // ignore
   }
+  scheduleFocusDefaultsSync();
+}
+
+function clampFocusGraceSeconds(v) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return DEFAULT_FOCUS_GRACE_SECONDS;
+  return Math.max(MIN_FOCUS_GRACE_SECONDS, Math.min(MAX_FOCUS_GRACE_SECONDS, n));
+}
+
+function loadFocusGraceSecondsLocal() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEYS.focusGraceSeconds);
+    if (raw == null) return DEFAULT_FOCUS_GRACE_SECONDS;
+    return clampFocusGraceSeconds(raw);
+  } catch {
+    return DEFAULT_FOCUS_GRACE_SECONDS;
+  }
+}
+
+async function syncFocusDefaultsToBackend() {
+  const body = {
+    allowedProcesses: getAllowedProcesses(),
+    allowedWebsites: [...(currentWhitelistSelection.websites || [])],
+    graceSeconds: loadFocusGraceSecondsLocal(),
+  };
+
+  try {
+    await fetch(`${API_BASE}/api/focus/defaults`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // ignore sync failures; local selection remains source of truth for main UI
+  }
+}
+
+function scheduleFocusDefaultsSync() {
+  if (focusDefaultsSyncTimer) {
+    clearTimeout(focusDefaultsSyncTimer);
+  }
+  focusDefaultsSyncTimer = setTimeout(() => {
+    focusDefaultsSyncTimer = null;
+    void syncFocusDefaultsToBackend();
+  }, 180);
 }
 
 function findAppById(id) {
@@ -223,6 +405,21 @@ function searchApps(keyword) {
   );
 }
 
+function getWebsiteInputHint(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  if (/\s/.test(text)) {
+    return 'Contains spaces. Check if this is a valid domain/URL.';
+  }
+
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
+  const hostLike = /^(localhost|(\d{1,3}\.){3}\d{1,3}|[a-z0-9-]+(\.[a-z0-9-]+)+)(:\d+)?(\/.*)?$/i.test(text);
+  if (hasScheme || hostLike) return '';
+
+  return 'Looks unusual for a website, but you can still add it.';
+}
+
 /**
  * 渲染“已选应用”列表（#wlSelectedList）
  * @param {HTMLElement} rootEl - whitelistGroup 根节点
@@ -231,22 +428,24 @@ function renderSelected(rootEl) {
   const listEl = rootEl.querySelector('#wlSelectedList');
   if (!listEl) return;
 
-  const visibleSelected = currentWhitelistApps.filter((id) => !isAlwaysAllowedId(id));
+  const visibleApps = currentWhitelistSelection.appIds.filter((id) => !isAlwaysAllowedId(id));
+  const visibleWebsites = currentWhitelistSelection.websites;
 
-  if (!visibleSelected.length) {
-    listEl.innerHTML = '<li class="wl-selected-empty">No apps selected yet.</li>';
+  if (!visibleApps.length && !visibleWebsites.length) {
+    listEl.innerHTML = '<li class="wl-selected-empty">No apps/websites selected yet.</li>';
     return;
   }
 
-  listEl.innerHTML = visibleSelected
-    .map(id => {
+  const appPills = visibleApps
+    .map((id) => {
       const app = findAppById(id);
-      const label = app?.label || id;
+      const label = escapeHtml(app?.label || id);
       return `
         <li class="wl-pill" data-app-id="${id}">
           <span class="wl-pill-label">${label}</span>
           <button type="button"
                   class="wl-pill-remove"
+                  data-remove-kind="app"
                   data-app-id="${id}">
             ×
           </button>
@@ -254,6 +453,34 @@ function renderSelected(rootEl) {
       `;
     })
     .join('');
+
+  const websitePills = visibleWebsites
+    .map((website) => {
+      const safeWebsite = escapeHtml(website);
+      return `
+        <li class="wl-pill wl-pill-website" data-website="${safeWebsite}">
+          <span class="wl-pill-label">${safeWebsite}</span>
+          <button type="button"
+                  class="wl-pill-remove"
+                  data-remove-kind="website"
+                  data-website="${safeWebsite}">
+            ×
+          </button>
+        </li>
+      `;
+    })
+    .join('');
+
+  listEl.innerHTML = `
+    <li class="wl-selected-line">
+      <span class="wl-selected-line-label">Apps:</span>
+      <ul class="wl-line-list">${appPills || '<li class="wl-line-empty">None</li>'}</ul>
+    </li>
+    <li class="wl-selected-line">
+      <span class="wl-selected-line-label">Websites:</span>
+      <ul class="wl-line-list">${websitePills || '<li class="wl-line-empty">None</li>'}</ul>
+    </li>
+  `;
 }
 
 /**
@@ -272,23 +499,66 @@ function renderResults(rootEl, keyword) {
   }
 
   const matches = searchApps(k);
-  if (!matches.length) {
+  const normalizedWebsite = k;
+  const websiteHint = getWebsiteInputHint(normalizedWebsite);
+  const websiteAlreadySelected = currentWhitelistSelection.websites
+    .some((site) => site.toLowerCase() === normalizedWebsite.toLowerCase());
+
+  const websiteOption = websiteAlreadySelected
+    ? ''
+    : `
+      <div class="wl-result-item wl-result-item-website"
+           data-result-type="website"
+           data-website="${escapeHtml(normalizedWebsite)}">
+        <div class="wl-result-name">Use website: ${escapeHtml(normalizedWebsite)}</div>
+        <div class="wl-result-exe">Add this website to whitelist</div>
+        ${websiteHint
+          ? `<div class="wl-result-hint-warning">${escapeHtml(websiteHint)}</div>`
+          : ''}
+      </div>
+    `;
+
+  if (!matches.length && !websiteOption) {
     resultsEl.innerHTML =
-      '<div class="wl-result-empty">No apps found. Try another keyword.</div>';
+      '<div class="wl-result-empty">No matching app or website option found.</div>';
     return;
   }
 
-  resultsEl.innerHTML = matches
-    .map(app => {
+  const appItems = matches
+    .map((app) => {
       const exes = app.exeList.join(', ');
       return `
         <div class="wl-result-item" data-app-id="${app.id}">
-          <div class="wl-result-name">${app.label}</div>
-          <div class="wl-result-exe">${exes}</div>
+          <div class="wl-result-name">${escapeHtml(app.label)}</div>
+          <div class="wl-result-exe">${escapeHtml(exes)}</div>
         </div>
       `;
     })
     .join('');
+
+  resultsEl.innerHTML = `${websiteOption}${appItems}`;
+}
+
+function addAppToSelection(appId) {
+  if (!appId || currentWhitelistSelection.appIds.includes(appId)) return false;
+  currentWhitelistSelection.appIds.push(appId);
+  currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
+  saveSelection();
+  return true;
+}
+
+function addWebsiteToSelection(rawWebsite) {
+  const website = String(rawWebsite || '').trim();
+  if (!website) return false;
+
+  const exists = currentWhitelistSelection.websites
+    .some((item) => item.toLowerCase() === website.toLowerCase());
+  if (exists) return false;
+
+  currentWhitelistSelection.websites.push(website);
+  currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
+  saveSelection();
+  return true;
 }
 
 /**
@@ -298,7 +568,7 @@ function renderResults(rootEl, keyword) {
 export function initWhitelist(groupEl) {
   if (!groupEl) {
     console.warn('[Whitelist] initWhitelist called with null element');
-    currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+    currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
     return;
   }
 
@@ -313,8 +583,17 @@ export function initWhitelist(groupEl) {
     return;
   }
 
-  currentWhitelistApps = normalizeSelection(currentWhitelistApps);
-  currentWhitelistApps = loadSelection();
+  currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
+  currentWhitelistSelection = loadSelection();
+
+  if (!focusDefaultsSyncBound) {
+    focusDefaultsSyncBound = true;
+    window.addEventListener('growin:focus-grace-seconds', () => {
+      scheduleFocusDefaultsSync();
+    });
+  }
+
+  scheduleFocusDefaultsSync();
 
   // 初始渲染：默认选中 electron
   renderSelected(groupEl);
@@ -325,42 +604,27 @@ export function initWhitelist(groupEl) {
     renderResults(groupEl, inputEl.value);
   });
 
-  // Browse -> 选择 exe -> 加入白名单（只取 file.name）
-  browseBtn?.addEventListener('click', () => {
-    // 触发隐藏的 file input，会弹出系统选择器
+  // Browse -> 选择 exe/lnk -> 加入白名单
+  browseBtn?.addEventListener('click', async () => {
+    const picker = window.electronAPI?.pickWhitelistAppFile;
+    if (typeof picker === 'function') {
+      try {
+        const picked = await picker();
+        addPickedFileToWhitelist(picked, groupEl, inputEl, browseFile);
+        return;
+      } catch (err) {
+        console.warn('[Whitelist] IPC picker unavailable, fallback to file input:', err);
+      }
+    }
+
+    // fallback: 触发隐藏 file input（非 Electron 环境）
     browseFile?.click();
   });
 
   browseFile?.addEventListener('change', () => {
     const file = browseFile.files?.[0];
     if (!file) return;
-
-    const exeName = file.name; // ✅ 只要 exe 名就够了
-    if (!/\.exe$/i.test(exeName)) {
-      console.warn('[Whitelist] Not an exe:', exeName);
-      browseFile.value = '';
-      return;
-    }
-
-    // 1) 记录到“自定义库”（推荐：存 localStorage，方便下次还能搜到）
-    const custom = upsertCustomApp?.(exeName); // 如果你写了 upsertCustomApp
-    // 如果你没做持久化，也可以直接用 exeName 创建一个临时 id：
-    const appId = custom?.id || `custom_${exeName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
-
-    // 2) 选中它
-    if (!currentWhitelistApps.includes(appId)) {
-      currentWhitelistApps.push(appId);
-      currentWhitelistApps = normalizeSelection(currentWhitelistApps);
-      saveSelection();
-      renderSelected(groupEl);
-    }
-
-    // 3) 清空搜索 & 结果（保持你原来的体验）
-    inputEl.value = '';
-    renderResults(groupEl, '');
-
-    // 4) 允许下次选择同一个文件也触发 change
-    browseFile.value = '';
+    addPickedFileToWhitelist({ selectedName: file.name }, groupEl, inputEl, browseFile);
   });
 
 
@@ -369,13 +633,18 @@ export function initWhitelist(groupEl) {
   resultsEl.addEventListener('click', event => {
     const item = event.target.closest('.wl-result-item');
     if (!item) return;
-    const appId = item.getAttribute('data-app-id');
-    if (!appId) return;
 
-    if (!currentWhitelistApps.includes(appId)) {
-      currentWhitelistApps.push(appId);
-      currentWhitelistApps = normalizeSelection(currentWhitelistApps);
-      saveSelection();
+    const resultType = item.getAttribute('data-result-type');
+    if (resultType === 'website') {
+      const website = item.getAttribute('data-website');
+      if (website) {
+        addWebsiteToSelection(website);
+        renderSelected(groupEl);
+      }
+    } else {
+      const appId = item.getAttribute('data-app-id');
+      if (!appId) return;
+      addAppToSelection(appId);
       renderSelected(groupEl);
     }
 
@@ -388,12 +657,22 @@ export function initWhitelist(groupEl) {
   selectedEl.addEventListener('click', event => {
     const btn = event.target.closest('.wl-pill-remove');
     if (!btn) return;
-    const appId = btn.getAttribute('data-app-id');
-    if (!appId) return;
-    if (isAlwaysAllowedId(appId)) return;
+    const removeKind = btn.getAttribute('data-remove-kind');
 
-    currentWhitelistApps = currentWhitelistApps.filter(id => id !== appId);
-    currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+    if (removeKind === 'website') {
+      const website = String(btn.getAttribute('data-website') || '').trim();
+      if (!website) return;
+      currentWhitelistSelection.websites = currentWhitelistSelection.websites
+        .filter((site) => site.toLowerCase() !== website.toLowerCase());
+    } else {
+      const appId = btn.getAttribute('data-app-id');
+      if (!appId) return;
+      if (isAlwaysAllowedId(appId)) return;
+      currentWhitelistSelection.appIds = currentWhitelistSelection.appIds
+        .filter((id) => id !== appId);
+    }
+
+    currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
     saveSelection();
 
     renderSelected(groupEl);
@@ -405,9 +684,9 @@ export function initWhitelist(groupEl) {
  * @returns {string[]}
  */
 export function getAllowedProcesses() {
-  currentWhitelistApps = normalizeSelection(currentWhitelistApps);
+  currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
   const exes = [];
-  currentWhitelistApps.forEach(id => {
+  currentWhitelistSelection.appIds.forEach(id => {
     const app = findAppById(id);
     if (!app) return;
     app.exeList.forEach(exe => exes.push(exe));
@@ -416,16 +695,22 @@ export function getAllowedProcesses() {
   return Array.from(new Set(exes));
 }
 
+export function getAllowedWebsites() {
+  currentWhitelistSelection = normalizeSelection(currentWhitelistSelection);
+  return [...currentWhitelistSelection.websites];
+}
+
 /**
  * 给存储 / 统计用：返回类似 "Google Chrome, Visual Studio Code" 的字符串
  * @returns {string}
  */
 export function getWhitelistNote() {
-  const visibleSelected = currentWhitelistApps.filter((id) => !isAlwaysAllowedId(id));
-  if (!visibleSelected.length) return '';
-  const labels = visibleSelected.map(id => {
+  const visibleApps = currentWhitelistSelection.appIds.filter((id) => !isAlwaysAllowedId(id));
+  const labels = visibleApps.map(id => {
     const app = findAppById(id);
     return app?.label || id;
   });
-  return labels.join(', ');
+  const websites = currentWhitelistSelection.websites;
+  const parts = [...labels, ...websites];
+  return parts.join(', ');
 }

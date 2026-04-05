@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Support held movement + soft drop together and lock hard drop to one trigger per space press.
+
 // 2026/03/23 edited by Zikai Lu
 // Changes:
 //  - Add and keep the starlit Tetris skin (starfield visible only through filled blocks).
@@ -84,8 +88,40 @@ function defaultState() {
     currentY: 0,
     dropInterval: null,
     lastDrop: 0,
+    input: {
+      left: false,
+      right: false,
+      down: false,
+      hardDropLocked: false,
+      lastHorizontalAt: 0,
+      lastSoftDropAt: 0,
+    },
     skinId: DEFAULT_SKIN_ID,
   };
+}
+
+function ensureInputState(st) {
+  if (!st.input || typeof st.input !== 'object') {
+    st.input = {
+      left: false,
+      right: false,
+      down: false,
+      hardDropLocked: false,
+      lastHorizontalAt: 0,
+      lastSoftDropAt: 0,
+    };
+  }
+  return st.input;
+}
+
+function resetInputState(st) {
+  const input = ensureInputState(st);
+  input.left = false;
+  input.right = false;
+  input.down = false;
+  input.hardDropLocked = false;
+  input.lastHorizontalAt = 0;
+  input.lastSoftDropAt = 0;
 }
 
 function toPersistedState(st) {
@@ -343,6 +379,7 @@ function startGame(st) {
   st.gameOver = false;
   st.paused = false;
   st.playing = true;
+  resetInputState(st);
   st.nextPiece = getRandomPiece();
   spawnPiece(st);
   save(st, { immediate: true });
@@ -538,6 +575,7 @@ function attachHandlers(els, stRef) {
     }
     st.playing = false;
     st.paused = false;
+    resetInputState(st);
     save(st);
   };
 
@@ -556,29 +594,48 @@ function attachHandlers(els, stRef) {
     else pauseTetris(st);
   });
 
-  window.addEventListener('keydown', (ev) => {
+  const onKeyDown = (ev) => {
     const st = stRef.current;
     if (!st || !st.playing || st.paused || st.gameOver) return;
 
+    const input = ensureInputState(st);
+
     switch (ev.key) {
       case 'ArrowLeft':
+        input.left = true;
         movePiece(st, -1, 0);
         ev.preventDefault();
         break;
       case 'ArrowRight':
+        input.right = true;
         movePiece(st, 1, 0);
         ev.preventDefault();
         break;
       case 'ArrowDown':
+        input.down = true;
         dropPiece(st, ui);
+        input.lastSoftDropAt = Date.now();
+        st.lastDrop = Date.now();
         ev.preventDefault();
         break;
       case 'ArrowUp':
       case 'x':
+      case 'X':
+        if (ev.repeat) {
+          ev.preventDefault();
+          break;
+        }
         rotatePieceAction(st);
         ev.preventDefault();
         break;
       case ' ':
+      case 'Spacebar':
+      case 'Space':
+        if (input.hardDropLocked || ev.repeat) {
+          ev.preventDefault();
+          break;
+        }
+        input.hardDropLocked = true;
         hardDrop(st, ui);
         ev.preventDefault();
         break;
@@ -587,7 +644,59 @@ function attachHandlers(els, stRef) {
     }
     save(st);
     render(ui, st);
-  });
+  };
+
+  const onKeyUp = (ev) => {
+    const st = stRef.current;
+    if (!st) return;
+    const input = ensureInputState(st);
+
+    switch (ev.key) {
+      case 'ArrowLeft':
+        input.left = false;
+        break;
+      case 'ArrowRight':
+        input.right = false;
+        break;
+      case 'ArrowDown':
+        input.down = false;
+        break;
+      case ' ':
+      case 'Spacebar':
+      case 'Space':
+        input.hardDropLocked = false;
+        break;
+      default:
+        return;
+    }
+    ev.preventDefault();
+  };
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+}
+
+function applyHeldInput(st, ui, now) {
+  const input = ensureInputState(st);
+  let changed = false;
+
+  if (input.left !== input.right && now - input.lastHorizontalAt >= 90) {
+    const dx = input.left ? -1 : 1;
+    if (movePiece(st, dx, 0)) {
+      changed = true;
+    }
+    input.lastHorizontalAt = now;
+  }
+
+  if (input.down && now - input.lastSoftDropAt >= 60) {
+    if (dropPiece(st, ui)) {
+      changed = true;
+    }
+    input.lastSoftDropAt = now;
+    st.lastDrop = now;
+  }
+
+  return changed;
 }
 
 function startGameLoop(st, ui) {
@@ -602,6 +711,7 @@ function startGameLoop(st, ui) {
       st.dropInterval = null;
       st.playing = false;
       st.paused = false;
+      resetInputState(st);
       save(st);
       return;
     }
@@ -609,6 +719,7 @@ function startGameLoop(st, ui) {
     if (st.paused || st.gameOver || !st.playing) return;
 
     const now = Date.now();
+    const holdChanged = applyHeldInput(st, ui, now);
     const elapsed = now - st.lastDrop;
     const speed = getSpeed(st.level);
 
@@ -620,6 +731,12 @@ function startGameLoop(st, ui) {
         clearInterval(st.dropInterval);
         st.dropInterval = null;
       }
+      save(st);
+      render(ui, st);
+      return;
+    }
+
+    if (holdChanged) {
       save(st);
       render(ui, st);
     }
@@ -701,6 +818,7 @@ export function closeTetris(els) {
   if (st) {
     st.playing = false;
     st.paused = false;
+    resetInputState(st);
     save(st, { immediate: true });
   }
   saver.cancel();

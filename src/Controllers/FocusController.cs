@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add focus defaults API (GET/POST /api/focus/defaults) for extension/main UI config sync.
+
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - Start 接口为 AllowedWebsites 赋默认空列表。
@@ -34,10 +38,12 @@ namespace CapstoneBackend.Controllers;
 public class FocusController : ControllerBase
 {
     private readonly FocusSessionService _focusService;
+    private readonly LocalDataService _dataService;
 
-    public FocusController(FocusSessionService focusService)
+    public FocusController(FocusSessionService focusService, LocalDataService dataService)
     {
         _focusService = focusService;
+        _dataService = dataService;
     }
 
     // 前端点击 Start 时调用：传入专注时长 + 白名单
@@ -104,5 +110,20 @@ public class FocusController : ControllerBase
         {
             PreferredDurationSeconds = seconds
         });
+    }
+
+    [HttpGet("defaults")]
+    public ActionResult<FocusDefaultsDto> GetDefaults()
+    {
+        var defaults = _dataService.GetFocusDefaults();
+        return Ok(defaults);
+    }
+
+    [HttpPost("defaults")]
+    public ActionResult<FocusDefaultsDto> SetDefaults([FromBody] FocusDefaultsDto request)
+    {
+        request ??= new FocusDefaultsDto();
+        var saved = _dataService.SaveFocusDefaults(request);
+        return Ok(saved);
     }
 }

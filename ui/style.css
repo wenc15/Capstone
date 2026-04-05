@@ -1,3 +1,8 @@
+/* 2026/04/05 edited by zhechengxu
+ * Changes:
+ *  - Add styling for apps/websites whitelist display and website warning hint.
+ */
+
 /* 2026/03/29 edited by JS
  * Changes:
  *  - Add Pet view stage background image (pet-back.png).
@@ -2771,6 +2776,15 @@ body{
   color: var(--sub);
 }
 
+.wl-result-item-website {
+  border-bottom: 1px dashed rgba(89, 108, 93, 0.24);
+}
+
+.wl-result-hint-warning {
+  color: #9a6422;
+  font-size: 11px;
+}
+
 .wl-selected-block {
   margin-top: 6px;
 }
@@ -2793,7 +2807,41 @@ body{
   margin-bottom: 4px;
 }
 
+.wl-selected-title-hint {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted-text, #888);
+  font-weight: 400;
+}
+
 .wl-selected-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wl-selected-empty {
+  font-size: 12px;
+  color: var(--sub);
+}
+
+.wl-selected-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wl-selected-line-label {
+  min-width: 68px;
+  color: var(--sub);
+  font-size: 12px;
+  line-height: 24px;
+}
+
+.wl-line-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -2802,9 +2850,10 @@ body{
   gap: 6px;
 }
 
-.wl-selected-empty {
+.wl-line-empty {
   font-size: 12px;
   color: var(--sub);
+  line-height: 24px;
 }
 
 .wl-pill {
@@ -2816,6 +2865,10 @@ body{
   background: var(--chip);
   font-size: 12px;
   color: var(--sub);
+}
+
+.wl-pill-website {
+  background: rgba(95, 141, 109, 0.12);
 }
 
 .wl-pill-remove {

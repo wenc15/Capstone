@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add FocusDefaultsDto for persisted default allowed apps/websites and grace seconds.
+
 // 2026/01/27 edited by Zikai Lu
 // 新增内容：
 //   - StartFocusRequest 新增 AllowedWebsites 字段。
@@ -36,4 +40,11 @@ public class FocusPreferenceRequest
 public class FocusPreferenceResponse
 {
     public int PreferredDurationSeconds { get; set; }
+}
+
+public class FocusDefaultsDto
+{
+    public List<string> AllowedProcesses { get; set; } = new();
+    public List<string> AllowedWebsites { get; set; } = new();
+    public int GraceSeconds { get; set; } = 10;
 }

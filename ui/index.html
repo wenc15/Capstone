@@ -1,3 +1,5 @@
+<!-- 2026/04/05 edited by zhechengxu -->
+<!-- Changes: add Selected apps/websites UI and add violation grace seconds setting input. -->
 <!DOCTYPE html>
 <!--
   2026/03/25 edited by Zhecheng Xu
@@ -259,15 +261,18 @@
           </div>
 
           <div id="whitelistGroup" style="max-width:520px;margin:20px auto;display:flex;flex-direction:column;gap:8px;">
-            <div class="wl-title">Allowed apps (whitelist)</div>
+            <div class="wl-title">Allowed apps/websites (whitelist)</div>
             <div class="wl-search-row">
-              <input id="wlSearchInput" type="text" placeholder="Search apps (Chrome, VS Code...)"/>
+              <input id="wlSearchInput" type="text" placeholder="Search apps or type website (github.com)"/>
               <button id="wlBrowseBtn" type="button" class="wl-browse-btn">Browse</button>
-              <input id="wlBrowseFile" type="file" accept=".exe" style="display:none" />
+              <input id="wlBrowseFile" type="file" accept=".exe,.lnk" style="display:none" />
             </div>
             <div id="wlSearchResults" class="wl-results"></div>
             <div class="wl-selected-block">
-              <div class="wl-selected-title">Selected apps</div>
+              <div class="wl-selected-title">
+                Selected apps/websites
+                <span class="wl-selected-title-hint">(Leave websites empty to allow all websites)</span>
+              </div>
               <ul id="wlSelectedList" class="wl-selected-list"></ul>
               <script>
                 (function applyBootWhitelistSelection() {
@@ -812,6 +817,11 @@
               <input id="settingMusicAutoPlay" type="checkbox" checked />
               <span class="settings-switch-bar"></span>
             </span>
+          </label>
+
+          <label class="settings-field-col" for="settingFocusGraceSeconds">
+            <span>Violation Grace Seconds (5-60)</span>
+            <input id="settingFocusGraceSeconds" class="settings-number" type="number" min="5" max="60" step="1" value="10" />
           </label>
 
           <button class="settings-action settings-action-spaced" id="openMusicFolderBtn" type="button">Open Music Folder</button>

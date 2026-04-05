@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Remove Minigame Devtools mount from app startup.
+
 // 2026/03/19 edited by Zhecheng Xu
 // Changes:
 //  - Mount Settings module for archive export/import UI.
@@ -29,7 +33,6 @@ import { mountMusic } from './js/music.js';
 import { mountMusicDock } from './js/music_dock.js';
 import { mountDiceBuild } from './js/minigame_dicebuild.js';
 import { mountRelaxPrompt } from './js/relax_prompt.js';
-import { mountMinigameDevtools } from './js/minigame_devtools.js';
 import { mountSettings } from './js/settings.js';
 import { mountWeather } from './js/weather.js';
 import { mountSessionSummary } from './js/session_summary.js';
@@ -61,7 +64,6 @@ mountMusic({ els, tracks: resolvedMusicTracks || undefined });
 mountMusicDock(els);
 mountDiceBuild(els);
 mountRelaxPrompt(els);
-mountMinigameDevtools(els);
 mountSettings(els);
 mountSessionSummary(els);
 // 2026/1/22 edited by JS:

@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Start focus from popup using backend defaults (allowed apps/websites + grace seconds).
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Harden start/stop flow with direct backend calls plus background fallback.
@@ -342,16 +346,40 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch(`${BACKEND_BASE_GLOBAL}/api/focus/preference`, { method: "GET", headers: { Accept: "application/json" } });
       let durationSeconds = 25 * 60;
+      let allowedProcesses = ["chrome.exe"];
+      let allowedWebsites = [];
+      let graceSeconds = 10;
       if (res.ok) {
         const pref = await res.json();
         const n = Number(pref?.preferredDurationSeconds ?? pref?.PreferredDurationSeconds);
         if (Number.isFinite(n) && n > 0) durationSeconds = Math.round(n);
       }
 
+      try {
+        const defaultsRes = await fetch(`${BACKEND_BASE_GLOBAL}/api/focus/defaults`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (defaultsRes.ok) {
+          const defaults = await defaultsRes.json();
+          if (Array.isArray(defaults?.allowedProcesses) && defaults.allowedProcesses.length) {
+            allowedProcesses = defaults.allowedProcesses;
+          }
+          if (Array.isArray(defaults?.allowedWebsites)) {
+            allowedWebsites = defaults.allowedWebsites;
+          }
+          const g = Number(defaults?.graceSeconds);
+          if (Number.isFinite(g) && g > 0) graceSeconds = Math.round(g);
+        }
+      } catch {
+        // keep fallback defaults
+      }
+
       const body = {
         durationSeconds,
-        allowedProcesses: ["chrome.exe"],
-        allowedWebsites: [],
+        allowedProcesses,
+        allowedWebsites,
+        graceSeconds,
       };
 
       const r = await fetch(`${BACKEND_BASE_GLOBAL}/api/focus/start`, {

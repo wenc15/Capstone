@@ -1,3 +1,8 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Send website usage in realtime with robust fallback to /api/usage.
+//  - Load focus defaults (allowed apps/websites + grace seconds) before extension start.
+
 // 2026/03/25 edited by Zhecheng Xu
 // Changes:
 //  - Add focus control and status message bridge for popup sync.
@@ -14,8 +19,10 @@ const RENOTIFY_MS = 10 * 1000;
 const RECONNECTFAIL_SLEEP = 5;
 
 // Backend REST API base URL (from `dotnet run` output)
+// 2026/04/05 edited by zhechengxu
 const API_BASE = "http://localhost:5024"; // 🔧 change port if needed
 const USAGE_ENDPOINT = `${API_BASE}/api/usage`; // you'll implement this on backend
+const USAGE_REALTIME_ENDPOINT = `${API_BASE}/api/usage/realtime`;
 const FOCUS_ENDPOINT = `${API_BASE}/api/Focus`;
 
 // 🔧 Turn this ON later when your backend WS server is ready
@@ -41,7 +48,16 @@ let growinActivePage = {
   startTime: "",
   endTime: "",
   duration: 0,
+  realtimeCursorTime: 0,
 };
+
+let realtimeSecondsPending = 0;
+let realtimeSendInFlight = false;
+let isRealtimeEndpointUnavailable = false;
+let hasLoggedRealtimeFallback = false;
+let realtimeDebugWindowStartMs = Date.now();
+let realtimeDebugAccumulatedSeconds = 0;
+let realtimeDebugLastDomain = "";
 
 // =====================================
 // Init
@@ -79,6 +95,10 @@ async function getFocusStatus() {
 
 async function startFocusSession() {
   let durationSeconds = 25 * 60;
+  let allowedProcesses = ["chrome.exe"];
+  let allowedWebsites = [];
+  let graceSeconds = 10;
+
   try {
     const prefRes = await fetch(`${FOCUS_ENDPOINT}/preference`);
     if (prefRes.ok) {
@@ -90,11 +110,32 @@ async function startFocusSession() {
     // fallback to 25min
   }
 
+  try {
+    const defaultsRes = await fetch(`${FOCUS_ENDPOINT}/defaults`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    if (defaultsRes.ok) {
+      const defaults = await defaultsRes.json();
+      if (Array.isArray(defaults?.allowedProcesses) && defaults.allowedProcesses.length) {
+        allowedProcesses = defaults.allowedProcesses;
+      }
+      if (Array.isArray(defaults?.allowedWebsites)) {
+        allowedWebsites = defaults.allowedWebsites;
+      }
+      const g = Number(defaults?.graceSeconds);
+      if (Number.isFinite(g) && g > 0) graceSeconds = Math.round(g);
+    }
+  } catch {
+    // keep fallback defaults
+  }
+
   // ⚠️ This body must match your StartFocusRequest model
   const body = {
     durationSeconds,
-    allowedProcesses: ["chrome.exe"],  // simple example, adjust for your app
-    allowedWebsites: []                // optional
+    allowedProcesses,
+    allowedWebsites,
+    graceSeconds,
   };
 
   try {
@@ -258,6 +299,129 @@ async function sendUsageToBackend(data) {
   }
 }
 
+function queueRealtimeUsage(seconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (!safeSeconds) return;
+  realtimeSecondsPending += safeSeconds;
+  reportRealtimeDebug(safeSeconds);
+  void flushRealtimeUsage();
+}
+
+function reportRealtimeDebug(deltaSeconds) {
+  const now = Date.now();
+  realtimeDebugAccumulatedSeconds += Math.max(0, Number(deltaSeconds) || 0);
+  realtimeDebugLastDomain = String(growinActivePage?.domain || "");
+
+  if (now - realtimeDebugWindowStartMs < 5000) return;
+
+  const windowSeconds = Math.max(0, Math.floor(realtimeDebugAccumulatedSeconds));
+  const domain = realtimeDebugLastDomain || "(unknown)";
+  console.log(
+    `[Growin][Realtime] domain=${domain} +${windowSeconds}s pending=${realtimeSecondsPending}s running=${!!growinActivePage?.url}`
+  );
+
+  realtimeDebugWindowStartMs = now;
+  realtimeDebugAccumulatedSeconds = 0;
+}
+
+async function flushRealtimeUsage() {
+  if (realtimeSendInFlight) return;
+  if (!growinActivePage || !growinActivePage.url) return;
+  if (realtimeSecondsPending <= 0) return;
+
+  realtimeSendInFlight = true;
+
+  try {
+    while (realtimeSecondsPending > 0 && growinActivePage && growinActivePage.url) {
+      const payloadSeconds = 1;
+      realtimeSecondsPending = Math.max(0, realtimeSecondsPending - payloadSeconds);
+
+      try {
+        if (isRealtimeEndpointUnavailable) {
+          await sendRealtimeChunkViaUsageEndpoint(payloadSeconds);
+          continue;
+        }
+
+        const body = [{
+          url: growinActivePage.url,
+          domain: growinActivePage.domain,
+          duration: payloadSeconds,
+        }];
+
+        const res = await fetch(USAGE_REALTIME_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          // Older backend may not expose /api/usage/realtime yet.
+          if (res.status === 404 || res.status === 405) {
+            isRealtimeEndpointUnavailable = true;
+          }
+
+          if (!hasLoggedRealtimeFallback) {
+            hasLoggedRealtimeFallback = true;
+            console.warn(`[Growin] realtime endpoint unavailable (${res.status}), fallback to /api/usage`);
+          }
+
+          await sendRealtimeChunkViaUsageEndpoint(payloadSeconds);
+        }
+      } catch {
+        try {
+          if (!hasLoggedRealtimeFallback) {
+            hasLoggedRealtimeFallback = true;
+            console.warn("[Growin] realtime endpoint request failed, fallback to /api/usage");
+          }
+          await sendRealtimeChunkViaUsageEndpoint(payloadSeconds);
+        } catch {
+          realtimeSecondsPending += payloadSeconds;
+          break;
+        }
+      }
+    }
+  } finally {
+    realtimeSendInFlight = false;
+  }
+
+  if (realtimeSecondsPending > 0 && growinActivePage && growinActivePage.url) {
+    setTimeout(() => {
+      void flushRealtimeUsage();
+    }, 0);
+  }
+}
+
+async function sendRealtimeChunkViaUsageEndpoint(durationSeconds) {
+  if (!growinActivePage || !growinActivePage.url) return;
+
+  const safeSeconds = Math.max(1, Math.floor(Number(durationSeconds) || 0));
+  const endTime = new Date();
+  const startTime = new Date(endTime.getTime() - safeSeconds * 1000);
+  const body = [{
+    url: growinActivePage.url,
+    title: growinActivePage.title || "",
+    icon: growinActivePage.icon || "",
+    domain: growinActivePage.domain || safeGetDomain(growinActivePage.url),
+    startTime: startTime.toISOString(),
+    endTime: endTime.toISOString(),
+    duration: safeSeconds,
+  }];
+
+  const res = await fetch(USAGE_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    throw new Error(`usage fallback failed ${res.status}`);
+  }
+}
+
 
 function startRenotify() {
   setInterval(() => {
@@ -275,7 +439,18 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.active) {
+  if (!tab?.active) return;
+
+  // Prefer URL-driven updates for realtime focus tracking.
+  // Some websites trigger many "complete" updates without meaningful navigation,
+  // which used to reset violation accumulation too often.
+  if (typeof changeInfo?.url === "string" && changeInfo.url.length > 0) {
+    onActivePage(tab);
+    return;
+  }
+
+  // Initial page load fallback.
+  if (changeInfo.status === "complete") {
     onActivePage(tab);
   }
 });
@@ -361,23 +536,54 @@ function getCurrentTab() {
 
 function onActivePage(tab) {
   if (isGrowinSleep) return;
+  if (!tab || !tab.url) return;
+
+  const nextUrl = String(tab.url || "");
+  const nextDomain = safeGetDomain(nextUrl);
+  const now = Date.now();
 
   if (growinActivePage && growinActivePage.url) {
-    if (growinActivePage.url !== tab.url) {
+    const currentDomain = String(growinActivePage.domain || "");
+    const sameUrl = growinActivePage.url === nextUrl;
+    const sameDomain = !!nextDomain && currentDomain === nextDomain;
+
+    if (!sameUrl && !sameDomain) {
       calDuration();
       setActive(tab);
     } else {
-      // same page; reset session start time
-      growinActivePage.pageStartTime = Date.now();
+      // Same site (or same URL): only refresh metadata.
+      // Do not reset realtime cursor, otherwise website violation becomes insensitive.
+      growinActivePage.url = nextUrl;
+      growinActivePage.title = tab.title || growinActivePage.title || "";
+      growinActivePage.icon = tab.favIconUrl || growinActivePage.icon || "";
+      if (nextDomain) {
+        growinActivePage.domain = nextDomain;
+      }
+      if (!growinActivePage.pageStartTime) {
+        growinActivePage.pageStartTime = now;
+      }
+      if (!growinActivePage.realtimeCursorTime) {
+        growinActivePage.realtimeCursorTime = now;
+      }
     }
   } else {
     setActive(tab);
   }
 }
 
+function safeGetDomain(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || ""));
+    return u.hostname || "";
+  } catch {
+    return "";
+  }
+}
+
 function setActive(tab) {
   const { url, title, favIconUrl: icon } = tab;
   if (url && !url.startsWith("chrome://")) {
+    const now = Date.now();
     growinActivePage = {
       url,
       title: title || "",
@@ -386,10 +592,13 @@ function setActive(tab) {
       startTime: new Date().toISOString(),
       endTime: null,
       duration: 0,
-      pageStartTime: Date.now(),
+      pageStartTime: now,
+      realtimeCursorTime: now,
     };
+    realtimeSecondsPending = 0;
   } else {
     growinActivePage = null;
+    realtimeSecondsPending = 0;
   }
 }
 
@@ -418,6 +627,7 @@ function calDuration() {
     );
 
     growinActivePage = null;
+    realtimeSecondsPending = 0;
     notifyGrowinServer(data);
   }
 }
@@ -432,6 +642,16 @@ function startWatchFocus() {
         const tab = await getCurrentTab();
         onActivePage(tab);
         console.warn("[Growin] Focus regained → reset tracking");
+      }
+
+      if (growinActivePage && growinActivePage.url) {
+        const now = Date.now();
+        const cursor = Math.max(0, Number(growinActivePage.realtimeCursorTime || growinActivePage.pageStartTime || now));
+        const deltaSeconds = Math.floor((now - cursor) / 1000);
+        if (deltaSeconds > 0) {
+          growinActivePage.realtimeCursorTime = cursor + deltaSeconds * 1000;
+          queueRealtimeUsage(deltaSeconds);
+        }
       }
     } else {
       if (isChromeFocused) {

@@ -1,3 +1,7 @@
+// 2026/04/05 edited by zhechengxu
+// Changes:
+//  - Add direction queue handling so rapid two-step inputs are processed in order.
+
 // minigame_snake.js
 // A Snake minigame prototype.
 // Notes:
@@ -43,6 +47,7 @@ function defaultState() {
     snake: [],
     direction: { x: 1, y: 0 },
     nextDirection: { x: 1, y: 0 },
+    directionQueue: [],
     food: null,
     score: 0,
     highScore: 0,
@@ -62,6 +67,7 @@ function toPersistedState(st) {
     snake: Array.isArray(st?.snake) ? st.snake : [],
     direction: st?.direction || { x: 1, y: 0 },
     nextDirection: st?.nextDirection || { x: 1, y: 0 },
+    directionQueue: [],
     food: st?.food || null,
     score: Number(st?.score) || 0,
     highScore: Number(st?.highScore) || 0,
@@ -143,6 +149,7 @@ function initGame(st) {
   ];
   st.direction = { x: 1, y: 0 };
   st.nextDirection = { x: 1, y: 0 };
+  st.directionQueue = [];
   st.food = spawnFood(st);
   st.score = 0;
   st.gameOver = false;
@@ -174,13 +181,32 @@ function startGame(st) {
 }
 
 function changeDirection(st, dx, dy) {
-  const curr = st.direction;
-  if (curr.x === -dx && curr.y === -dy) return;
-  st.nextDirection = { x: dx, y: dy };
+  const next = { x: dx, y: dy };
+  if (!Array.isArray(st.directionQueue)) st.directionQueue = [];
+
+  const baseline = st.directionQueue.length
+    ? st.directionQueue[st.directionQueue.length - 1]
+    : (st.nextDirection || st.direction);
+
+  const same = baseline.x === next.x && baseline.y === next.y;
+  const opposite = baseline.x === -next.x && baseline.y === -next.y;
+  if (same || opposite) return;
+
+  if (st.directionQueue.length >= 2) return;
+  st.directionQueue.push(next);
 }
 
 function moveSnake(st, els) {
   if (st.gameOver || !st.playing || st.paused) return;
+
+  if (!Array.isArray(st.directionQueue)) st.directionQueue = [];
+  if (st.directionQueue.length) {
+    const queued = st.directionQueue.shift();
+    const oppositeToCurrent = st.direction.x === -queued.x && st.direction.y === -queued.y;
+    if (!oppositeToCurrent) {
+      st.nextDirection = { ...queued };
+    }
+  }
 
   st.direction = { ...st.nextDirection };
 

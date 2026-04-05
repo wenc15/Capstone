@@ -1,3 +1,9 @@
+/* 2026/04/05 edited by zhechengxu
+ * Changes:
+ *  - Use configurable grace seconds from settings for backend start payload.
+ *  - Improve violation/status sync and start request guarding.
+ */
+
 /* 2026/03/25 edited by Zhecheng Xu
  * Changes:
  *  - Add backend-to-frontend stop sync so external extension stop halts local timer.
@@ -43,6 +49,7 @@ import { renderStats } from './stats.js';
 import {
   initWhitelist,
   getAllowedProcesses,
+  getAllowedWebsites,
   getWhitelistNote,
 } from './whitelist.js';
 
@@ -51,6 +58,7 @@ import { updateSessionSummary } from './session_summary.js';
 import { refreshCredits, getCreditsSnapshot } from './creditsStore.js';
 
 import { offerRelaxAfterFocus } from './relax_prompt.js';
+import { LOCAL_STORAGE_KEYS } from './local_storage.js';
 
 
 export function mountTimer(els) {
@@ -76,6 +84,10 @@ export function mountTimer(els) {
   const BACKEND_DRIFT_CORRECT_THRESHOLD_MS = 1000;
   const TIMER_SELECTED_MINS_KEY = 'growin.timer.selectedMins.v1';
   const TIMER_SELECTED_DURATION_MS_KEY = 'growin.timer.selectedDurationMs.v1';
+  const FOCUS_GRACE_SECONDS_KEY = LOCAL_STORAGE_KEYS.focusGraceSeconds;
+  const DEFAULT_FOCUS_GRACE_SECONDS = 10;
+  const MIN_FOCUS_GRACE_SECONDS = 5;
+  const MAX_FOCUS_GRACE_SECONDS = 60;
   let prefSyncTimer = null;
   let prefRetryTimer = null;
   let pendingPreferredDurationSeconds = null;
@@ -172,7 +184,7 @@ export function mountTimer(els) {
       searchInput.disabled = !enabled;
       searchInput.style.cursor = enabled ? 'text' : 'not-allowed';
       searchInput.placeholder = enabled 
-        ? "Search apps (Chrome, VS Code, Word…)" 
+        ? "Search apps or type website (github.com)" 
         : "Timer running - Whitelist locked";
     }
     if (browseBtn) {
@@ -209,6 +221,22 @@ export function mountTimer(els) {
     return gained;
   }
 
+  function clampFocusGraceSeconds(v) {
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n)) return DEFAULT_FOCUS_GRACE_SECONDS;
+    return Math.max(MIN_FOCUS_GRACE_SECONDS, Math.min(MAX_FOCUS_GRACE_SECONDS, n));
+  }
+
+  function loadFocusGraceSeconds() {
+    try {
+      const raw = localStorage.getItem(FOCUS_GRACE_SECONDS_KEY);
+      if (raw == null) return DEFAULT_FOCUS_GRACE_SECONDS;
+      return clampFocusGraceSeconds(raw);
+    } catch {
+      return DEFAULT_FOCUS_GRACE_SECONDS;
+    }
+  }
+
   async function syncCreditsWithTimeout(timeoutMs = 1800) {
     try {
       return await Promise.race([
@@ -233,17 +261,16 @@ export function mountTimer(els) {
   async function createBackendSession(durationSecondsInput) {
     const durationSeconds = Math.max(1, Math.round(durationSecondsInput));
 
-    // [FIX Bug 1] 校验 Grace Period，不允许负数
-    // 如果想要报错：
-    // if (grace < 0) throw new Error("Grace period cannot be negative");
-    const graceSeconds = Math.max(0, 10); // 强制 >= 0
+    const graceSeconds = loadFocusGraceSeconds();
 
     // Build allowedProcesses from the current whitelist selection
     const allowedProcesses = getAllowedProcesses();
+    const allowedWebsites = getAllowedWebsites();
 
     const body = {
       durationSeconds,
       allowedProcesses,
+      allowedWebsites,
       graceSeconds, 
     };
 
@@ -332,6 +359,7 @@ export function mountTimer(els) {
         backendFlags.violationSeconds = data.violationSeconds ?? 0;
         backendFlags.currentProcess = data.currentProcess ?? null;
         backendFlags.failReason = data.failReason ?? null;
+        backendViolationSyncedAtMs = nowMonotonicMs();
 
         // [FIX Bug 2] 状态恢复：如果后端在跑，前端没跑，则立刻同步 UI
         if (data.isRunning && !isRunning) {
@@ -494,7 +522,7 @@ export function mountTimer(els) {
 
   function startBackendStatusPolling() {
     if (statusTimer) return;
-    statusTimer = setInterval(pollBackendStatusOnce, 1000);
+    statusTimer = setInterval(pollBackendStatusOnce, 500);
   }
 
   function stopBackendStatusPolling() {
@@ -505,7 +533,27 @@ export function mountTimer(els) {
       statusPollAbortController.abort();
     }
     backendFlags = { isFailed: false, isViolating: false, violationSeconds: 0, currentProcess: null, failReason: null };
+    backendViolationSyncedAtMs = nowMonotonicMs();
     broadcastState();
+  }
+
+  function getLiveViolationSeconds() {
+    const base = Math.max(0, Number(backendFlags.violationSeconds ?? 0) || 0);
+    if (!isRunning || !backendFlags.isViolating) return base;
+
+    const now = nowMonotonicMs();
+    const elapsedMs = Math.max(0, now - backendViolationSyncedAtMs);
+    const extra = Math.floor(elapsedMs / 1000);
+    return base + extra;
+  }
+
+  function resetBackendViolationVisualState() {
+    backendFlags.isFailed = false;
+    backendFlags.isViolating = false;
+    backendFlags.violationSeconds = 0;
+    backendFlags.currentProcess = null;
+    backendFlags.failReason = null;
+    backendViolationSyncedAtMs = nowMonotonicMs();
   }
 
 
@@ -528,6 +576,9 @@ export function mountTimer(els) {
     currentProcess: null,
     failReason: null,
   };
+  let backendViolationSyncedAtMs = nowMonotonicMs();
+  let violationDisplayFloorSeconds = 0;
+  let wasDisplayingViolation = false;
 
   let statusTimer = null;
   let statusPollPromise = null;
@@ -535,6 +586,7 @@ export function mountTimer(els) {
   let statusStateVersion = 0;
   // Credits: track backend running edge (for success completion)
   let prevBackendRunning = false;
+  let startRequestInFlight = false;
   let stopRequestInFlight = false;
 
   // Prevent repeating failure side-effects while polling.
@@ -642,12 +694,35 @@ export function mountTimer(els) {
     const syncedSeconds = (running && Number.isFinite(lastRenderedRunningSeconds))
       ? Math.max(0, Number(lastRenderedRunningSeconds))
       : fallbackSeconds;
+    const liveViolationSeconds = getLiveViolationSeconds();
+    const liveIsViolating = backendFlags.isViolating || liveViolationSeconds > 0;
+
+    let displayViolationSeconds = 0;
+    if (running && liveIsViolating) {
+      if (!wasDisplayingViolation) {
+        const first = Math.max(0, Math.floor(liveViolationSeconds));
+        // Reduce first-frame jump (e.g. 10 -> 8) caused by report/poll latency.
+        // Keep close to real value without fully resetting to 0.
+        violationDisplayFloorSeconds = Math.max(0, first - 1);
+        wasDisplayingViolation = true;
+      } else {
+        violationDisplayFloorSeconds = Math.max(
+          violationDisplayFloorSeconds,
+          Math.max(0, Math.floor(liveViolationSeconds))
+        );
+      }
+      displayViolationSeconds = violationDisplayFloorSeconds;
+    } else {
+      violationDisplayFloorSeconds = 0;
+      wasDisplayingViolation = false;
+    }
+
     setFocusStatus({
       isRunning: running,
       remainingSeconds: syncedSeconds,
       isFailed: backendFlags.isFailed,
-      isViolating: backendFlags.isViolating,
-      violationSeconds: backendFlags.violationSeconds,
+      isViolating: running && liveIsViolating,
+      violationSeconds: displayViolationSeconds,
       currentProcess: backendFlags.currentProcess,
       failReason: backendFlags.failReason,
     });
@@ -992,7 +1067,10 @@ export function mountTimer(els) {
   });
 
   startBtn?.addEventListener('click', async () => {
-    if (isRunning) return;
+    if (isRunning || startRequestInFlight) return;
+    startRequestInFlight = true;
+    resetBackendViolationVisualState();
+    broadcastState();
     statusStateVersion += 1;
     if (statusPollAbortController) {
       statusPollAbortController.abort();
@@ -1006,6 +1084,8 @@ export function mountTimer(els) {
       console.error('Start session via backend failed:', err);
       alert('Failed to start focus session (backend). Please try again later.');
       return;
+    } finally {
+      startRequestInFlight = false;
     }
     backendFailureHandled = false;
     startBackendStatusPolling();
