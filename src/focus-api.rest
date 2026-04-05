@@ -61,7 +61,7 @@ Content-Type: application/json
 {
   "durationSeconds": 60,
   "allowedProcesses": ["chrome.exe", "notepad.exe", "Code.exe"],
-  "allowedWebsites": ["https://leetcode.com", "github.com"],
+  "allowedWebsites": ["https://leetcode.com", "github.com", "google.com"],
   "graceSeconds": 10
 }
 
@@ -186,7 +186,7 @@ Content-Type: application/json
 {
   "name": "Study - Chrome + VSCode",
   "allowedProcesses": ["chrome.exe", "Code.exe"],
-  "allowedWebsites": ["https://leetcode.com", "github.com"]
+  "allowedWebsites": ["https://leetcode.com", "github.com","google.com"]
 }
 
 ###

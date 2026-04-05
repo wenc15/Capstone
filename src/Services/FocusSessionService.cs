@@ -418,23 +418,47 @@ public class FocusSessionService
             return string.Empty;
 
         var raw = value.Trim();
+        string host;
+
         if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
-            return uri.Host;
+            host = uri.Host;
+        else if (Uri.TryCreate("https://" + raw, UriKind.Absolute, out uri))
+            host = uri.Host;
+        else
+            host = raw.ToLowerInvariant();
 
-        if (Uri.TryCreate("https://" + raw, UriKind.Absolute, out uri))
-            return uri.Host;
+        return host.Trim('.').ToLowerInvariant();
+    }
 
-        return raw.ToLowerInvariant();
+    private static string RemoveOptionalWwwPrefix(string domain)
+    {
+        if (domain.StartsWith("www.", StringComparison.OrdinalIgnoreCase) && domain.Length > 4)
+        {
+            var withoutWww = domain[4..];
+            if (withoutWww.Contains('.'))
+                return withoutWww;
+        }
+
+        return domain;
     }
 
     private bool IsDomainAllowed(string domain)
     {
-        if (_websiteWhitelist.Contains(domain))
+        var normalizedDomain = NormalizeDomain(domain);
+        var domainWithoutWww = RemoveOptionalWwwPrefix(normalizedDomain);
+
+        if (_websiteWhitelist.Contains(normalizedDomain) || _websiteWhitelist.Contains(domainWithoutWww))
             return true;
 
         foreach (var allowed in _websiteWhitelist)
         {
-            if (domain.EndsWith("." + allowed, StringComparison.OrdinalIgnoreCase))
+            var normalizedAllowed = NormalizeDomain(allowed);
+            var allowedWithoutWww = RemoveOptionalWwwPrefix(normalizedAllowed);
+
+            if (normalizedDomain.EndsWith("." + normalizedAllowed, StringComparison.OrdinalIgnoreCase)
+                || normalizedDomain.EndsWith("." + allowedWithoutWww, StringComparison.OrdinalIgnoreCase)
+                || domainWithoutWww.EndsWith("." + normalizedAllowed, StringComparison.OrdinalIgnoreCase)
+                || domainWithoutWww.EndsWith("." + allowedWithoutWww, StringComparison.OrdinalIgnoreCase))
                 return true;
         }
 
