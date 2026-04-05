@@ -897,6 +897,15 @@ export function mountTimer(els) {
     const { mins, secs } = getDurationParts(selectedDurationMs);
     input.value = part === 'min' ? String(mins).padStart(2, '0') : String(secs).padStart(2, '0');
     input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+        ev.preventDefault();
+        const start = clampCaretForTwoDigits(input.selectionStart ?? 0);
+        const delta = ev.key === 'ArrowLeft' ? -1 : 1;
+        const next = Math.max(0, Math.min(1, start + delta));
+        setOverwriteCaret(input, next);
+        return;
+      }
+
       if (ev.key >= '0' && ev.key <= '9') {
         ev.preventDefault();
         const start = clampCaretForTwoDigits(input.selectionStart ?? 2);
