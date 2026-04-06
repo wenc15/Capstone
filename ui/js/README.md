@@ -31,9 +31,8 @@ Please install the following before running the frontend locally:
 
 You can check your installation with:
 
-```bash
-node -v
-npm -v
+- node -v
+- npm -v
 
 ## Install Dependencies:
 
@@ -51,9 +50,9 @@ Before starting the frontend, make sure the backend is already running.
 
 In a separate terminal, start the backend first:
 
-cd src
-dotnet run
+- cd src
+- dotnet run
 
 Then, in the ui folder, run:
 
-npm start
+- npm start
