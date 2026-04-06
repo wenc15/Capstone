@@ -178,7 +178,7 @@ public class LocalDataService
     }
 
     // 作用：根据一次专注会话结果更新用户 profile 里的统计信息。
-    //       现在会额外统计 Aborted -> CanceledSessions，同时按照 ceil(专注分钟数) 奖励点数（Credits）。
+    //       额外统计 Aborted -> CanceledSessions；仅在 Success 时按 ceil(专注分钟数) 奖励点数（Credits）。
     // =============================================================
     public void RecordSession(SessionOutcome outcome, int focusSeconds)
     {
@@ -211,22 +211,20 @@ public class LocalDataService
                     break;
             }
 
-            // 新增：按分钟数奖励点数，使用 ceil 原则
-            // 例如：5.1 分钟 → 6 点；0.1 分钟 → 1 点（若本次有时长）
-            var minutes = (int)Math.Ceiling(safeSeconds / 60.0);
-            if (minutes > 0)
+            // Credits 只在“成功完成”的会话中发放。
+            // 使用 ceil 原则：例如 5.1 分钟 -> 6 点；用于避免计时抖动导致少发。
+            if (outcome == SessionOutcome.Success)
             {
-                profile.Credits += minutes;
-
-
-            // 成就系统：累计获得点数（历史总获得 Credits，不受花费影响）
-                if (profile.AchievementCounters == null)
+                var minutes = (int)Math.Ceiling(safeSeconds / 60.0);
+                if (minutes > 0)
                 {
-                profile.AchievementCounters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                }
-                profile.AchievementCounters.TryGetValue("credits_earned_total", out var earned);
-                profile.AchievementCounters["credits_earned_total"] = checked(earned + minutes);
+                    profile.Credits += minutes;
 
+                    // 成就系统：累计获得点数（历史总获得 Credits，不受花费影响）
+                    profile.AchievementCounters ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    profile.AchievementCounters.TryGetValue("credits_earned_total", out var earned);
+                    profile.AchievementCounters["credits_earned_total"] = checked(earned + minutes);
+                }
             }
             SaveUserProfile(profile);
         }
