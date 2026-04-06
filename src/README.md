@@ -36,7 +36,7 @@ Please install the following before running the backend locally:
 
 You can check your installation with:
 
-```bash
+bash
 dotnet --version
 
 
@@ -44,7 +44,7 @@ dotnet --version
 
 Open a terminal in the src folder and run:
 
-dotnet run
+- dotnet run
 
 If the backend starts successfully, you should see output similar to:
 
