@@ -127,6 +127,14 @@ After loading it, the GrowIn extension should appear in your Chrome extensions l
 ## Running From Source
 
 ### Backend
-```bash
-cd src
-dotnet run
+bash
+- cd src
+- dotnet run
+
+
+## Local Development and Testing
+
+For users or TAs who would like to test the project locally from source code, please refer to the README files inside each subfolder:
+
+- `src/README.md` — backend running instructions
+- `ui/README.md` — frontend running instructions
