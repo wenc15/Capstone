@@ -24,7 +24,7 @@
 // =============================================================
 
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, session, shell, dialog } = require('electron');
-
+const { spawn } = require('child_process');
 const { placeBallAtOldWidgetSpot } = require('./js/ballPositioner');
 
 const fs = require('fs');
@@ -55,7 +55,50 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
 });
 let appSettings = { ...DEFAULT_APP_SETTINGS };
 
+let backendProcess = null;
+
 const MUSIC_EXTS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac']);
+
+
+
+function getBackendExecutablePath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'backend', 'CapstoneBackend.exe');
+  }
+  return path.join(__dirname, 'backend', 'CapstoneBackend.exe');
+}
+
+function startBackend() {
+  const backendPath = getBackendExecutablePath();
+
+  if (!fs.existsSync(backendPath)) {
+    console.error('[Backend] Executable not found:', backendPath);
+    return;
+  }
+
+  backendProcess = spawn(backendPath, [], {
+    cwd: path.dirname(backendPath),
+    detached: false,
+    stdio: 'pipe'
+  });
+
+  backendProcess.stdout.on('data', (data) => {
+    console.log(`[Backend] ${data.toString()}`);
+  });
+
+  backendProcess.stderr.on('data', (data) => {
+    console.error(`[Backend Error] ${data.toString()}`);
+  });
+
+  backendProcess.on('close', (code) => {
+    console.log(`[Backend] exited with code ${code}`);
+    backendProcess = null;
+  });
+
+  backendProcess.on('error', (err) => {
+    console.error('[Backend] failed to start:', err);
+  });
+}
 
 function getMusicFolder() {
   return path.join(__dirname, 'music');
@@ -466,6 +509,7 @@ app.whenReady().then(() => {
   // Allow geolocation for renderer (used by weather module).
   // Electron does not show Chromium permission prompts by default,
   // so we handle the permission request here.
+  startBackend();
   const ses = session?.defaultSession;
   if (ses) {
     ses.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -501,6 +545,19 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+
+app.on('before-quit', () => {
+  isQuitting = true;
+
+  if (backendProcess) {
+    try {
+      backendProcess.kill();
+    } catch (err) {
+      console.error('[Backend] failed to kill process:', err);
+    }
+  }
 });
 
 // （可选）穿透点击

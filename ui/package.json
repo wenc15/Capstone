@@ -1,19 +1,39 @@
 {
   "name": "growin",
   "version": "1.0.0",
-  "description": "",
+  "description": "GrowIn desktop application",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
   },
   "keywords": [],
   "author": "Jingyao Sun, Qinquan Wang",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^39.1.2"
+    "electron": "^39.1.2",
+    "electron-builder": "^25.1.8"
   },
   "dependencies": {
     "music-metadata": "^10.9.1"
+  },
+  "build": {
+    "appId": "com.growin.app",
+    "productName": "GrowIn",
+    "files": [
+      "**/*",
+      "!backend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    }
   }
 }

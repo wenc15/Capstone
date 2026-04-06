@@ -1,17 +1,28 @@
+# Dependencies
 node_modules/
+ui/node_modules/
 
 # .NET build output
 **/bin/
 **/obj/
+.vs/
 
-# Frontend build output and local artifacts
+# Published / packaged output
+src/publish/
+ui/backend/
+ui/dist/
 dist/
 out/
+
+# Logs and OS files
 *.log
 .DS_Store
 Thumbs.db
 
 # Local SQLite database files
+*.db
+*.db-shm
+*.db-wal
 src/growin.db
 src/growin.db-shm
 src/growin.db-wal
