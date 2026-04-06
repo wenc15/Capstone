@@ -1,53 +1,59 @@
-🟦 Capstone 前端（Electron）运行说明
+# GrowIn Frontend (UI)
 
-本文件说明：**从零开始** 如何跑起来前端界面（包含计时器 + widget），以及如何和后端一起联动测试。
+This folder contains the Electron frontend for GrowIn.
 
----
+## Overview
 
-## 1. 必装
+The frontend provides the main desktop user interface of GrowIn. It allows users to interact with the core features of the app, including:
 
-1. **Node.js（自带 npm）**
-   - 安装 LTS 版本（搜索node.js官网下一键安装即可）。
-   - 安装完成后，在终端里检查：
-     node -v
-     output: v24.11.0
-     npm -v
-     output: 11.6.1
+- focus sessions
+- whitelist management
+- statistics and achievements
+- food and skin gacha
+- pet interaction
+- minigames during break periods
 
-2. 在 `ui` 目录里执行 `npm install`，会自动把 Electron 和其它依赖(文件夹：node_modules)一起装好。
-依然是在此目录，执行 `npm start` 打开electron窗口。
+## Tech Used
 
-## 2. 下载项目代码
+- Electron
+- HTML
+- CSS
+- JavaScript
+- REST API
+- WebSocket
 
-如果是第一次拿代码，请在你想放项目的目录里执行：
+## Requirements
+
+Please install the following before running the frontend locally:
+
+- Node.js (LTS version recommended)
+- npm
+
+You can check your installation with:
 
 ```bash
-git clone https://github.com/wenc15/Capstone.git
-cd 
-```
-项目默认会停在 main 分支，而前端正在开发的代码在 feat/frontend。
-因此需要切换到前端分支:
-```bash
-git checkout feat/frontend
-git pull
-```
-## 3. 前后端联动测试
-在一个终端窗口中：
-```bash
+node -v
+npm -v
+
+## Install Dependencies:
+
+Open a terminal in the ui folder and run:
+
+npm install
+
+This will install Electron and other frontend dependencies.
+
+## Local Frontend + Backend Test Flow
+
+If a packaged GrowIn .exe is already open, close it before running the frontend locally
+
+Before starting the frontend, make sure the backend is already running.
+
+In a separate terminal, start the backend first:
+
 cd src
 dotnet run
-```
-看到类似`Now listening on: http://localhost:5024`说明成功。
 
-再开一个新的终端窗口：
-```bash
-cd ui
+Then, in the ui folder, run:
+
 npm start
-```
-## 4. 前端修改 push （非常重要！）
-首先`git branch`检查确认在feat/frontend这个branch，然后执行：
-```bash
-git add .
-git commit -m "your message here"
-git push origin feat/frontend
-```
