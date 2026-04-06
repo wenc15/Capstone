@@ -3,7 +3,7 @@
 
 ## `src/README.md`
 
-```md
+
 # GrowIn Backend (src)
 
 This folder contains the ASP.NET Core backend for GrowIn.
