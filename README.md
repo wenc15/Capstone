@@ -1,4 +1,4 @@
-# 🌱 GrowIn
+# 🌱 GrowIn(Windows System Only)
 
 GrowIn is a gamified productivity desktop application designed to help users stay focused while making study or work sessions more engaging and rewarding. Instead of treating focus as a repetitive task, GrowIn combines a timer-based focus system with interactive features such as rewards, progress tracking, and whitelist-based distraction control.
 
