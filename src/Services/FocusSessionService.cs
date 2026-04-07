@@ -147,6 +147,10 @@ public class FocusSessionService
         "iexplore",
     };
 
+    private static readonly HashSet<string> AlwaysAllowedProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "growin"
+    };
     private static readonly TimeSpan WebsiteViolationStateTtl = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CrossChannelViolationBridgeWindow = TimeSpan.FromSeconds(2);
 
@@ -275,7 +279,10 @@ public class FocusSessionService
 
             if (!string.IsNullOrWhiteSpace(normalized))
             {
-                bool isAllowed = _whitelist.Contains(normalized) || _sessionTrustedProcesses.Contains(normalized);
+                bool isAllowed =
+                                AlwaysAllowedProcesses.Contains(normalized) ||
+                                _whitelist.Contains(normalized) ||
+                                _sessionTrustedProcesses.Contains(normalized);
 
                 if (!isAllowed && active is not null && TryAutoTrustByParent(active, normalized))
                 {

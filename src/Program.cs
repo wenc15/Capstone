@@ -46,6 +46,7 @@ using System.Linq;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("http://localhost:5024");
 
 // -------------------------------------------------------------
 // 服务注册（依赖注入）

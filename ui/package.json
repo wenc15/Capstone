@@ -1,10 +1,11 @@
 {
   "name": "growin",
   "version": "1.0.0",
-  "description": "",
+  "description": "GrowIn desktop application",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "dist": "electron-builder --win portable",
     "test": "npm run test:unit",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
@@ -17,10 +18,29 @@
   "devDependencies": {
     "@playwright/test": "^1.54.2",
     "electron": "^39.1.2",
+    "electron-builder": "^25.1.8",
     "jsdom": "^24.1.3",
     "vitest": "^2.1.8"
   },
   "dependencies": {
     "music-metadata": "^10.9.1"
+  },
+  "build": {
+    "appId": "com.growin.app",
+    "productName": "GrowIn",
+    "files": [
+      "**/*",
+      "!backend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    }
   }
 }
