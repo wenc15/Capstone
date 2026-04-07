@@ -1,0 +1,4 @@
+﻿"date","endpoint","count","p50_ms","p95_ms","target_p95_ms","result","notes"
+"2026-04-07","/api/focus/status","200","16.446","20.529","50","PASS","localhost"
+"2026-04-07","/api/focus/history","200","15.31","16.392","100","PASS","localhost"
+"2026-04-07","/api/usage/today","200","15.578","17.159","150","PASS","localhost"

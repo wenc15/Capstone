@@ -1,0 +1,34 @@
+﻿{
+    "totalFocusSeconds":  154,
+    "totalSessions":  28,
+    "successfulSessions":  0,
+    "failedSessions":  6,
+    "canceledSessions":  22,
+    "credits":  20,
+    "petGrowth":  [
+
+                  ],
+    "inventory":  {
+
+                  },
+    "collection":  {
+
+                   },
+    "activeSkinsByGame":  {
+
+                          },
+    "activePetId":  3,
+    "feedingPetId":  3,
+    "unlockedPetIds":  [
+                           3
+                       ],
+    "achievementCounters":  {
+                                "credits_earned_total":  20
+                            },
+    "unlockedAchievements":  [
+
+                             ],
+    "achievementUnlockedAt":  {
+
+                              }
+}

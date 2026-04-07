@@ -1,0 +1,9 @@
+﻿{
+    "isRunning":  true,
+    "remainingSeconds":  18,
+    "isFailed":  false,
+    "failReason":  null,
+    "isViolating":  true,
+    "violationSeconds":  2,
+    "currentProcess":  "WindowsTerminal"
+}

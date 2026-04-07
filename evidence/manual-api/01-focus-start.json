@@ -1,0 +1,9 @@
+﻿{
+    "isRunning":  true,
+    "remainingSeconds":  20,
+    "isFailed":  false,
+    "failReason":  null,
+    "isViolating":  false,
+    "violationSeconds":  0,
+    "currentProcess":  null
+}

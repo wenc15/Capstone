@@ -1,0 +1,110 @@
+﻿[
+    {
+        "name":  "Automated tests discovery and execution",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:38"
+    },
+    {
+        "name":  "Core API chain: start/status/stop",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:44"
+    },
+    {
+        "name":  "Core API chain: profile and history",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:44"
+    },
+    {
+        "name":  "Core API chain: whitelist CRUD",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:45"
+    },
+    {
+        "name":  "Core API chain: usage ingest and today summary",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:45"
+    },
+    {
+        "name":  "Exception path: duplicate start returns 409",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:45"
+    },
+    {
+        "name":  "Exception path: invalid payload returns 400",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:45"
+    },
+    {
+        "name":  "Exception path: delete non-existing preset returns 404",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:45"
+    },
+    {
+        "name":  "Performance: three API endpoints",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:00:55"
+    },
+    {
+        "name":  "Performance: timer drift",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:01:15"
+    },
+    {
+        "name":  "Performance: backend CPU and memory",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:01:56"
+    },
+    {
+        "name":  "Extended: missing profile file fallback",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:01:57"
+    },
+    {
+        "name":  "Extended: corrupted whitelist file fallback",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:01:57"
+    },
+    {
+        "name":  "Extended: violation to failed full path",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:02:00"
+    },
+    {
+        "name":  "Extended: usage boundaries (empty and duplicates)",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:02:00"
+    },
+    {
+        "name":  "Frontend unit tests (Vitest)",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:02:02"
+    },
+    {
+        "name":  "Frontend E2E smoke tests (Playwright)",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:02:04"
+    },
+    {
+        "name":  "Performance: UI update latency",
+        "status":  "PASS",
+        "details":  "ok",
+        "time":  "2026-04-07T17:02:15"
+    }
+]

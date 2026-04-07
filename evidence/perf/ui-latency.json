@@ -1,0 +1,9 @@
+{
+  "capturedAt": "2026-04-07T21:02:15.324Z",
+  "mode": "synthetic-render-fallback",
+  "sampleCount": 200,
+  "p50Ms": 16.7,
+  "p95Ms": 18,
+  "targetMs": 200,
+  "result": "PASS"
+}

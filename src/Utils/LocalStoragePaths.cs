@@ -33,14 +33,24 @@ namespace CapstoneBackend.Utils;
 
 public static class LocalStoragePaths
 {
+    private static string ResolveBaseDirectory()
+    {
+        var overridePath = Environment.GetEnvironmentVariable("GROWIN_BASE_DIR");
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            return overridePath;
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Growin");
+    }
+
     /// <summary>
     /// Growin 的根目录，例如：
     /// C:\Users\xxx\AppData\Roaming\Growin
     /// </summary>
-    public static string BaseDirectory { get; } =
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Growin");
+    public static string BaseDirectory { get; } = ResolveBaseDirectory();
 
     /// <summary>用户 profile 文件路径：user_profile.json</summary>
     public static string UserProfileFilePath =>

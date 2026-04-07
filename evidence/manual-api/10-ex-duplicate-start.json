@@ -1,0 +1,4 @@
+﻿{
+    "body":  "{\"error\":\"A focus session is already running\"}",
+    "status":  409
+}

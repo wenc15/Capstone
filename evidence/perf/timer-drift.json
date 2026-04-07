@@ -1,0 +1,130 @@
+﻿{
+    "capturedAt":  "2026-04-07T17:01:15.6670222-04:00",
+    "sampleCount":  20,
+    "maxAbsDriftSeconds":  0,
+    "avgAbsDriftSeconds":  0,
+    "targetMaxAbsDriftSeconds":  2,
+    "result":  "PASS",
+    "samples":  [
+                    {
+                        "t":  1,
+                        "expectedRemainingSeconds":  39,
+                        "reportedRemainingSeconds":  39,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  2,
+                        "expectedRemainingSeconds":  38,
+                        "reportedRemainingSeconds":  38,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  3,
+                        "expectedRemainingSeconds":  37,
+                        "reportedRemainingSeconds":  37,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  4,
+                        "expectedRemainingSeconds":  36,
+                        "reportedRemainingSeconds":  36,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  5,
+                        "expectedRemainingSeconds":  35,
+                        "reportedRemainingSeconds":  35,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  6,
+                        "expectedRemainingSeconds":  34,
+                        "reportedRemainingSeconds":  34,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  7,
+                        "expectedRemainingSeconds":  33,
+                        "reportedRemainingSeconds":  33,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  8,
+                        "expectedRemainingSeconds":  32,
+                        "reportedRemainingSeconds":  32,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  9,
+                        "expectedRemainingSeconds":  31,
+                        "reportedRemainingSeconds":  31,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  10,
+                        "expectedRemainingSeconds":  30,
+                        "reportedRemainingSeconds":  30,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  11,
+                        "expectedRemainingSeconds":  29,
+                        "reportedRemainingSeconds":  29,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  12,
+                        "expectedRemainingSeconds":  28,
+                        "reportedRemainingSeconds":  28,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  13,
+                        "expectedRemainingSeconds":  27,
+                        "reportedRemainingSeconds":  27,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  14,
+                        "expectedRemainingSeconds":  26,
+                        "reportedRemainingSeconds":  26,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  15,
+                        "expectedRemainingSeconds":  25,
+                        "reportedRemainingSeconds":  25,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  16,
+                        "expectedRemainingSeconds":  24,
+                        "reportedRemainingSeconds":  24,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  17,
+                        "expectedRemainingSeconds":  23,
+                        "reportedRemainingSeconds":  23,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  18,
+                        "expectedRemainingSeconds":  22,
+                        "reportedRemainingSeconds":  22,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  19,
+                        "expectedRemainingSeconds":  21,
+                        "reportedRemainingSeconds":  21,
+                        "driftSeconds":  0
+                    },
+                    {
+                        "t":  20,
+                        "expectedRemainingSeconds":  20,
+                        "reportedRemainingSeconds":  20,
+                        "driftSeconds":  0
+                    }
+                ]
+}

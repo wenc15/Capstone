@@ -1,0 +1,115 @@
+﻿{
+    "capturedAt":  "2026-04-07T17:01:56.9826141-04:00",
+    "sampleCount":  20,
+    "avgCpuPercent":  0,
+    "peakCpuPercent":  0,
+    "peakMemoryMb":  139.801,
+    "targets":  {
+                    "avgCpuPercent":  5,
+                    "peakCpuPercent":  20,
+                    "peakMemoryMb":  300
+                },
+    "result":  "PASS",
+    "samples":  [
+                    {
+                        "timestamp":  "2026-04-07T17:01:17.8221060-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.785
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:19.8876028-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.801
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:21.9473919-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.801
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:24.0107829-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.047
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:26.0751730-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.098
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:28.1241428-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.098
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:30.1924810-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.48
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:32.2599162-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.484
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:34.3123422-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.383
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:36.3683150-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.383
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:38.4204387-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.359
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:40.4848584-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.336
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:42.5364232-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.336
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:44.6103949-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.312
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:46.6731107-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.312
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:48.7377183-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.312
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:50.8034753-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  138.703
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:52.8717290-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  138.703
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:54.9119991-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.555
+                    },
+                    {
+                        "timestamp":  "2026-04-07T17:01:56.9776079-04:00",
+                        "cpuPercent":  0,
+                        "memoryMb":  139.555
+                    }
+                ]
+}

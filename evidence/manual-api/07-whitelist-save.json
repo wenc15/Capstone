@@ -1,0 +1,13 @@
+﻿{
+    "id":  "401a52368cd94576998cf162d829588a",
+    "name":  "vv-preset-0104a9b9",
+    "allowedProcesses":  [
+                             "powershell.exe",
+                             "Code.exe"
+                         ],
+    "allowedWebsites":  [
+                            "github.com"
+                        ],
+    "createdAt":  "2026-04-07T21:00:44.9577404+00:00",
+    "updatedAt":  "2026-04-07T21:00:44.9577764+00:00"
+}
